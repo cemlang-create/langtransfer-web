@@ -974,15 +974,9 @@ function beinPreisBerechnen(fahrtplan, fahrgaeste){
 
   const endpreis = aktionGilt ? aktionGesamt : regulaer;
 
-  // Allgemeiner Einführungsrabatt (10 % auf reguläre Fahrten bis 20.12.,
-  // ausgenommen die bereits stark rabattierten GVV<->Flughafen-Transfers)
-  const allgemeinerRabattProzent = (!aktionGilt && fahrtplan.abholung <= AKTION_BIS) ? 10 : 0;
-  const endpreisNachEinfuehrung = endpreis * (1 - allgemeinerRabattProzent / 100);
-
   return {
     grundpreis, nachtzuschlag, fahrgastzuschlag, zusatzFahrgaeste, regulaer,
-    aktionGilt, aktionBasis, umwegAufschlag, aktionGesamt, endpreis,
-    allgemeinerRabattProzent, endpreisNachEinfuehrung
+    aktionGilt, aktionBasis, umwegAufschlag, aktionGesamt, endpreis
   };
 }
 
@@ -1033,9 +1027,18 @@ async function preisBerechnen(){
 
   const regulaer = hin.regulaer + (ruck ? ruck.regulaer : 0);
   const anyAktionGilt = hin.aktionGilt || (ruck && ruck.aktionGilt);
-  const anyAllgemeinerRabatt = hin.allgemeinerRabattProzent > 0 || (ruck && ruck.allgemeinerRabattProzent > 0);
-  const endpreisNachEinfuehrungsrabatt = hin.endpreisNachEinfuehrung + (ruck ? ruck.endpreisNachEinfuehrung : 0);
-  const einfuehrungsErsparnisGesamt = (hin.endpreis - hin.endpreisNachEinfuehrung) + (ruck ? (ruck.endpreis - ruck.endpreisNachEinfuehrung) : 0);
+  // Wenn Hin- UND Rückfahrt beide das Flughafen-Einführungsangebot erfüllen,
+  // gilt nicht 2× der Einzelpreis, sondern der Paketpreis laut Flyer
+  // ("Paket Hin & Zurück", 85 €, Zuschläge s. u.).
+  const beidePaketAktion = !!(ruck && hin.aktionGilt && ruck.aktionGilt);
+
+  let endpreisVorRabatt;
+  if (beidePaketAktion) {
+    const paketBasis = fahrgaeste >= 5 ? 105 : 85; // analog zum 10-€-Aufschlag/Fahrt ab 5 Personen
+    endpreisVorRabatt = paketBasis + hin.nachtzuschlag + ruck.nachtzuschlag + hin.umwegAufschlag + ruck.umwegAufschlag;
+  } else {
+    endpreisVorRabatt = hin.endpreis + (ruck ? ruck.endpreis : 0);
+  }
 
   // ---------- Gutschein (gilt einmalig auf den Gesamtpreis) ----------
   const gutscheinCode = document.getElementById("gutschein").value.trim();
@@ -1066,32 +1069,50 @@ async function preisBerechnen(){
       gutscheinStatusEl.classList.add("warn");
     }
   }
-  const endpreisNachRabatt = endpreisNachEinfuehrungsrabatt * (1 - rabattProzent / 100);
+
+  // ---------- Rabatt anwenden: Gutschein ODER allgemeiner Einführungsrabatt, nie beides ----------
+  const beideVorAktionBis = plan.abholung <= AKTION_BIS && (!ruck || planRueck.abholung <= AKTION_BIS);
+  let allgemeinerRabattAktiv = false;
+  let endpreisNachRabatt;
+  if (rabattProzent > 0) {
+    endpreisNachRabatt = endpreisVorRabatt * (1 - rabattProzent / 100);
+  } else if (!anyAktionGilt && beideVorAktionBis) {
+    allgemeinerRabattAktiv = true;
+    endpreisNachRabatt = endpreisVorRabatt * 0.9;
+  } else {
+    endpreisNachRabatt = endpreisVorRabatt;
+  }
   const netto = endpreisNachRabatt / 1.19;
   const mwst = endpreisNachRabatt - netto;
 
   // ---------- Ausgabe ----------
-  document.getElementById("priceOut").innerHTML = (anyAktionGilt || anyAllgemeinerRabatt || rabattProzent > 0)
+  document.getElementById("priceOut").innerHTML = (anyAktionGilt || allgemeinerRabattAktiv || rabattProzent > 0)
     ? `<span class="alt">${fmt(regulaer)} €</span>${fmt(endpreisNachRabatt)} <span class="eur">€</span>`
     : `${fmt(regulaer)} <span class="eur">€</span>`;
   const aktionEl = document.getElementById("aktionText");
-  aktionEl.style.display = (anyAktionGilt || anyAllgemeinerRabatt) ? "block" : "none";
-  aktionEl.textContent = anyAktionGilt
-    ? "Einführungsangebot Flughafentransfer – gültig bis 20.12.2026"
-    : "Einführungsangebot: 10 % Rabatt – gültig bis 20.12.2026";
+  aktionEl.style.display = (anyAktionGilt || allgemeinerRabattAktiv) ? "block" : "none";
+  aktionEl.textContent = beidePaketAktion
+    ? "Einführungsangebot Flughafentransfer – Hin- und Rückfahrt-Paket – gültig bis 20.12.2026"
+    : anyAktionGilt
+      ? "Einführungsangebot Flughafentransfer – gültig bis 20.12.2026"
+      : "Einführungsangebot: 10 % Rabatt – gültig bis 20.12.2026";
 
   let r = beinAufschluesseln(ruck ? "Hinfahrt – " : "", hin, plan, fahrgaeste);
   if (ruck) r += beinAufschluesseln("Rückfahrt – ", ruck, planRueck, fahrgaeste);
+  if (beidePaketAktion) {
+    r += `<div class="titel"><span>Einführungsangebot Hin- und Rückfahrt-Paket</span><span></span></div>`;
+    r += `<div><span>Paketpreis (${fahrgaeste >= 5 ? "ab 5" : "bis 4"} Fahrgäste)</span><span>${fmt(fahrgaeste >= 5 ? 105 : 85)} €</span></div>`;
+  }
   r += `<div class="titel"><span>Endbetrag</span><span></span></div>`;
   r += `<div><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
   r += `<div><span>zzgl. MwSt. 19 %</span><span>${fmt(mwst)} €</span></div>`;
-  if (anyAllgemeinerRabatt) {
-    r += `<div><span>Preis vor Rabatt</span><span>${fmt(regulaer)} €</span></div>`;
-    r += `<div><span>Einführungsangebot (-10%)</span><span>-${fmt(einfuehrungsErsparnisGesamt)} €</span></div>`;
+  if (allgemeinerRabattAktiv) {
+    r += `<div><span>Preis vor Rabatt</span><span>${fmt(endpreisVorRabatt)} €</span></div>`;
+    r += `<div><span>Einführungsangebot (-10%)</span><span>-${fmt(endpreisVorRabatt - endpreisNachRabatt)} €</span></div>`;
   }
   if (rabattProzent > 0) {
-    r += `<div><span>Preis vor Gutschein</span><span>${fmt(endpreisNachEinfuehrungsrabatt)} €</span></div>`;
-    r += `<div><span>Gutschein (-${rabattProzent}%)</span><span>-${fmt(endpreisNachEinfuehrungsrabatt - endpreisNachRabatt)} €</span></div>`;
+    r += `<div><span>Preis vor Gutschein</span><span>${fmt(endpreisVorRabatt)} €</span></div>`;
+    r += `<div><span>Gutschein (-${rabattProzent}%)</span><span>-${fmt(endpreisVorRabatt - endpreisNachRabatt)} €</span></div>`;
   }
   r += `<div class="total"><span>Gesamtpreis (brutto)</span><span>${fmt(endpreisNachRabatt)} €</span></div>`;
   document.getElementById("preisTabelle").innerHTML = r;
@@ -1101,7 +1122,7 @@ async function preisBerechnen(){
     fahrgaeste, ab12, unter12, gross, klein,
     grossKoffer, grossTasche, kleinKoffer, kleinTasche, sonstiges,
     endpreisNachRabatt, netto, mwst, rabattProzent,
-    allgemeinerRabattProzent: anyAllgemeinerRabatt ? 10 : 0, aktionGilt: anyAktionGilt,
+    allgemeinerRabattProzent: allgemeinerRabattAktiv ? 10 : 0, aktionGilt: anyAktionGilt,
     hinRueckAktiv
   };
   document.getElementById("schritt3").style.display = "block";
