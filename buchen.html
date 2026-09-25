@@ -127,6 +127,11 @@
   <p class="pflichtlegende"><span class="pflicht">*</span> Pflichtfeld</p>
 
   <!-- ===================== SCHRITT 1: VERFÜGBARKEIT ===================== -->
+  <div class="toggle">
+    <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
+    <button id="fahrtartHinRueck" onclick="setFahrtart('hinrueck')">Hin- und Rückfahrt</button>
+  </div>
+
   <div class="field">
     <label for="abhol">Abholadresse<span class="pflicht"> *</span></label>
     <input type="text" id="abhol" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
@@ -158,6 +163,40 @@
       <label for="uhrzeit" id="uhrzeitLabel">Abholuhrzeit<span class="pflicht"> *</span></label>
       <input type="time" id="uhrzeit">
     </div>
+  </div>
+
+  <div id="rueckfahrtBereich" style="display:none;">
+    <div style="font-weight:600;color:var(--moss-dark);margin:22px 0 14px;">Rückfahrt</div>
+
+    <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
+      <input type="checkbox" id="ruckAbholGleich" checked onchange="ruckAbholUmschalten()" style="margin-top:3px; width:17px; height:17px; accent-color:var(--moss); flex:none;">
+      <label for="ruckAbholGleich" style="font-weight:400; margin:0;">Abholort der Rückfahrt = Zielort der Hinfahrt</label>
+    </div>
+    <div class="field" id="ruckAbholFeld" style="display:none;">
+      <label for="ruckAbhol">Abholadresse Rückfahrt<span class="pflicht"> *</span></label>
+      <input type="text" id="ruckAbhol" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
+    </div>
+
+    <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
+      <input type="checkbox" id="ruckZielGleich" checked onchange="ruckZielUmschalten()" style="margin-top:3px; width:17px; height:17px; accent-color:var(--moss); flex:none;">
+      <label for="ruckZielGleich" style="font-weight:400; margin:0;">Zielort der Rückfahrt = Abholort der Hinfahrt</label>
+    </div>
+    <div class="field" id="ruckZielFeld" style="display:none;">
+      <label for="ruckZiel">Zieladresse Rückfahrt<span class="pflicht"> *</span></label>
+      <input type="text" id="ruckZiel" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="ruckDatum">Datum Rückfahrt<span class="pflicht"> *</span></label>
+        <input type="date" id="ruckDatum">
+      </div>
+      <div>
+        <label for="ruckUhrzeit">Abholuhrzeit Rückfahrt<span class="pflicht"> *</span></label>
+        <input type="time" id="ruckUhrzeit">
+      </div>
+    </div>
+    <p class="hinweis">Für die Rückfahrt geben Sie die gewünschte Abholzeit an, die Ankunftszeit berechnen wir automatisch.</p>
   </div>
 
   <button class="primary" id="pruefBtn" onclick="verfuegbarkeitPruefen()">Verfügbarkeit prüfen</button>
@@ -452,9 +491,11 @@ const T_2230 = 22 * 60 + 30;
 const T_2330 = 23 * 60 + 30;
 
 // ===================== ZUSTAND =====================
-const places = { abhol: null, zwischen: null, ziel: null };
+const places = { abhol: null, zwischen: null, ziel: null, ruckAbhol: null, ruckZiel: null };
 let modus = "abhol";
-let plan = null;      // Ergebnis aus Schritt 1
+let fahrtart = "einfach"; // "einfach" oder "hinrueck"
+let plan = null;      // Ergebnis aus Schritt 1 (Hinfahrt)
+let planRueck = null; // Ergebnis aus Schritt 1 (Rückfahrt, nur bei fahrtart "hinrueck")
 let preisPlan = null; // Ergebnis aus Schritt 2
 let buchungstyp = null; // "firma" | "privat"
 
@@ -482,9 +523,10 @@ function vorbelegungAusStartseite(){
 
 function initAutocomplete(){
   document.getElementById("datum").min = lokalesDatum(new Date());
+  document.getElementById("ruckDatum").min = lokalesDatum(new Date());
   vorbelegungAusStartseite();
   const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name"] };
-  ["abhol", "zwischen", "ziel"].forEach(id => {
+  ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
     const input = document.getElementById(id);
     const ac = new google.maps.places.Autocomplete(input, optionen);
     ac.addListener("place_changed", () => { places[id] = ac.getPlace(); schritt1Zuruecksetzen(); });
@@ -617,8 +659,31 @@ function setModus(m){
   schritt1Zuruecksetzen();
 }
 
+function setFahrtart(f){
+  fahrtart = f;
+  document.getElementById("fahrtartEinfach").classList.toggle("active", f === "einfach");
+  document.getElementById("fahrtartHinRueck").classList.toggle("active", f === "hinrueck");
+  document.getElementById("rueckfahrtBereich").style.display = f === "hinrueck" ? "block" : "none";
+  schritt1Zuruecksetzen();
+}
+
+function ruckAbholUmschalten(){
+  const gleich = document.getElementById("ruckAbholGleich").checked;
+  document.getElementById("ruckAbholFeld").style.display = gleich ? "none" : "block";
+  if (gleich) { document.getElementById("ruckAbhol").value = ""; places.ruckAbhol = null; }
+  schritt1Zuruecksetzen();
+}
+
+function ruckZielUmschalten(){
+  const gleich = document.getElementById("ruckZielGleich").checked;
+  document.getElementById("ruckZielFeld").style.display = gleich ? "none" : "block";
+  if (gleich) { document.getElementById("ruckZiel").value = ""; places.ruckZiel = null; }
+  schritt1Zuruecksetzen();
+}
+
 function schritt1Zuruecksetzen(){
   plan = null;
+  planRueck = null;
   preisPlan = null;
   document.getElementById("schritt2").style.display = "none";
   document.getElementById("preisErgebnis").style.display = "none";
@@ -671,6 +736,92 @@ function kinderRendern(){
 }
 
 // ===================== SCHRITT 1: VERFÜGBARKEIT =====================
+/**
+ * Berechnet Route, Zeitplanung und prüft die Geschäftsregeln (Nachtfenster,
+ * Vorlauf, max. Abwesenheit) für EIN Bein der Fahrt. Wirft bei einer
+ * verletzten Regel einen String mit der Nutzer-Fehlermeldung.
+ */
+async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabeZeit, modusLokal, praefix }){
+  const A = abholPlace.formatted_address;
+  const Z = zielPlace.formatted_address;
+  const W = zwischenPlace ? zwischenPlace.formatted_address : null;
+
+  const anfahrt = await strecke(BASIS_ADRESSE, A);
+  const kundenLegs = W ? [await strecke(A, W), await strecke(W, Z)] : [await strecke(A, Z)];
+  const rueckfahrt = await strecke(Z, BASIS_ADRESSE);
+  // Bei Zwischenziel: direkte Vergleichsstrecke Abholort -> Ziel, um später
+  // den Umweg (Mehrstrecke durchs Zwischenziel) fürs Einführungsangebot
+  // herauszurechnen.
+  const direkt = W ? await strecke(A, Z) : null;
+
+  const kundenKm = kundenLegs.reduce((s, l) => s + l.km, 0);
+  const kundenFahrMin = kundenLegs.reduce((s, l) => s + l.min, 0);
+  const kundenGesamtMin = Math.ceil(
+    kundenFahrMin + kmPuffer(kundenKm) + PUFFER_EINSTIEG_MIN + (W ? PUFFER_EINSTIEG_MIN : 0)
+  );
+  const anfahrtMin = Math.ceil(anfahrt.min + kmPuffer(anfahrt.km));
+  const rueckMin = Math.ceil(rueckfahrt.min + kmPuffer(rueckfahrt.km));
+
+  // Ladestopps für die EQV: 20 Min. je vollen 250 km, segmentgenau eingerechnet
+  // (nur ein Ladestopp, der zwischen Abholung und Ankunft liegt, verschiebt die
+  // versprochene Ankunftszeit; davor oder danach wirkt er sich nur intern aus)
+  const ladeMinuten = (km) => Math.floor(km / 250) * 20;
+  const kmNachAnfahrt = anfahrt.km;
+  const kmNachKundenstrecke = anfahrt.km + kundenKm;
+  const kmGesamt = anfahrt.km + kundenKm + rueckfahrt.km;
+  const ladeVorAbholung = ladeMinuten(kmNachAnfahrt);
+  const ladeBisAnkunft = ladeMinuten(kmNachKundenstrecke) - ladeVorAbholung;
+  const ladeNachAnkunft = ladeMinuten(kmGesamt) - ladeMinuten(kmNachKundenstrecke);
+  const anfahrtMinGesamt = anfahrtMin + ladeVorAbholung;
+  const kundenGesamtMinMitLaden = kundenGesamtMin + ladeBisAnkunft;
+  const rueckMinGesamt = rueckMin + ladeNachAnkunft;
+
+  // Abholzeit bestimmen (bei Ankunftsmodus rückwärts rechnen, auf 5 Min. abrunden)
+  const abholung = modusLokal === "abhol" ? eingabeZeit : abrunden5(plusMin(eingabeZeit, -kundenGesamtMinMitLaden));
+  const ankunft = plusMin(abholung, kundenGesamtMinMitLaden);
+  const abfahrtBasis = plusMin(abholung, -anfahrtMinGesamt);
+  const rueckkehrBasis = plusMin(ankunft, rueckMinGesamt);
+  const abwesenheitMin = Math.round((rueckkehrBasis - abfahrtBasis) / 60000);
+
+  // ---------- Regelprüfung ----------
+  const jetzt = new Date();
+  const tAbhol = minTag(abholung);
+  const telefon = " Bitte rufen Sie uns dafür an.";
+
+  if (abholung <= jetzt) {
+    throw `${praefix}Die Abholzeit liegt in der Vergangenheit.`;
+  }
+  if (tAbhol > T_2230 || tAbhol < T_0430) {
+    throw `${praefix}Abholungen zwischen 22:30 und 4:30 Uhr sind online nicht buchbar (berechnete Abholzeit: ${uhr(abholung)} Uhr).` + telefon;
+  }
+  if (tAbhol < T_0900) {
+    const frist = new Date(abholung);
+    frist.setDate(frist.getDate() - 1);
+    frist.setHours(18, 0, 0, 0);
+    if (jetzt >= frist) {
+      throw `${praefix}Abholungen vor 9 Uhr müssen bis 18 Uhr am Vortag gebucht werden (Frist: ${datumUhr(frist)}).` + telefon;
+    }
+  } else {
+    const frueheste = aufrunden5(plusMin(new Date(), VORLAUF_MIN + anfahrtMinGesamt));
+    if (abholung < frueheste) {
+      throw `${praefix}Zu kurzfristig. Frühestmögliche Abholung: ${datumUhr(frueheste)}.`;
+    }
+  }
+  if (lokalesDatum(ankunft) !== lokalesDatum(abholung) || minTag(ankunft) > T_2330) {
+    throw `${praefix}Die Ankunft am Ziel wäre erst um ${uhr(ankunft)} Uhr. Fahrten mit Ankunft nach 23:30 Uhr sind online nicht buchbar.` + telefon;
+  }
+  if (abwesenheitMin > MAX_ABWESENHEIT_MIN) {
+    throw `${praefix}Diese Fahrt dauert inklusive An- und Rückfahrt länger als 3 Stunden. Längere Fahrten und Tagespauschalen besprechen wir gern persönlich.` + telefon;
+  }
+
+  return {
+    abhol: abholPlace, zwischen: zwischenPlace || null, ziel: zielPlace,
+    anfahrtKm: anfahrt.km, kundenKm, rueckKm: rueckfahrt.km,
+    umwegKm: direkt ? Math.max(0, kundenKm - direkt.km) : 0,
+    abholung, ankunft, abfahrtBasis, rueckkehrBasis, abwesenheitMin
+  };
+}
+
 async function verfuegbarkeitPruefen(){
   schritt1Zuruecksetzen();
 
@@ -687,111 +838,92 @@ async function verfuegbarkeitPruefen(){
   const eingabeZeit = new Date(`${datumStr}T${zeitStr}`);
   if (isNaN(eingabeZeit.getTime())) return setStatus("status1", "Ungültiges Datum oder Uhrzeit.", "error");
 
+  const hinRueckAktiv = fahrtart === "hinrueck";
+  let ruckAbholPlace = null, ruckZielPlace = null, ruckEingabeZeit = null;
+
+  if (hinRueckAktiv) {
+    const ruckAbholGleich = document.getElementById("ruckAbholGleich").checked;
+    const ruckZielGleich = document.getElementById("ruckZielGleich").checked;
+    ruckAbholPlace = ruckAbholGleich ? places.ziel : places.ruckAbhol;
+    ruckZielPlace = ruckZielGleich ? places.abhol : places.ruckZiel;
+    if (!ruckAbholGleich && (!ruckAbholPlace || !ruckAbholPlace.geometry)) return setStatus("status1", "Bitte Abholadresse der Rückfahrt aus der Vorschlagsliste auswählen.", "error");
+    if (!ruckZielGleich && (!ruckZielPlace || !ruckZielPlace.geometry)) return setStatus("status1", "Bitte Zieladresse der Rückfahrt aus der Vorschlagsliste auswählen.", "error");
+
+    const ruckDatumStr = document.getElementById("ruckDatum").value;
+    const ruckZeitStr = document.getElementById("ruckUhrzeit").value;
+    if (!ruckDatumStr || !ruckZeitStr) return setStatus("status1", "Bitte Datum und Uhrzeit der Rückfahrt angeben.", "error");
+    ruckEingabeZeit = new Date(`${ruckDatumStr}T${ruckZeitStr}`);
+    if (isNaN(ruckEingabeZeit.getTime())) return setStatus("status1", "Ungültiges Datum oder Uhrzeit für die Rückfahrt.", "error");
+  }
+
   const btn = document.getElementById("pruefBtn");
   btn.disabled = true;
   setStatus("status1", "Route wird berechnet …", "loading");
 
   try {
-    const A = places.abhol.formatted_address;
-    const Z = places.ziel.formatted_address;
-    const W = zwischenAktiv ? places.zwischen.formatted_address : null;
+    const W = zwischenAktiv ? places.zwischen : null;
 
-    const anfahrt = await strecke(BASIS_ADRESSE, A);
-    const kundenLegs = W ? [await strecke(A, W), await strecke(W, Z)] : [await strecke(A, Z)];
-    const rueckfahrt = await strecke(Z, BASIS_ADRESSE);
-    // Bei Zwischenziel: direkte Vergleichsstrecke Abholort -> Ziel, um später
-    // den Umweg (Mehrstrecke durchs Zwischenziel) fürs Einführungsangebot
-    // herauszurechnen.
-    const direkt = W ? await strecke(A, Z) : null;
+    const hinPlan = await berechneFahrtplan({
+      abholPlace: places.abhol, zielPlace: places.ziel, zwischenPlace: W,
+      eingabeZeit, modusLokal: modus, praefix: hinRueckAktiv ? "Hinfahrt: " : ""
+    });
 
-    const kundenKm = kundenLegs.reduce((s, l) => s + l.km, 0);
-    const kundenFahrMin = kundenLegs.reduce((s, l) => s + l.min, 0);
-    const kundenGesamtMin = Math.ceil(
-      kundenFahrMin + kmPuffer(kundenKm) + PUFFER_EINSTIEG_MIN + (W ? PUFFER_EINSTIEG_MIN : 0)
-    );
-    const anfahrtMin = Math.ceil(anfahrt.min + kmPuffer(anfahrt.km));
-    const rueckMin = Math.ceil(rueckfahrt.min + kmPuffer(rueckfahrt.km));
-
-    // Ladestopps für die EQV: 20 Min. je vollen 250 km, segmentgenau eingerechnet
-    // (nur ein Ladestopp, der zwischen Abholung und Ankunft liegt, verschiebt die
-    // versprochene Ankunftszeit; davor oder danach wirkt er sich nur intern aus)
-    const ladeMinuten = (km) => Math.floor(km / 250) * 20;
-    const kmNachAnfahrt = anfahrt.km;
-    const kmNachKundenstrecke = anfahrt.km + kundenKm;
-    const kmGesamt = anfahrt.km + kundenKm + rueckfahrt.km;
-    const ladeVorAbholung = ladeMinuten(kmNachAnfahrt);
-    const ladeBisAnkunft = ladeMinuten(kmNachKundenstrecke) - ladeVorAbholung;
-    const ladeNachAnkunft = ladeMinuten(kmGesamt) - ladeMinuten(kmNachKundenstrecke);
-    const anfahrtMinGesamt = anfahrtMin + ladeVorAbholung;
-    const kundenGesamtMinMitLaden = kundenGesamtMin + ladeBisAnkunft;
-    const rueckMinGesamt = rueckMin + ladeNachAnkunft;
-
-    // Abholzeit bestimmen (bei Ankunftsmodus rückwärts rechnen, auf 5 Min. abrunden)
-    const abholung = modus === "abhol" ? eingabeZeit : abrunden5(plusMin(eingabeZeit, -kundenGesamtMinMitLaden));
-    const ankunft = plusMin(abholung, kundenGesamtMinMitLaden);
-    const abfahrtBasis = plusMin(abholung, -anfahrtMinGesamt);
-    const rueckkehrBasis = plusMin(ankunft, rueckMinGesamt);
-    const abwesenheitMin = Math.round((rueckkehrBasis - abfahrtBasis) / 60000);
-
-    // Zeitplanung (Kundenansicht: nur Abholung bis Ankunft am Ziel)
-    document.getElementById("zeitTabelle").innerHTML = `
-      <div class="titel"><span>Zeitplanung</span><span></span></div>
-      <div><span>Abholung</span><span>${datumUhr(abholung)}</span></div>
-      <div><span>Voraussichtliche Ankunft am Ziel</span><span>${datumUhr(ankunft)}</span></div>`;
-
-    // ---------- Regelprüfung ----------
-    const jetzt = new Date();
-    const tAbhol = minTag(abholung);
-    const telefon = " Bitte rufen Sie uns dafür an.";
-
-    if (abholung <= jetzt) {
-      return setStatus("status1", "Die Abholzeit liegt in der Vergangenheit.", "error");
-    }
-    if (tAbhol > T_2230 || tAbhol < T_0430) {
-      return setStatus("status1",
-        `Abholungen zwischen 22:30 und 4:30 Uhr sind online nicht buchbar (berechnete Abholzeit: ${uhr(abholung)} Uhr).` + telefon, "error");
-    }
-    if (tAbhol < T_0900) {
-      const frist = new Date(abholung);
-      frist.setDate(frist.getDate() - 1);
-      frist.setHours(18, 0, 0, 0);
-      if (jetzt >= frist) {
+    let ruckPlan = null;
+    if (hinRueckAktiv) {
+      // Für die Rückfahrt geben Kunden immer direkt die gewünschte Abholzeit an
+      // (kein Ankunftszeit-Modus), das hält das Formular überschaubar.
+      ruckPlan = await berechneFahrtplan({
+        abholPlace: ruckAbholPlace, zielPlace: ruckZielPlace, zwischenPlace: null,
+        eingabeZeit: ruckEingabeZeit, modusLokal: "abhol", praefix: "Rückfahrt: "
+      });
+      if (ruckPlan.abfahrtBasis < hinPlan.rueckkehrBasis) {
         return setStatus("status1",
-          `Abholungen vor 9 Uhr müssen bis 18 Uhr am Vortag gebucht werden (Frist: ${datumUhr(frist)}).` + telefon, "error");
-      }
-    } else {
-      const frueheste = aufrunden5(plusMin(new Date(), VORLAUF_MIN + anfahrtMinGesamt));
-      if (abholung < frueheste) {
-        return setStatus("status1",
-          `Zu kurzfristig. Frühestmögliche Abholung: ${datumUhr(frueheste)}.`, "error");
+          `Die Rückfahrt kann nicht vor Ende der Hinfahrt beginnen (Hinfahrt endet ca. ${datumUhr(hinPlan.rueckkehrBasis)} inkl. Rückweg zu unserem Standort).`, "error");
       }
     }
-    if (lokalesDatum(ankunft) !== lokalesDatum(abholung) || minTag(ankunft) > T_2330) {
-      return setStatus("status1",
-        `Die Ankunft am Ziel wäre erst um ${uhr(ankunft)} Uhr. Fahrten mit Ankunft nach 23:30 Uhr sind online nicht buchbar.` + telefon, "error");
-    }
-    if (abwesenheitMin > MAX_ABWESENHEIT_MIN) {
-      return setStatus("status1",
-        "Diese Fahrt dauert inklusive An- und Rückfahrt länger als 3 Stunden. Längere Fahrten und Tagespauschalen besprechen wir gern persönlich." + telefon, "error");
-    }
 
-    // ---------- Kalenderabgleich ----------
+    // Zeitplanung (Kundenansicht: nur Abholung bis Ankunft am Ziel, je Bein)
+    let zeitHtml = `
+      <div class="titel"><span>Zeitplanung${hinRueckAktiv ? " – Hinfahrt" : ""}</span><span></span></div>
+      <div><span>Abholung</span><span>${datumUhr(hinPlan.abholung)}</span></div>
+      <div><span>Voraussichtliche Ankunft am Ziel</span><span>${datumUhr(hinPlan.ankunft)}</span></div>`;
+    if (hinRueckAktiv) {
+      zeitHtml += `
+      <div class="titel"><span>Zeitplanung – Rückfahrt</span><span></span></div>
+      <div><span>Abholung</span><span>${datumUhr(ruckPlan.abholung)}</span></div>
+      <div><span>Voraussichtliche Ankunft am Ziel</span><span>${datumUhr(ruckPlan.ankunft)}</span></div>`;
+    }
+    document.getElementById("zeitTabelle").innerHTML = zeitHtml;
+
+    // ---------- Kalenderabgleich (Hinfahrt) ----------
     setStatus("status1", "Verfügbarkeit wird geprüft …", "loading");
-    const kalender = await kalenderFrei(abfahrtBasis, rueckkehrBasis);
-    if (!kalender.frei) {
+    const kalenderHin = await kalenderFrei(hinPlan.abfahrtBasis, hinPlan.rueckkehrBasis);
+    if (!kalenderHin.frei) {
       return setStatus("status1",
-        `Zu diesem Zeitpunkt sind wir leider schon unterwegs. Wieder verfügbar ab ca. ${datumUhr(new Date(kalender.freiAb))} (inkl. Anfahrt zu Ihnen entsprechend später).`, "error");
+        `${hinRueckAktiv ? "Hinfahrt: " : ""}Zu diesem Zeitpunkt sind wir leider schon unterwegs. Wieder verfügbar ab ca. ${datumUhr(new Date(kalenderHin.freiAb))} (inkl. Anfahrt zu Ihnen entsprechend später). ` +
+        `Diese automatische Prüfung liegt in ca. 90 % der Fälle genau richtig – rufen Sie uns bei Bedarf trotzdem gerne an: manchmal lässt sich z. B. mit einer leicht abweichenden Abholzeit doch noch eine Lösung finden.`,
+        "error");
     }
 
-    plan = {
-      abhol: places.abhol, zwischen: W ? places.zwischen : null, ziel: places.ziel,
-      anfahrtKm: anfahrt.km, kundenKm, rueckKm: rueckfahrt.km,
-      umwegKm: direkt ? Math.max(0, kundenKm - direkt.km) : 0,
-      abholung, ankunft, abfahrtBasis, rueckkehrBasis, abwesenheitMin
-    };
+    // ---------- Kalenderabgleich (Rückfahrt) ----------
+    if (hinRueckAktiv) {
+      const kalenderRueck = await kalenderFrei(ruckPlan.abfahrtBasis, ruckPlan.rueckkehrBasis);
+      if (!kalenderRueck.frei) {
+        return setStatus("status1",
+          `Rückfahrt: Zu diesem Zeitpunkt sind wir leider schon unterwegs. Wieder verfügbar ab ca. ${datumUhr(new Date(kalenderRueck.freiAb))}. ` +
+          `Diese automatische Prüfung liegt in ca. 90 % der Fälle genau richtig – rufen Sie uns bei Bedarf trotzdem gerne an: manchmal lässt sich z. B. mit einer leicht abweichenden Abholzeit doch noch eine Lösung finden.`,
+          "error");
+      }
+    }
+
+    plan = hinPlan;
+    planRueck = ruckPlan;
 
     setStatus("status1",
-      `✓ Verfügbar! Abholung um ${uhr(abholung)} Uhr, voraussichtliche Ankunft ca. ${uhr(ankunft)} Uhr.`, "ok");
+      hinRueckAktiv
+        ? `✓ Verfügbar! Hinfahrt: Abholung ${uhr(hinPlan.abholung)} Uhr, Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr. Rückfahrt: Abholung ${uhr(ruckPlan.abholung)} Uhr, Ankunft ca. ${uhr(ruckPlan.ankunft)} Uhr.`
+        : `✓ Verfügbar! Abholung um ${uhr(hinPlan.abholung)} Uhr, voraussichtliche Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr.`,
+      "ok");
     document.getElementById("schritt2").style.display = "block";
   } catch (err) {
     setStatus("status1",
@@ -807,10 +939,75 @@ function anfahrtPreis(km){
   return 10 * 0.75 + (km - 10) * 1.50;
 }
 
+/**
+ * Berechnet Grundpreis, Zuschläge und Einführungsangebot/-rabatt für EIN Bein
+ * der Fahrt (Hinfahrt oder Rückfahrt). Wird bei einfacher Fahrt einmal, bei
+ * Hin- und Rückfahrt zweimal aufgerufen und am Ende zusammengerechnet.
+ */
+function beinPreisBerechnen(fahrtplan, fahrgaeste){
+  const innerhalb = plz(fahrtplan.abhol) === PLZ_NECKARTENZLINGEN;
+  const anfahrt = innerhalb ? 2.50 : anfahrtPreis(fahrtplan.anfahrtKm);
+  const kundenstrecke = fahrtplan.kundenKm * 1.50;
+  const rueckfahrtZurBasis = fahrtplan.rueckKm * 1.50;
+  const zwischensumme = Math.ceil(anfahrt + kundenstrecke + rueckfahrtZurBasis) + 1;
+  const grundpreis = Math.max(zwischensumme, 25);
+
+  const nachtzuschlag = (imNachtfenster(fahrtplan.abholung) || imNachtfenster(fahrtplan.ankunft)) ? 15 : 0;
+  const zusatzFahrgaeste = Math.max(0, fahrgaeste - 4);
+  const fahrgastzuschlag = zusatzFahrgaeste * 5;
+
+  const regulaer = grundpreis + fahrgastzuschlag + nachtzuschlag;
+
+  // Einführungsangebot Flughafentransfer (beide Richtungen: GVV -> Flughafen oder Flughafen -> GVV)
+  const abholGVV = PLZ_GVV.includes(plz(fahrtplan.abhol));
+  const zielGVV = PLZ_GVV.includes(plz(fahrtplan.ziel));
+  const abholFlughafen = istFlughafenStuttgart(fahrtplan.abhol);
+  const zielFlughafen = istFlughafenStuttgart(fahrtplan.ziel);
+  const zwischenGVV = !fahrtplan.zwischen || PLZ_GVV.includes(plz(fahrtplan.zwischen));
+  const aktionGilt =
+    ((abholGVV && zielFlughafen) || (abholFlughafen && zielGVV)) &&
+    zwischenGVV &&
+    fahrtplan.abholung <= AKTION_BIS;
+  const aktionBasis = fahrgaeste >= 5 ? 55 : 45;
+  const umwegAufschlag = fahrtplan.umwegKm * 1.50;
+  const aktionGesamt = aktionBasis + nachtzuschlag + umwegAufschlag;
+
+  const endpreis = aktionGilt ? aktionGesamt : regulaer;
+
+  // Allgemeiner Einführungsrabatt (10 % auf reguläre Fahrten bis 20.12.,
+  // ausgenommen die bereits stark rabattierten GVV<->Flughafen-Transfers)
+  const allgemeinerRabattProzent = (!aktionGilt && fahrtplan.abholung <= AKTION_BIS) ? 10 : 0;
+  const endpreisNachEinfuehrung = endpreis * (1 - allgemeinerRabattProzent / 100);
+
+  return {
+    grundpreis, nachtzuschlag, fahrgastzuschlag, zusatzFahrgaeste, regulaer,
+    aktionGilt, aktionBasis, umwegAufschlag, aktionGesamt, endpreis,
+    allgemeinerRabattProzent, endpreisNachEinfuehrung
+  };
+}
+
+/** Baut die Preis-Aufschlüsselung (HTML) für ein Bein, mit optionalem Präfix ("Hinfahrt – "/"Rückfahrt – "). */
+function beinAufschluesseln(praefix, bein, fahrtplan, fahrgaeste){
+  let s = `<div class="titel"><span>${praefix}Grundpreis</span><span>${fmt(bein.grundpreis)} €</span></div>`;
+  s += `<div><span>Fahrgäste (${fahrgaeste}; ab dem 5.: ${bein.zusatzFahrgaeste} × 5 €)</span><span>${fmt(bein.fahrgastzuschlag)} €</span></div>`;
+  s += `<div><span>Nachtzuschlag (Abholung ${uhr(fahrtplan.abholung)} / Ankunft ${uhr(fahrtplan.ankunft)})</span><span>${fmt(bein.nachtzuschlag)} €</span></div>`;
+  if (bein.aktionGilt) {
+    s += `<div class="titel"><span>${praefix}Einführungsangebot</span><span></span></div>`;
+    s += `<div><span>Aktionspreis (${fahrgaeste >= 5 ? "ab 5" : "bis 4"} Fahrgäste)</span><span>${fmt(bein.aktionBasis)} €</span></div>`;
+    if (fahrtplan.umwegKm > 0) {
+      s += `<div><span>Umweg durch Zwischenziel (${fahrtplan.umwegKm.toFixed(1)} km × 1,50 €)</span><span>${fmt(bein.umwegAufschlag)} €</span></div>`;
+    }
+    if (bein.nachtzuschlag > 0) s += `<div><span>+ Nachtzuschlag</span><span>${fmt(bein.nachtzuschlag)} €</span></div>`;
+  }
+  return s;
+}
+
 async function preisBerechnen(){
   setStatus("status2", "", "");
   document.getElementById("preisErgebnis").style.display = "none";
   if (!plan) return setStatus("status2", "Bitte zuerst die Verfügbarkeit prüfen.", "error");
+  const hinRueckAktiv = fahrtart === "hinrueck";
+  if (hinRueckAktiv && !planRueck) return setStatus("status2", "Bitte zuerst die Verfügbarkeit prüfen.", "error");
 
   const ab12 = Math.max(0, parseInt(document.getElementById("ab12").value || 0));
   const unter12 = Math.max(0, parseInt(document.getElementById("unter12").value || 0));
@@ -831,41 +1028,22 @@ async function preisBerechnen(){
   }
   setStatus("status2", "", "");
 
-  // ---------- Grundpreis ----------
-  const innerhalb = plz(plan.abhol) === PLZ_NECKARTENZLINGEN;
-  const anfahrt = innerhalb ? 2.50 : anfahrtPreis(plan.anfahrtKm);
-  const kundenstrecke = plan.kundenKm * 1.50;
-  const rueckfahrt = plan.rueckKm * 1.50;
-  const zwischensumme = Math.ceil(anfahrt + kundenstrecke + rueckfahrt) + 1;
-  const mindestGegriffen = zwischensumme < 25;
-  const grundpreis = Math.max(zwischensumme, 25);
+  const hin = beinPreisBerechnen(plan, fahrgaeste);
+  const ruck = hinRueckAktiv ? beinPreisBerechnen(planRueck, fahrgaeste) : null;
 
-  // ---------- Zuschläge ----------
-  const nachtzuschlag = (imNachtfenster(plan.abholung) || imNachtfenster(plan.ankunft)) ? 15 : 0;
-  const zusatzFahrgaeste = Math.max(0, fahrgaeste - 4);
-  const fahrgastzuschlag = zusatzFahrgaeste * 5;
+  const regulaer = hin.regulaer + (ruck ? ruck.regulaer : 0);
+  const anyAktionGilt = hin.aktionGilt || (ruck && ruck.aktionGilt);
+  const anyAllgemeinerRabatt = hin.allgemeinerRabattProzent > 0 || (ruck && ruck.allgemeinerRabattProzent > 0);
+  const endpreisNachEinfuehrungsrabatt = hin.endpreisNachEinfuehrung + (ruck ? ruck.endpreisNachEinfuehrung : 0);
+  const einfuehrungsErsparnisGesamt = (hin.endpreis - hin.endpreisNachEinfuehrung) + (ruck ? (ruck.endpreis - ruck.endpreisNachEinfuehrung) : 0);
 
-  const regulaer = grundpreis + fahrgastzuschlag + nachtzuschlag;
-
-  // ---------- Einführungsangebot ----------
-  const aktionGilt =
-    PLZ_GVV.includes(plz(plan.abhol)) &&
-    (!plan.zwischen || PLZ_GVV.includes(plz(plan.zwischen))) &&
-    istFlughafenStuttgart(plan.ziel) &&
-    plan.abholung <= AKTION_BIS;
-  const aktionBasis = fahrgaeste >= 5 ? 55 : 45;
-  const umwegAufschlag = plan.umwegKm * 1.50;
-  const aktionGesamt = aktionBasis + nachtzuschlag + umwegAufschlag;
-
-  const endpreis = aktionGilt ? aktionGesamt : regulaer;
-
-  // ---------- Gutschein ----------
+  // ---------- Gutschein (gilt einmalig auf den Gesamtpreis) ----------
   const gutscheinCode = document.getElementById("gutschein").value.trim();
   const gutscheinStatusEl = document.getElementById("gutscheinStatus");
   let rabattProzent = 0;
   gutscheinStatusEl.textContent = "";
   gutscheinStatusEl.classList.remove("warn");
-  if (aktionGilt && gutscheinCode) {
+  if (anyAktionGilt && gutscheinCode) {
     gutscheinStatusEl.textContent = "Gutscheincodes sind mit dem Einführungsangebot nicht kombinierbar.";
     gutscheinStatusEl.classList.add("warn");
   } else if (gutscheinCode) {
@@ -888,36 +1066,32 @@ async function preisBerechnen(){
       gutscheinStatusEl.classList.add("warn");
     }
   }
-  const endpreisNachRabatt = endpreis * (1 - rabattProzent / 100);
+  const endpreisNachRabatt = endpreisNachEinfuehrungsrabatt * (1 - rabattProzent / 100);
   const netto = endpreisNachRabatt / 1.19;
   const mwst = endpreisNachRabatt - netto;
 
   // ---------- Ausgabe ----------
-  document.getElementById("priceOut").innerHTML = (aktionGilt || rabattProzent > 0)
+  document.getElementById("priceOut").innerHTML = (anyAktionGilt || anyAllgemeinerRabatt || rabattProzent > 0)
     ? `<span class="alt">${fmt(regulaer)} €</span>${fmt(endpreisNachRabatt)} <span class="eur">€</span>`
     : `${fmt(regulaer)} <span class="eur">€</span>`;
   const aktionEl = document.getElementById("aktionText");
-  aktionEl.style.display = aktionGilt ? "block" : "none";
-  aktionEl.textContent = "Einführungsangebot Flughafentransfer – gültig bis 20.12.2026";
+  aktionEl.style.display = (anyAktionGilt || anyAllgemeinerRabatt) ? "block" : "none";
+  aktionEl.textContent = anyAktionGilt
+    ? "Einführungsangebot Flughafentransfer – gültig bis 20.12.2026"
+    : "Einführungsangebot: 10 % Rabatt – gültig bis 20.12.2026";
 
-  let r = `<div><span>Grundpreis</span><span>${fmt(grundpreis)} €</span></div>`;
-  r += `<div class="titel"><span>Zuschläge</span><span></span></div>`;
-  r += `<div><span>Fahrgäste (${fahrgaeste}; ab dem 5.: ${zusatzFahrgaeste} × 5 €)</span><span>${fmt(fahrgastzuschlag)} €</span></div>`;
-  r += `<div><span>Nachtzuschlag (Abholung ${uhr(plan.abholung)} / Ankunft ${uhr(plan.ankunft)})</span><span>${fmt(nachtzuschlag)} €</span></div>`;
-  if (aktionGilt) {
-    r += `<div class="titel"><span>Einführungsangebot</span><span></span></div>`;
-    r += `<div><span>Aktionspreis (${fahrgaeste >= 5 ? "ab 5" : "bis 4"} Fahrgäste)</span><span>${fmt(aktionBasis)} €</span></div>`;
-    if (plan.umwegKm > 0) {
-      r += `<div><span>Umweg durch Zwischenziel (${plan.umwegKm.toFixed(1)} km × 1,50 €)</span><span>${fmt(umwegAufschlag)} €</span></div>`;
-    }
-    if (nachtzuschlag > 0) r += `<div><span>+ Nachtzuschlag</span><span>${fmt(nachtzuschlag)} €</span></div>`;
-  }
+  let r = beinAufschluesseln(ruck ? "Hinfahrt – " : "", hin, plan, fahrgaeste);
+  if (ruck) r += beinAufschluesseln("Rückfahrt – ", ruck, planRueck, fahrgaeste);
   r += `<div class="titel"><span>Endbetrag</span><span></span></div>`;
   r += `<div><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
   r += `<div><span>zzgl. MwSt. 19 %</span><span>${fmt(mwst)} €</span></div>`;
+  if (anyAllgemeinerRabatt) {
+    r += `<div><span>Preis vor Rabatt</span><span>${fmt(regulaer)} €</span></div>`;
+    r += `<div><span>Einführungsangebot (-10%)</span><span>-${fmt(einfuehrungsErsparnisGesamt)} €</span></div>`;
+  }
   if (rabattProzent > 0) {
-    r += `<div><span>Preis vor Rabatt</span><span>${fmt(endpreis)} €</span></div>`;
-    r += `<div><span>Gutschein (-${rabattProzent}%)</span><span>-${fmt(endpreis - endpreisNachRabatt)} €</span></div>`;
+    r += `<div><span>Preis vor Gutschein</span><span>${fmt(endpreisNachEinfuehrungsrabatt)} €</span></div>`;
+    r += `<div><span>Gutschein (-${rabattProzent}%)</span><span>-${fmt(endpreisNachEinfuehrungsrabatt - endpreisNachRabatt)} €</span></div>`;
   }
   r += `<div class="total"><span>Gesamtpreis (brutto)</span><span>${fmt(endpreisNachRabatt)} €</span></div>`;
   document.getElementById("preisTabelle").innerHTML = r;
@@ -926,7 +1100,9 @@ async function preisBerechnen(){
   preisPlan = {
     fahrgaeste, ab12, unter12, gross, klein,
     grossKoffer, grossTasche, kleinKoffer, kleinTasche, sonstiges,
-    endpreisNachRabatt, netto, mwst, rabattProzent, aktionGilt
+    endpreisNachRabatt, netto, mwst, rabattProzent,
+    allgemeinerRabattProzent: anyAllgemeinerRabatt ? 10 : 0, aktionGilt: anyAktionGilt,
+    hinRueckAktiv
   };
   document.getElementById("schritt3").style.display = "block";
   document.getElementById("anfrageBtn").style.display =
@@ -1079,6 +1255,14 @@ async function buchungsanfrageSenden(){
           ankunftISO: plan.ankunft.toISOString(),
           blockStartISO: plan.abfahrtBasis.toISOString(),
           blockEndeISO: plan.rueckkehrBasis.toISOString(),
+          rueckfahrt: planRueck ? {
+            abholadresse: planRueck.abhol.formatted_address,
+            zieladresse: planRueck.ziel.formatted_address,
+            zeitpunktISO: planRueck.abholung.toISOString(),
+            ankunftISO: planRueck.ankunft.toISOString(),
+            blockStartISO: planRueck.abfahrtBasis.toISOString(),
+            blockEndeISO: planRueck.rueckkehrBasis.toISOString()
+          } : null,
           fahrgaesteAb12: preisPlan.ab12,
           fahrgaesteUnter12: preisPlan.unter12,
           grossesGepaeck: preisPlan.gross,
@@ -1089,6 +1273,7 @@ async function buchungsanfrageSenden(){
           kleinTasche: preisPlan.kleinTasche,
           sonstigesGepaeck: preisPlan.sonstiges,
           gutscheinProzent: preisPlan.rabattProzent,
+          einfuehrungsrabattProzent: preisPlan.allgemeinerRabattProzent,
           einfuehrungsangebot: preisPlan.aktionGilt
         },
         preis: {
