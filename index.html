@@ -345,6 +345,20 @@
     transform:translateY(-2px);
   }
   .fleet-top img{ border-radius:4px; width:100%; height:100%; object-fit:cover; aspect-ratio:4/3; }
+  .fleet-gallery{
+    margin-top:32px;
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:20px;
+  }
+  .fleet-gallery figure{ margin:0; }
+  .fleet-gallery img{
+    width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:4px; display:block;
+  }
+  .fleet-gallery figcaption{ margin-top:8px; font-size:14px; color:var(--ink-soft); }
+  @media (max-width:760px){
+    .fleet-gallery{ grid-template-columns:1fr; }
+  }
 
   @media (max-width:760px){
     .fleet-top{ grid-template-columns:1fr; gap:28px; }
@@ -606,6 +620,21 @@
         </ul>
       </div>
       <img src="images/fahrzeug-heck.jpg" alt="Mercedes-Benz EQV 300 – Fahrzeug für Shuttle und Fahrservice von LANGtransfer">
+    </div>
+
+    <div class="fleet-gallery">
+      <figure>
+        <img src="images/innenraum-2-reihe.jpg" alt="Zweite Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy">
+        <figcaption>2. Sitzreihe – bequeme Sitze, viel Beinfreiheit</figcaption>
+      </figure>
+      <figure>
+        <img src="images/innenraum-3-reihe.jpg" alt="Dritte Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy">
+        <figcaption>3. Sitzreihe – bequeme Sitze, viel Beinfreiheit</figcaption>
+      </figure>
+      <figure>
+        <img src="images/kofferraum-7-personen.jpg" alt="Kofferraum des Mercedes-Benz EQV 300 voll beladen bei sieben Fahrgästen" loading="lazy">
+        <figcaption>Kofferraum bei voller Besetzung (7 Fahrgäste)</figcaption>
+      </figure>
     </div>
   </div>
 </section>
