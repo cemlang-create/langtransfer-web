@@ -2,6 +2,24 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+
+<!-- Consent Mode v2: Voreinstellung "abgelehnt", bis der Nutzer im Cookie-Banner zustimmt -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('consent', 'default', {
+    'ad_storage': 'denied',
+    'ad_user_data': 'denied',
+    'ad_personalization': 'denied',
+    'analytics_storage': 'denied'
+  });
+</script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-18474476304"></script>
+<script>
+  gtag('js', new Date());
+  gtag('config', 'AW-18474476304');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LANGtransfer – Fahrservice, Shuttle & Flughafentransfer im Raum Esslingen</title>
 <meta name="description" content="LANGtransfer ist Ihr privater Fahrservice und Shuttle aus Neckartenzlingen: Flughafentransfer, Business-Fahrten, Event- und Klinikfahrten – zuverlässig, sauber und freundlich.">
@@ -708,6 +726,42 @@
 
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=qbInitAutocomplete&language=de&region=DE">
+</script>
+
+<div id="cookieBanner" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#232320; color:#faf9f5; padding:18px 20px; font-family:'Work Sans',sans-serif; font-size:14px; line-height:1.5; box-shadow:0 -4px 16px rgba(0,0,0,0.15);">
+  <div style="max-width:900px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:16px; justify-content:space-between;">
+    <div style="flex:1; min-width:240px;">
+      Wir nutzen Google Ads zur Reichweiten- und Erfolgsmessung unserer Anzeigen. Cookies dafür werden erst nach Ihrer Zustimmung gesetzt.
+      <a href="datenschutz.html" style="color:#e8c17a; text-decoration:underline;">Mehr dazu</a>
+    </div>
+    <div style="display:flex; gap:10px; flex:none;">
+      <button onclick="cookieEntscheidung(false)" style="background:transparent; color:#faf9f5; border:1px solid #6b6a63; border-radius:6px; padding:9px 16px; cursor:pointer; font-family:inherit; font-size:14px;">Ablehnen</button>
+      <button onclick="cookieEntscheidung(true)" style="background:#b9862f; color:#fff; border:none; border-radius:6px; padding:9px 16px; cursor:pointer; font-family:inherit; font-size:14px; font-weight:600;">Akzeptieren</button>
+    </div>
+  </div>
+</div>
+<script>
+  (function(){
+    function gtagConsentUpdate(gewaehrt){
+      gtag('consent', 'update', {
+        'ad_storage': gewaehrt ? 'granted' : 'denied',
+        'ad_user_data': gewaehrt ? 'granted' : 'denied',
+        'ad_personalization': gewaehrt ? 'granted' : 'denied',
+        'analytics_storage': gewaehrt ? 'granted' : 'denied'
+      });
+    }
+    window.cookieEntscheidung = function(gewaehrt){
+      localStorage.setItem('langtransfer_cookie_consent', gewaehrt ? 'granted' : 'denied');
+      gtagConsentUpdate(gewaehrt);
+      document.getElementById('cookieBanner').style.display = 'none';
+    };
+    var gespeichert = localStorage.getItem('langtransfer_cookie_consent');
+    if (gespeichert === 'granted' || gespeichert === 'denied') {
+      gtagConsentUpdate(gespeichert === 'granted');
+    } else {
+      document.getElementById('cookieBanner').style.display = 'block';
+    }
+  })();
 </script>
 
 </body>
