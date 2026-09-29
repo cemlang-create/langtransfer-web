@@ -363,19 +363,35 @@
     transform:translateY(-2px);
   }
   .fleet-top img{ border-radius:4px; width:100%; height:100%; object-fit:cover; aspect-ratio:4/3; }
-  .fleet-gallery{
+
+  /* ---------- Fahrzeug-Karussell (autoplay, per Punkte auch manuell steuerbar) ---------- */
+  .fleet-carousel{
     margin-top:32px;
-    display:grid;
-    grid-template-columns:repeat(3, 1fr);
-    gap:20px;
+    position:relative;
+    border-radius:6px;
+    overflow:hidden;
+    background:#111;
+    touch-action:pan-y;
   }
-  .fleet-gallery figure{ margin:0; }
-  .fleet-gallery img{
-    width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:4px; display:block;
+  .fleet-carousel-track{
+    display:flex;
+    transition:transform 0.6s cubic-bezier(0.4,0,0.2,1);
   }
-  .fleet-gallery figcaption{ margin-top:8px; font-size:14px; color:var(--ink-soft); }
-  @media (max-width:760px){
-    .fleet-gallery{ grid-template-columns:1fr; }
+  .fleet-carousel-track figure{ flex:0 0 100%; margin:0; }
+  .fleet-carousel-track img{
+    width:100%; aspect-ratio:4/5; object-fit:cover; display:block;
+  }
+  .fleet-carousel-dots{
+    position:absolute; left:0; right:0; bottom:14px;
+    display:flex; justify-content:center; gap:8px;
+  }
+  .fleet-carousel-dots button{
+    width:8px; height:8px; border-radius:50%; border:none; padding:0;
+    background:rgba(255,255,255,0.45); cursor:pointer;
+  }
+  .fleet-carousel-dots button.active{ background:#fff; }
+  @media (min-width:760px){
+    .fleet-carousel-track img{ aspect-ratio:16/9; }
   }
 
   @media (max-width:760px){
@@ -640,22 +656,66 @@
       <img src="images/fahrzeug-heck.jpg" alt="Mercedes-Benz EQV 300 – Fahrzeug für Shuttle und Fahrservice von LANGtransfer">
     </div>
 
-    <div class="fleet-gallery">
-      <figure>
-        <img src="images/innenraum-3-reihe.jpg" alt="Zweite Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy">
-        <figcaption>2. Sitzreihe – bequeme Sitze, viel Beinfreiheit</figcaption>
-      </figure>
-      <figure>
-        <img src="images/innenraum-2-reihe.jpg" alt="Dritte Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy">
-        <figcaption>3. Sitzreihe – bequeme Sitze, viel Beinfreiheit</figcaption>
-      </figure>
-      <figure>
-        <img src="images/kofferraum-7-personen.jpg" alt="Kofferraum des Mercedes-Benz EQV 300 voll beladen bei sieben Fahrgästen" loading="lazy">
-        <figcaption>Kofferraum bei voller Besetzung (7 Fahrgäste)</figcaption>
-      </figure>
+    <div class="fleet-carousel" id="fleetCarousel">
+      <div class="fleet-carousel-track" id="fleetCarouselTrack">
+        <figure><img src="images/eqv-front.jpg" alt="Mercedes-Benz EQV 300 von vorne" loading="lazy"></figure>
+        <figure><img src="images/eqv-seite.jpg" alt="Mercedes-Benz EQV 300 Seitenansicht" loading="lazy"></figure>
+        <figure><img src="images/eqv-heck.jpg" alt="Mercedes-Benz EQV 300 von hinten" loading="lazy"></figure>
+        <figure><img src="images/eqv-einstieg.jpg" alt="Einstieg in den Mercedes-Benz EQV 300" loading="lazy"></figure>
+        <figure><img src="images/eqv-innenraum-2reihe.jpg" alt="Zweite Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy"></figure>
+        <figure><img src="images/eqv-innenraum-3reihe.jpg" alt="Dritte Sitzreihe im Mercedes-Benz EQV 300 mit viel Beinfreiheit" loading="lazy"></figure>
+        <figure><img src="images/eqv-kofferraum.jpg" alt="Kofferraum des Mercedes-Benz EQV 300" loading="lazy"></figure>
+        <figure><img src="images/eqv-cockpit.jpg" alt="Cockpit und Infotainment des Mercedes-Benz EQV 300" loading="lazy"></figure>
+      </div>
+      <div class="fleet-carousel-dots" id="fleetCarouselDots"></div>
     </div>
   </div>
 </section>
+
+<script>
+  (function(){
+    const track = document.getElementById('fleetCarouselTrack');
+    const dotsWrap = document.getElementById('fleetCarouselDots');
+    const slides = track.children.length;
+    let index = 0;
+    let timer;
+
+    for (let i = 0; i < slides; i++) {
+      const dot = document.createElement('button');
+      if (i === 0) dot.classList.add('active');
+      dot.setAttribute('aria-label', 'Bild ' + (i + 1) + ' von ' + slides);
+      dot.addEventListener('click', () => { gehZu(i); starteAutoplay(); });
+      dotsWrap.appendChild(dot);
+    }
+
+    function gehZu(i){
+      index = (i + slides) % slides;
+      track.style.transform = `translateX(-${index * 100}%)`;
+      Array.from(dotsWrap.children).forEach((d, di) => d.classList.toggle('active', di === index));
+    }
+
+    function starteAutoplay(){
+      clearInterval(timer);
+      timer = setInterval(() => gehZu(index + 1), 4000);
+    }
+
+    // Wischen per Touch (Handy)
+    let startX = null;
+    track.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', (e) => {
+      if (startX === null) return;
+      const diff = e.changedTouches[0].clientX - startX;
+      if (Math.abs(diff) > 40) gehZu(index + (diff < 0 ? 1 : -1));
+      startX = null;
+      starteAutoplay();
+    });
+
+    document.getElementById('fleetCarousel').addEventListener('mouseenter', () => clearInterval(timer));
+    document.getElementById('fleetCarousel').addEventListener('mouseleave', starteAutoplay);
+
+    starteAutoplay();
+  })();
+</script>
 
 <section id="ueber-uns">
   <div class="wrap about">
