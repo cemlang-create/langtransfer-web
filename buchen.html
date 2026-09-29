@@ -1288,6 +1288,7 @@ async function buchungsanfrageSenden(){
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        sprache: "de",
         kunde,
         fahrt: {
           abholadresse: places.abhol.formatted_address,

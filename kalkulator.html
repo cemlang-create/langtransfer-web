@@ -90,8 +90,8 @@
 
   <div class="row">
     <div class="field">
-      <label for="rabatt">Rabatt (€)</label>
-      <input type="number" id="rabatt" value="0" min="0" step="1">
+      <label for="rabatt">Rabatt (%)</label>
+      <input type="number" id="rabatt" value="0" min="0" max="100" step="1">
     </div>
     <div class="field">
       <label for="sonderzuschlag">Sonderzuschlag (€)</label>
@@ -200,7 +200,7 @@ async function pauschaleBerechnen(){
   const stundensatzRaw = document.getElementById("stundensatz").value;
   const stundensatz = stundensatzRaw === "" ? 0 : Math.max(0, parseFloat(stundensatzRaw));
   const nachtzuschlagAn = document.getElementById("nachtzuschlagAn").checked;
-  const rabatt = Math.max(0, parseFloat(document.getElementById("rabatt").value || 0));
+  const rabattProzent = Math.min(100, Math.max(0, parseFloat(document.getElementById("rabatt").value || 0)));
   const sonderzuschlag = Math.max(0, parseFloat(document.getElementById("sonderzuschlag").value || 0));
 
   if (standzeit > 0 && stundensatzRaw === "") {
@@ -232,7 +232,8 @@ async function pauschaleBerechnen(){
     const nachtzuschlag = nachtzuschlagAn ? 15 : 0;
     const standzeitkosten = standzeit * stundensatz;
 
-    const gesamt = grundpreis + fahrgastzuschlag + nachtzuschlag + standzeitkosten + sonderzuschlag - rabatt;
+    const zwischensumme = grundpreis + fahrgastzuschlag + nachtzuschlag + standzeitkosten + sonderzuschlag;
+    const gesamt = zwischensumme * (1 - rabattProzent / 100);
     const netto = gesamt / 1.19;
     const mwst = gesamt - netto;
 
@@ -243,7 +244,10 @@ async function pauschaleBerechnen(){
     r += `<div><span>Nachtzuschlag</span><span>${fmt(nachtzuschlag)} €</span></div>`;
     r += `<div><span>Standzeit (${standzeit} Std. × ${fmt(stundensatz)} €)</span><span>${fmt(standzeitkosten)} €</span></div>`;
     r += `<div><span>Sonderzuschlag</span><span>${fmt(sonderzuschlag)} €</span></div>`;
-    r += `<div><span>Rabatt</span><span>-${fmt(rabatt)} €</span></div>`;
+    if (rabattProzent > 0) {
+      r += `<div><span>Preis vor Rabatt</span><span>${fmt(zwischensumme)} €</span></div>`;
+      r += `<div><span>Rabatt (-${rabattProzent}%)</span><span>-${fmt(zwischensumme - gesamt)} €</span></div>`;
+    }
     r += `<div class="titel"><span>Endbetrag</span><span></span></div>`;
     r += `<div><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
     r += `<div><span>zzgl. MwSt. 19 %</span><span>${fmt(mwst)} €</span></div>`;
