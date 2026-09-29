@@ -67,8 +67,8 @@
 
   <div class="row">
     <div class="field">
-      <label for="fahrgaeste">Fahrgäste</label>
-      <input type="number" id="fahrgaeste" value="1" min="1" max="7" step="1">
+      <label for="fahrgastzuschlag">Zuschlag Fahrgäste (€)</label>
+      <input type="number" id="fahrgastzuschlag" value="0" min="0" step="1">
     </div>
     <div class="field">
       <label for="standzeit">Standzeit/Wartezeit (Std.)</label>
@@ -81,14 +81,21 @@
     <input type="number" id="stundensatz" value="" min="0" step="1" placeholder="z. B. 25">
   </div>
 
+  <div class="field">
+    <label style="display:flex; align-items:center; gap:8px; font-weight:400; cursor:pointer;">
+      <input type="checkbox" id="nachtzuschlagAn" style="width:17px; height:17px; accent-color:var(--moss);">
+      Nachtzuschlag (+15 €) anwenden
+    </label>
+  </div>
+
   <div class="row">
     <div class="field">
-      <label for="startzeit">Startuhrzeit (optional, für Nachtzuschlag)</label>
-      <input type="time" id="startzeit">
+      <label for="rabatt">Rabatt (€)</label>
+      <input type="number" id="rabatt" value="0" min="0" step="1">
     </div>
     <div class="field">
-      <label for="endzeit">Enduhrzeit (optional, für Nachtzuschlag)</label>
-      <input type="time" id="endzeit">
+      <label for="sonderzuschlag">Sonderzuschlag (€)</label>
+      <input type="number" id="sonderzuschlag" value="0" min="0" step="1">
     </div>
   </div>
 
@@ -103,8 +110,6 @@
 <script>
 const BASIS_ADRESSE = "Neckarburg 3, 72654 Neckartenzlingen";
 const PLZ_NECKARTENZLINGEN = "72654";
-const T_2230 = 22 * 60 + 30;
-const T_0530 = 5 * 60 + 30;
 
 function fmt(n){ return n.toLocaleString("de-DE", {minimumFractionDigits:2, maximumFractionDigits:2}); }
 
@@ -176,17 +181,6 @@ function anfahrtPreis(km){
   return 10 * 0.75 + (km - 10) * 1.50;
 }
 
-function minTagVonZeit(zeit){
-  const [h, m] = zeit.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function imNachtfenster(zeit){
-  if (!zeit) return false;
-  const t = minTagVonZeit(zeit);
-  return t >= T_2230 || t < T_0530;
-}
-
 async function pauschaleBerechnen(){
   setStatus("", "");
   document.getElementById("ergebnis").style.display = "none";
@@ -201,12 +195,13 @@ async function pauschaleBerechnen(){
     return setStatus("Bitte jeden Stopp aus der Vorschlagsliste auswählen (nicht nur eintippen).", "error");
   }
 
-  const fahrgaeste = Math.max(1, parseInt(document.getElementById("fahrgaeste").value || 1));
+  const fahrgastzuschlag = Math.max(0, parseFloat(document.getElementById("fahrgastzuschlag").value || 0));
   const standzeit = Math.max(0, parseFloat(document.getElementById("standzeit").value || 0));
   const stundensatzRaw = document.getElementById("stundensatz").value;
   const stundensatz = stundensatzRaw === "" ? 0 : Math.max(0, parseFloat(stundensatzRaw));
-  const startzeit = document.getElementById("startzeit").value;
-  const endzeit = document.getElementById("endzeit").value;
+  const nachtzuschlagAn = document.getElementById("nachtzuschlagAn").checked;
+  const rabatt = Math.max(0, parseFloat(document.getElementById("rabatt").value || 0));
+  const sonderzuschlag = Math.max(0, parseFloat(document.getElementById("sonderzuschlag").value || 0));
 
   if (standzeit > 0 && stundensatzRaw === "") {
     return setStatus("Bitte einen Stundensatz angeben, wenn Standzeit eingetragen ist.", "error");
@@ -234,22 +229,21 @@ async function pauschaleBerechnen(){
     const kmSumme = Math.ceil(ersterPreis + restPreis) + 1;
     const grundpreis = Math.max(kmSumme, 25);
 
-    const zusatzFahrgaeste = Math.max(0, fahrgaeste - 4);
-    const fahrgastzuschlag = zusatzFahrgaeste * 5;
-
-    const nachtzuschlag = (imNachtfenster(startzeit) || imNachtfenster(endzeit)) ? 15 : 0;
+    const nachtzuschlag = nachtzuschlagAn ? 15 : 0;
     const standzeitkosten = standzeit * stundensatz;
 
-    const gesamt = grundpreis + fahrgastzuschlag + nachtzuschlag + standzeitkosten;
+    const gesamt = grundpreis + fahrgastzuschlag + nachtzuschlag + standzeitkosten + sonderzuschlag - rabatt;
     const netto = gesamt / 1.19;
     const mwst = gesamt - netto;
 
     let r = `<div><span>Gesamtstrecke</span><span>${gesamtKm.toFixed(1)} km</span></div>`;
     r += `<div><span>Reine Fahrzeit (ohne Standzeit)</span><span>${Math.round(gesamtMin)} Min.</span></div>`;
     r += `<div class="titel"><span>Grundpreis (km-basiert)</span><span>${fmt(grundpreis)} €</span></div>`;
-    r += `<div><span>Fahrgäste (${fahrgaeste}; ab dem 5.: ${zusatzFahrgaeste} × 5 €)</span><span>${fmt(fahrgastzuschlag)} €</span></div>`;
+    r += `<div><span>Zuschlag Fahrgäste</span><span>${fmt(fahrgastzuschlag)} €</span></div>`;
     r += `<div><span>Nachtzuschlag</span><span>${fmt(nachtzuschlag)} €</span></div>`;
     r += `<div><span>Standzeit (${standzeit} Std. × ${fmt(stundensatz)} €)</span><span>${fmt(standzeitkosten)} €</span></div>`;
+    r += `<div><span>Sonderzuschlag</span><span>${fmt(sonderzuschlag)} €</span></div>`;
+    r += `<div><span>Rabatt</span><span>-${fmt(rabatt)} €</span></div>`;
     r += `<div class="titel"><span>Endbetrag</span><span></span></div>`;
     r += `<div><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
     r += `<div><span>zzgl. MwSt. 19 %</span><span>${fmt(mwst)} €</span></div>`;
