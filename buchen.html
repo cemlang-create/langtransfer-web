@@ -1325,6 +1325,11 @@ async function buchungsanfrageSenden(){
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || "Anfrage fehlgeschlagen.");
 
+    // Google Ads Conversion: feuert nur bei erfolgreich abgeschickter Buchungsanfrage
+    if (typeof gtag === "function") {
+      gtag('event', 'conversion', {'send_to': 'AW-18474476304/sb27CI7Yq4odEJDGqOlE'});
+    }
+
     setStatus("status3", "Vielen Dank für Ihre Buchungsanfrage! Bei Nachfragen, erlauben wir uns, Sie kurz anzurufen. Falls es keine Nachfragen gibt, erhalten Sie von uns eine Buchungsbestätigung per E-Mail.", "ok");
     btn.disabled = true;
     btn.textContent = "Anfrage gesendet";
