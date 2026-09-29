@@ -561,7 +561,7 @@
     const datum = document.getElementById('qbDatum').value;
     const personen = document.getElementById('qbPersonen').value;
 
-    // Die geprüfte Adresse wird per sessionStorage an /buchen.html übergeben,
+    // Die geprüfte Adresse wird per sessionStorage an /booking-en.html übergeben,
     // damit dort keine erneute Auswahl nötig ist.
     sessionStorage.setItem('langtransfer_quickbook', JSON.stringify({
       ziel: { formatted_address: qbZielPlace.formatted_address, geprueft: true },
@@ -569,7 +569,7 @@
       ab12: personen
     }));
 
-    window.location.href = 'buchen.html';
+    window.location.href = 'booking-en.html';
     return false;
   }
 </script>
