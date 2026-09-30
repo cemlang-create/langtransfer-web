@@ -940,6 +940,14 @@ async function verfuegbarkeitPruefen(){
     plan = hinPlan;
     planRueck = ruckPlan;
 
+    console.log("DEBUG Hinfahrt:", {
+      abholadresse_google: hinPlan.abhol.formatted_address,
+      zieladresse_google: hinPlan.ziel.formatted_address,
+      anfahrtKm: hinPlan.anfahrtKm,
+      kundenKm: hinPlan.kundenKm,
+      rueckKm: hinPlan.rueckKm
+    });
+
     setStatus("status1",
       hinRueckAktiv
         ? `✓ Verfügbar! Hinfahrt: Abholung ${uhr(hinPlan.abholung)} Uhr, Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr. Rückfahrt: Abholung ${uhr(ruckPlan.abholung)} Uhr, Ankunft ca. ${uhr(ruckPlan.ankunft)} Uhr.`
