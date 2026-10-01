@@ -311,11 +311,30 @@
         <input type="text" id="fFirmenname">
       </div>
       <div class="field">
-        <label for="fRechnungsadresse">Billing address<span class="pflicht"> *</span></label>
+        <label>Billing address<span class="pflicht"> *</span></label>
         <div class="radios" style="margin-bottom:10px;">
-          <label><input type="checkbox" id="fRechnungAdresseUebernehmen" onchange="firmaRechnungsadresseUebernehmen()"> Use pickup address</label>
+          <label><input type="checkbox" id="fRechnungAdresseGleich" checked onchange="firmaRechnungsadresseUmschalten()"> Billing address = pickup address</label>
         </div>
-        <input type="text" id="fRechnungsadresse" placeholder="Street, house number, postcode, city">
+        <div id="fRechnungsadresseFelder" style="display:none;">
+          <div class="field">
+            <label for="fRechnungStrasse">Street and house number<span class="pflicht"> *</span></label>
+            <input type="text" id="fRechnungStrasse">
+          </div>
+          <div class="row">
+            <div>
+              <label for="fRechnungPlz">Postcode<span class="pflicht"> *</span></label>
+              <input type="text" id="fRechnungPlz">
+            </div>
+            <div>
+              <label for="fRechnungOrt">City<span class="pflicht"> *</span></label>
+              <input type="text" id="fRechnungOrt">
+            </div>
+          </div>
+          <div class="field">
+            <label for="fRechnungLand">Country<span class="pflicht"> *</span></label>
+            <input type="text" id="fRechnungLand" value="Germany">
+          </div>
+        </div>
       </div>
 
       <div class="row">
@@ -407,11 +426,30 @@
       </div>
 
       <div class="field">
-        <label>Address<span class="pflicht"> *</span></label>
+        <label>Billing address<span class="pflicht"> *</span></label>
         <div class="radios" style="margin-bottom:10px;">
-          <label><input type="checkbox" id="pAdresseUebernehmen" onchange="privatAdresseUebernehmen()"> Use pickup address</label>
+          <label><input type="checkbox" id="pRechnungAdresseGleich" checked onchange="privatRechnungsadresseUmschalten()"> Billing address = pickup address</label>
         </div>
-        <input type="text" id="pAdresse" placeholder="Street, house number, postcode, city">
+        <div id="pRechnungsadresseFelder" style="display:none;">
+          <div class="field">
+            <label for="pRechnungStrasse">Street and house number<span class="pflicht"> *</span></label>
+            <input type="text" id="pRechnungStrasse">
+          </div>
+          <div class="row">
+            <div>
+              <label for="pRechnungPlz">Postcode<span class="pflicht"> *</span></label>
+              <input type="text" id="pRechnungPlz">
+            </div>
+            <div>
+              <label for="pRechnungOrt">City<span class="pflicht"> *</span></label>
+              <input type="text" id="pRechnungOrt">
+            </div>
+          </div>
+          <div class="field">
+            <label for="pRechnungLand">Country<span class="pflicht"> *</span></label>
+            <input type="text" id="pRechnungLand" value="Germany">
+          </div>
+        </div>
       </div>
 
       <div class="row">
@@ -550,7 +588,14 @@ function initAutocomplete(){
   ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
     const input = document.getElementById(id);
     const ac = new google.maps.places.Autocomplete(input, optionen);
-    ac.addListener("place_changed", () => { places[id] = ac.getPlace(); schritt1Zuruecksetzen(); });
+    ac.addListener("place_changed", () => {
+      places[id] = ac.getPlace();
+      schritt1Zuruecksetzen();
+      if (id === "abhol") {
+        if (document.getElementById("fRechnungAdresseGleich")) rechnungsadressfeldStatus("f");
+        if (document.getElementById("pRechnungAdresseGleich")) rechnungsadressfeldStatus("p");
+      }
+    });
     input.addEventListener("input", () => {
       if (!input.value.trim()) places[id] = null;
       schritt1Zuruecksetzen();
@@ -1161,6 +1206,8 @@ function setBuchungstyp(typ){
   document.getElementById("formFirma").style.display = typ === "firma" ? "block" : "none";
   document.getElementById("formPrivat").style.display = typ === "privat" ? "block" : "none";
   document.getElementById("anfrageBtn").style.display = "block";
+  if (typ === "firma") rechnungsadressfeldStatus("f");
+  if (typ === "privat") rechnungsadressfeldStatus("p");
   agbStatusPruefen();
   setStatus("status3", "", "");
 }
@@ -1184,27 +1231,39 @@ function firmaHauptfahrgastRendern(){
     (selbst && selbst.value === "nein") ? "block" : "none";
 }
 
-function privatAdresseUebernehmen(){
-  const checkbox = document.getElementById("pAdresseUebernehmen");
-  const feld = document.getElementById("pAdresse");
-  if (checkbox.checked) {
-    feld.value = places.abhol ? places.abhol.formatted_address : "";
-    feld.disabled = true;
-  } else {
-    feld.disabled = false;
+/**
+ * Splits a Google place's address_components into {strasse, plz, ort, land}.
+ * Google only returns these when "address_components" was requested in the
+ * Autocomplete fields (true for "abhol") - otherwise returns empty values.
+ */
+function adresseAusPlace(place){
+  const teile = {};
+  (place && place.address_components ? place.address_components : []).forEach((c) => {
+    if (c.types.includes("route")) teile.strasse_name = c.long_name;
+    if (c.types.includes("street_number")) teile.hausnummer = c.long_name;
+    if (c.types.includes("postal_code")) teile.plz = c.long_name;
+    if (c.types.includes("locality")) teile.ort = c.long_name;
+    if (!teile.ort && c.types.includes("postal_town")) teile.ort = c.long_name;
+    if (c.types.includes("country")) teile.land = c.long_name;
+  });
+  const strasse = [teile.strasse_name, teile.hausnummer].filter(Boolean).join(" ");
+  return { strasse, plz: teile.plz || "", ort: teile.ort || "", land: teile.land || "Germany" };
+}
+
+function rechnungsadressfeldStatus(praefix){
+  const gleich = document.getElementById(`${praefix}RechnungAdresseGleich`).checked;
+  document.getElementById(`${praefix}RechnungsadresseFelder`).style.display = gleich ? "none" : "block";
+  if (gleich && places.abhol) {
+    const a = adresseAusPlace(places.abhol);
+    document.getElementById(`${praefix}RechnungStrasse`).value = a.strasse;
+    document.getElementById(`${praefix}RechnungPlz`).value = a.plz;
+    document.getElementById(`${praefix}RechnungOrt`).value = a.ort;
+    document.getElementById(`${praefix}RechnungLand`).value = a.land;
   }
 }
 
-function firmaRechnungsadresseUebernehmen(){
-  const checkbox = document.getElementById("fRechnungAdresseUebernehmen");
-  const feld = document.getElementById("fRechnungsadresse");
-  if (checkbox.checked) {
-    feld.value = places.abhol ? places.abhol.formatted_address : "";
-    feld.disabled = true;
-  } else {
-    feld.disabled = false;
-  }
-}
+function privatRechnungsadresseUmschalten(){ rechnungsadressfeldStatus("p"); }
+function firmaRechnungsadresseUmschalten(){ rechnungsadressfeldStatus("f"); }
 
 function istGueltigeEmail(email){
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
@@ -1228,7 +1287,12 @@ async function buchungsanfrageSenden(){
   let kunde;
   if (buchungstyp === "firma") {
     const firmenname = document.getElementById("fFirmenname").value.trim();
-    const rechnungsadresse = document.getElementById("fRechnungsadresse").value.trim();
+    const rechnungsadresse = {
+      strasse: document.getElementById("fRechnungStrasse").value.trim(),
+      plz: document.getElementById("fRechnungPlz").value.trim(),
+      ort: document.getElementById("fRechnungOrt").value.trim(),
+      land: document.getElementById("fRechnungLand").value.trim()
+    };
     const selbst = document.querySelector('input[name="fSelbstFahrgast"]:checked');
     const buchendAnrede = document.getElementById("fBuchendAnrede").value;
     const buchendVorname = document.getElementById("fBuchendVorname").value.trim();
@@ -1240,7 +1304,9 @@ async function buchungsanfrageSenden(){
     const hauptMobil = document.getElementById("fHauptMobil").value.trim();
     const bemerkungen = document.getElementById("fBemerkungen").value.trim();
 
-    if (!firmenname || !rechnungsadresse) return setStatus("status3", "Please provide the company name and billing address.", "error");
+    if (!firmenname || !rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land) {
+      return setStatus("status3", "Please provide the company name and complete billing address.", "error");
+    }
     if (!buchendAnrede) return setStatus("status3", "Please select the title of the person booking.", "error");
     if (!selbst) return setStatus("status3", "Please specify whether you are also the main passenger.", "error");
     if (!buchendVorname || !buchendNachname || !buchendTelefon || !buchendEmail) return setStatus("status3", "Please provide the first name, last name, phone number and email of the person booking.", "error");
@@ -1262,20 +1328,27 @@ async function buchungsanfrageSenden(){
     const anrede = document.getElementById("pAnrede").value;
     const vorname = document.getElementById("pVorname").value.trim();
     const nachname = document.getElementById("pNachname").value.trim();
-    const adresse = document.getElementById("pAdresse").value.trim();
+    const rechnungsadresse = {
+      strasse: document.getElementById("pRechnungStrasse").value.trim(),
+      plz: document.getElementById("pRechnungPlz").value.trim(),
+      ort: document.getElementById("pRechnungOrt").value.trim(),
+      land: document.getElementById("pRechnungLand").value.trim()
+    };
     const mobil = document.getElementById("pMobil").value.trim();
     const email = document.getElementById("pEmail").value.trim();
     const bemerkungen = document.getElementById("pBemerkungen").value.trim();
 
     if (!anrede) return setStatus("status3", "Please select a title.", "error");
     if (!vorname || !nachname) return setStatus("status3", "Please provide first and last name.", "error");
-    if (!adresse) return setStatus("status3", "Please provide an address.", "error");
+    if (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land) {
+      return setStatus("status3", "Please provide a complete billing address.", "error");
+    }
     if (!mobil) return setStatus("status3", "Please provide a mobile number.", "error");
     if (!email || !istGueltigeEmail(email)) return setStatus("status3", "Please enter a valid email address.", "error");
 
     const name = `${vorname} ${nachname}`.trim();
     kunde = {
-      typ: "privat", anrede, vorname, nachname, name, adresse, mobil, email, bemerkungen,
+      typ: "privat", anrede, vorname, nachname, name, rechnungsadresse, mobil, email, bemerkungen,
       zahlung: "with the driver, card payment only"
     };
   }
