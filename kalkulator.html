@@ -104,6 +104,81 @@
 
   <div class="ergebnis" id="ergebnis">
     <div class="tabelle" id="tabelle"></div>
+
+    <div style="margin-top:24px; border-top:1px solid var(--line); padding-top:20px;">
+      <div style="font-weight:600; margin-bottom:12px;">Angebot verschicken</div>
+
+      <div class="field">
+        <label for="agEigenerPreis">Eigener Pauschalpreis (€, überschreibt die Berechnung oben)</label>
+        <input type="number" id="agEigenerPreis" min="0" step="1" placeholder="leer lassen, um den berechneten Preis zu verwenden">
+      </div>
+
+      <div class="field">
+        <label for="agKurzbeschreibung">Kurzbeschreibung (erscheint in Mail/Kalender)</label>
+        <input type="text" id="agKurzbeschreibung" placeholder="z. B. Shuttle Hochzeitsgesellschaft Restaurant Adler">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="agName">Name des Kunden</label>
+          <input type="text" id="agName">
+        </div>
+        <div class="field">
+          <label for="agTelefon">Telefon (optional)</label>
+          <input type="text" id="agTelefon">
+        </div>
+      </div>
+      <div class="field">
+        <label for="agEmail">E-Mail des Kunden</label>
+        <input type="email" id="agEmail">
+      </div>
+
+      <div class="field">
+        <label for="agStrasse">Rechnungsadresse: Straße und Hausnummer</label>
+        <input type="text" id="agStrasse">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="agPlz">PLZ</label>
+          <input type="text" id="agPlz">
+        </div>
+        <div class="field">
+          <label for="agOrt">Ort</label>
+          <input type="text" id="agOrt">
+        </div>
+      </div>
+      <div class="field">
+        <label for="agLand">Land</label>
+        <input type="text" id="agLand" value="Deutschland">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="agAbholDatum">Abholdatum</label>
+          <input type="date" id="agAbholDatum">
+        </div>
+        <div class="field">
+          <label for="agAbholZeit">Abholuhrzeit</label>
+          <input type="time" id="agAbholZeit">
+        </div>
+      </div>
+      <p class="hint" style="margin:-10px 0 14px;">Wird für die E-Mail und den Kalendereintrag verwendet (Startzeit der Fahrt).</p>
+
+      <div class="row">
+        <div class="field">
+          <label for="agBlockStart">Kalender: Block ab (du bist belegt)</label>
+          <input type="datetime-local" id="agBlockStart">
+        </div>
+        <div class="field">
+          <label for="agBlockEnde">Kalender: Block bis</label>
+          <input type="datetime-local" id="agBlockEnde">
+        </div>
+      </div>
+      <p class="hint" style="margin:-10px 0 14px;">Trag hier ein, wie lange du für den gesamten Auftrag (inkl. An-/Abfahrt, Wartezeit) wirklich gebunden bist – nicht nur die reine Fahrzeit.</p>
+
+      <button class="primary" id="angebotBtn" onclick="angebotSenden()">Angebot senden</button>
+      <div class="status" id="angebotStatus"></div>
+    </div>
   </div>
 </div>
 
@@ -256,8 +331,84 @@ async function pauschaleBerechnen(){
     document.getElementById("tabelle").innerHTML = r;
     document.getElementById("ergebnis").style.display = "block";
     setStatus("", "");
+
+    // Für den Angebots-Versand zwischenspeichern
+    letztesErgebnis = {
+      gesamtBrutto: gesamt,
+      abholadresse: adressen[0],
+      zieladresse: adressen[adressen.length - 1]
+    };
   } catch (err) {
     setStatus(typeof err === "string" ? err : "Berechnung fehlgeschlagen.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===================== ANGEBOT MIT ZAHLUNGSLINK VERSCHICKEN =====================
+const PAUSCHALANGEBOT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/pauschalangebotSenden";
+let letztesErgebnis = null;
+
+function setAngebotStatus(msg, cls){
+  const el = document.getElementById("angebotStatus");
+  el.textContent = msg || "";
+  el.className = "status" + (cls ? " " + cls : "");
+}
+
+async function angebotSenden(){
+  setAngebotStatus("", "");
+  if (!letztesErgebnis) return setAngebotStatus("Bitte zuerst oben auf \"Berechnen\" klicken.", "error");
+
+  const eigenerPreisRaw = document.getElementById("agEigenerPreis").value;
+  const gesamtBrutto = eigenerPreisRaw !== "" ? Math.max(0, parseFloat(eigenerPreisRaw)) : letztesErgebnis.gesamtBrutto;
+
+  const kurzbeschreibung = document.getElementById("agKurzbeschreibung").value.trim();
+  const name = document.getElementById("agName").value.trim();
+  const telefon = document.getElementById("agTelefon").value.trim();
+  const email = document.getElementById("agEmail").value.trim();
+  const strasse = document.getElementById("agStrasse").value.trim();
+  const plz = document.getElementById("agPlz").value.trim();
+  const ort = document.getElementById("agOrt").value.trim();
+  const land = document.getElementById("agLand").value.trim();
+  const abholDatum = document.getElementById("agAbholDatum").value;
+  const abholZeit = document.getElementById("agAbholZeit").value;
+  const blockStart = document.getElementById("agBlockStart").value;
+  const blockEnde = document.getElementById("agBlockEnde").value;
+
+  if (!kurzbeschreibung) return setAngebotStatus("Bitte eine Kurzbeschreibung angeben.", "error");
+  if (!name || !email) return setAngebotStatus("Bitte Name und E-Mail des Kunden angeben.", "error");
+  if (!strasse || !plz || !ort || !land) return setAngebotStatus("Bitte vollständige Rechnungsadresse angeben.", "error");
+  if (!abholDatum || !abholZeit) return setAngebotStatus("Bitte Abholdatum und -uhrzeit angeben.", "error");
+  if (!blockStart || !blockEnde) return setAngebotStatus("Bitte den Kalender-Zeitraum angeben.", "error");
+
+  const btn = document.getElementById("angebotBtn");
+  btn.disabled = true;
+  setAngebotStatus("Angebot wird verschickt …", "");
+
+  try {
+    const antwort = await fetch(PAUSCHALANGEBOT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kunde: { name, telefon, email, rechnungsadresse: { strasse, plz, ort, land } },
+        fahrt: {
+          beschreibung: kurzbeschreibung,
+          abholadresse: letztesErgebnis.abholadresse,
+          zieladresse: letztesErgebnis.zieladresse,
+          zeitpunktISO: new Date(`${abholDatum}T${abholZeit}`).toISOString()
+        },
+        preis: { gesamtBrutto },
+        kalender: {
+          blockStartISO: new Date(blockStart).toISOString(),
+          blockEndeISO: new Date(blockEnde).toISOString()
+        }
+      })
+    });
+    const daten = await antwort.json();
+    if (!antwort.ok) throw new Error(daten.fehler || "Angebot konnte nicht verschickt werden.");
+    setAngebotStatus(`✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen/Änderungen/Nicht mehr benötigt).`, "ok");
+  } catch (err) {
+    setAngebotStatus(err.message || "Angebot konnte nicht verschickt werden.", "error");
   } finally {
     btn.disabled = false;
   }
