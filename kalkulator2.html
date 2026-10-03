@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Preis-Kalkulator 2 (intern)</title>
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  :root{
+    --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --err:#b23b2f; --ok:#2f6b45;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);padding:32px 20px 100px;}
+  .card{max-width:720px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:28px;}
+  h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;}
+  h2{font-size:1.05rem;margin:28px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:var(--moss-dark);}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:5px;}
+  input, select, textarea{
+    width:100%;font-family:inherit;font-size:15px;padding:9px 11px;
+    border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--moss);}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--moss);}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:560px){ .row, .row3{grid-template-columns:1fr;} }
+  .toggle{display:flex;margin-bottom:16px;border:1px solid #cfc9b8;border-radius:6px;overflow:hidden;}
+  .toggle button{flex:1;padding:10px;background:#fff;border:none;font-family:inherit;font-size:14px;cursor:pointer;color:var(--muted);}
+  .toggle button.active{background:var(--moss);color:#fff;font-weight:600;}
+  .link-btn{background:none;border:none;color:var(--moss-dark);font-weight:600;font-size:14px;cursor:pointer;padding:0;margin:0 0 14px;text-decoration:underline;}
+  .primary{width:100%;background:var(--moss);color:#fff;border:none;border-radius:6px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px;}
+  .primary:disabled{opacity:0.5;cursor:default;}
+  .status{margin-top:10px;font-size:14px;min-height:1.2em;}
+  .status.error{color:var(--err);} .status.ok{color:var(--ok);}
+  .hint{font-size:12.5px;color:var(--muted);margin:3px 0 0;}
+  .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-bottom:10px;}
+  .tabelle div{display:flex;justify-content:space-between;gap:14px;padding:4px 0;font-size:14px;}
+  .tabelle div span:last-child{white-space:nowrap;}
+  .tabelle small{color:var(--muted);font-size:12px;display:block;}
+  .tabelle .titel{font-weight:700;margin-top:12px;border-top:1px solid var(--line);padding-top:10px;}
+  .tabelle .sub2{color:var(--muted);}
+  .tabelle .total{font-weight:700;font-size:18px;border-top:2px solid var(--ink);margin-top:10px;padding-top:10px;}
+  .tabelle .note{color:var(--muted);font-size:13px;}
+  .ergebnis{display:none;}
+  #typBereich{display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Preis-Kalkulator 2</h1>
+  <p class="sub">Intern. Wie das Buchungsformular (inkl. aktueller Aktionen &amp; Rabatte), aber ohne Verfügbarkeitsprüfung und ohne Regeln wie 3-Stunden-Grenze oder Nachtzeiten. Der <a href="kalkulator.html" style="color:var(--moss-dark);">alte Kalkulator</a> bleibt bestehen.</p>
+
+  <div class="toggle">
+    <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
+    <button id="fahrtartHinRueck" onclick="setFahrtart('hinrueck')">Hin- und Rückfahrt</button>
+  </div>
+
+  <div class="field">
+    <label for="abhol">Abholadresse</label>
+    <input type="text" id="abhol" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
+  </div>
+  <div class="field" id="zwischenFeld" style="display:none;">
+    <label for="zwischen">Zwischenziel</label>
+    <input type="text" id="zwischen" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
+  </div>
+  <button class="link-btn" id="zwischenToggle" onclick="zwischenUmschalten()">+ Zwischenziel hinzufügen</button>
+  <div class="field">
+    <label for="ziel">Zieladresse</label>
+    <input type="text" id="ziel" placeholder="Straße, Hausnummer, Ort" autocomplete="off">
+  </div>
+
+  <div class="row">
+    <div class="field"><label for="datum">Datum</label><input type="date" id="datum"></div>
+    <div class="field"><label for="uhrzeit">Abholuhrzeit</label><input type="time" id="uhrzeit"></div>
+  </div>
+
+  <div id="rueckfahrtBereich" style="display:none;">
+    <h2 style="margin-top:8px;">Rückfahrt</h2>
+    <label class="check"><input type="checkbox" id="ruckAbholGleich" checked onchange="ruckAbholUmschalten()"> Abholort Rückfahrt = Zielort Hinfahrt</label>
+    <div class="field" id="ruckAbholFeld" style="display:none;"><label for="ruckAbhol">Abholadresse Rückfahrt</label><input type="text" id="ruckAbhol" autocomplete="off"></div>
+    <label class="check"><input type="checkbox" id="ruckZielGleich" checked onchange="ruckZielUmschalten()"> Zielort Rückfahrt = Abholort Hinfahrt</label>
+    <div class="field" id="ruckZielFeld" style="display:none;"><label for="ruckZiel">Zieladresse Rückfahrt</label><input type="text" id="ruckZiel" autocomplete="off"></div>
+    <div class="row">
+      <div class="field"><label for="ruckDatum">Datum Rückfahrt</label><input type="date" id="ruckDatum"></div>
+      <div class="field"><label for="ruckUhrzeit">Abholuhrzeit Rückfahrt</label><input type="time" id="ruckUhrzeit"></div>
+    </div>
+  </div>
+
+  <h2>Fahrgäste &amp; Preis-Optionen</h2>
+  <div class="row">
+    <div class="field"><label for="ab12">Fahrgäste ab 12 Jahren</label><input type="number" id="ab12" value="1" min="0" step="1"></div>
+    <div class="field"><label for="unter12">Fahrgäste unter 12 Jahren</label><input type="number" id="unter12" value="0" min="0" step="1"></div>
+  </div>
+  <div class="field">
+    <label for="gutschein">Gutschein-/Aktionscode (optional)</label>
+    <input type="text" id="gutschein" style="text-transform:uppercase;">
+    <div class="hint" id="gutscheinStatus"></div>
+  </div>
+  <div class="row3">
+    <div class="field"><label for="manuellRabatt">Eigener Rabatt (%)</label><input type="number" id="manuellRabatt" value="0" min="0" max="100" step="1"></div>
+    <div class="field"><label for="sonderzuschlag">Sonderzuschlag (€)</label><input type="number" id="sonderzuschlag" value="0" min="0" step="1"></div>
+    <div class="field"><label for="eigenerPreis">Eigener Gesamtpreis (€)</label><input type="number" id="eigenerPreis" min="0" step="1" placeholder="optional"></div>
+  </div>
+  <p class="hint" style="margin-top:-6px;">Reihenfolge: Aktion/Gutschein → eigener Rabatt → Sonderzuschlag. Ein eigener Gesamtpreis (brutto) überschreibt das Ergebnis komplett.</p>
+
+  <button class="primary" id="berechnenBtn" onclick="preisBerechnen()">Preis berechnen</button>
+  <div class="status" id="status"></div>
+
+  <div class="ergebnis" id="ergebnis">
+    <h2>Preis-Aufschlüsselung</h2>
+    <div class="tabelle" id="tabelle"></div>
+
+    <div id="typBereich" style="display:block;">
+      <h2>Kunde &amp; Angebot</h2>
+      <div class="toggle" id="typToggle">
+        <button id="typPrivat" class="active" onclick="setKundentyp('privat')">Privat</button>
+        <button id="typFirma" onclick="setKundentyp('firma')">Firma</button>
+        <button id="typHotel" onclick="setKundentyp('hotel')">Hotel</button>
+      </div>
+
+      <!-- PRIVAT -->
+      <div id="formPrivat">
+        <div class="row3">
+          <div class="field"><label for="pAnrede">Anrede</label>
+            <select id="pAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="pVorname">Vorname</label><input type="text" id="pVorname"></div>
+          <div class="field"><label for="pNachname">Nachname</label><input type="text" id="pNachname"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="pTelefon">Telefon</label><input type="text" id="pTelefon"></div>
+          <div class="field"><label for="pEmail">E-Mail</label><input type="email" id="pEmail"></div>
+        </div>
+      </div>
+
+      <!-- FIRMA -->
+      <div id="formFirma" style="display:none;">
+        <div class="field"><label for="fFirmenname">Firmenname</label><input type="text" id="fFirmenname"></div>
+        <div class="row3">
+          <div class="field"><label for="fAnrede">Ansprechpartner: Anrede</label>
+            <select id="fAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="fVorname">Vorname</label><input type="text" id="fVorname"></div>
+          <div class="field"><label for="fNachname">Nachname</label><input type="text" id="fNachname"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="fTelefon">Telefon</label><input type="text" id="fTelefon"></div>
+          <div class="field"><label for="fEmail">E-Mail</label><input type="email" id="fEmail"></div>
+        </div>
+        <div class="field"><label for="fHauptName">Hauptfahrgast (optional)</label><input type="text" id="fHauptName"></div>
+      </div>
+
+      <!-- HOTEL -->
+      <div id="formHotel" style="display:none;">
+        <div class="field"><label for="hHotelname">Hotelname</label><input type="text" id="hHotelname"></div>
+        <div class="row3">
+          <div class="field"><label for="hAnrede">Ansprechpartner: Anrede</label>
+            <select id="hAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="hVorname">Vorname</label><input type="text" id="hVorname"></div>
+          <div class="field"><label for="hNachname">Nachname</label><input type="text" id="hNachname"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="hTelefon">Telefon (Rezeption/Ansprechpartner)</label><input type="text" id="hTelefon"></div>
+          <div class="field"><label for="hEmail">E-Mail</label><input type="email" id="hEmail"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="hGastname">Gastname</label><input type="text" id="hGastname" placeholder="Name des Hotelgasts"></div>
+          <div class="field"><label for="hZimmer">Zimmernummer (optional)</label><input type="text" id="hZimmer"></div>
+        </div>
+      </div>
+
+      <!-- RECHNUNGSADRESSE (gemeinsam) -->
+      <div style="margin-top:6px;">
+        <label>Rechnungsadresse</label>
+        <label class="check"><input type="checkbox" id="raGleich" checked onchange="rechnungsadresseStatus()"> Rechnungsadresse = Abholadresse</label>
+        <div id="raFelder" style="display:none;">
+          <div class="field"><label for="raStrasse">Straße und Hausnummer</label><input type="text" id="raStrasse"></div>
+          <div class="row">
+            <div class="field"><label for="raPlz">PLZ</label><input type="text" id="raPlz"></div>
+            <div class="field"><label for="raOrt">Ort</label><input type="text" id="raOrt"></div>
+          </div>
+          <div class="field"><label for="raLand">Land</label><input type="text" id="raLand" value="Deutschland"></div>
+        </div>
+      </div>
+
+      <div class="field"><label for="agKurz">Kurzbeschreibung (Mail/Kalender)</label><input type="text" id="agKurz"></div>
+      <div class="row">
+        <div class="field"><label for="agGepaeck">Gepäck</label><input type="text" id="agGepaeck" placeholder="z. B. 2 große Koffer"></div>
+        <div class="field"><label for="agBemerkungen">Bemerkungen</label><input type="text" id="agBemerkungen"></div>
+      </div>
+      <div class="field">
+        <label for="agReferenz">Bestehende Buchung überschreiben (Referenz, optional)</label>
+        <input type="text" id="agReferenz" style="text-transform:uppercase;" placeholder="leer lassen für ein neues Angebot">
+      </div>
+
+      <label>Kalender-Block (du bist belegt)</label>
+      <div class="row">
+        <div class="field"><label for="agBlockStart" style="font-weight:400;">Hinfahrt ab</label><input type="datetime-local" id="agBlockStart"></div>
+        <div class="field"><label for="agBlockEnde" style="font-weight:400;">Hinfahrt bis</label><input type="datetime-local" id="agBlockEnde"></div>
+      </div>
+      <div class="row" id="rueckBlockZeile" style="display:none;">
+        <div class="field"><label for="agRueckBlockStart" style="font-weight:400;">Rückfahrt ab</label><input type="datetime-local" id="agRueckBlockStart"></div>
+        <div class="field"><label for="agRueckBlockEnde" style="font-weight:400;">Rückfahrt bis</label><input type="datetime-local" id="agRueckBlockEnde"></div>
+      </div>
+      <p class="hint" style="margin-bottom:10px;">Vorbelegt mit Abfahrt/Rückkehr an der Basis aus der Berechnung – bei Tagesaufträgen ggf. anpassen.</p>
+
+      <button class="primary" id="angebotBtn" onclick="angebotSenden()">Angebot senden</button>
+      <div class="status" id="angebotStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== KONFIGURATION =====================
+const BASIS_ADRESSE = "Neckarburg 3, 72654 Neckartenzlingen";
+const PLZ_NECKARTENZLINGEN = "72654";
+// GVV Neckartenzlingen: Neckartenzlingen, Altdorf, Altenriet, Bempflingen, Neckartailfingen, Schlaitdorf; zusätzlich Aichtal (alle Teilorte)
+const PLZ_GVV = ["72654", "72655", "72657", "72658", "72666", "72667", "72631"];
+const PLZ_FLUGHAFEN_STR = "70629";
+const AKTION_BIS = new Date("2026-12-20T23:59:59");
+const GUTSCHEIN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/gutscheinPruefen";
+const PAUSCHALANGEBOT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/pauschalangebotSenden";
+
+const PUFFER_EINSTIEG_MIN = 5;
+const MIN_PRO_50KM = 5;
+const T_0530 = 5 * 60 + 30;
+const T_2230 = 22 * 60 + 30;
+
+// ===================== ZUSTAND =====================
+const places = { abhol: null, zwischen: null, ziel: null, ruckAbhol: null, ruckZiel: null };
+let fahrtart = "einfach";
+let kundentyp = "privat";
+let letztesErgebnis = null;
+
+// ===================== HILFSFUNKTIONEN =====================
+function uhr(d){ return d.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"}); }
+function datumUhr(d){ return d.toLocaleString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) + " Uhr"; }
+function minTag(d){ return d.getHours() * 60 + d.getMinutes(); }
+function plusMin(d, m){ return new Date(d.getTime() + m * 60000); }
+function fmt(n){ return n.toLocaleString("de-DE", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function kmPuffer(km){ return km > 0 ? Math.ceil(km / 50) * MIN_PRO_50KM : 0; }
+function imNachtfenster(d){ const t = minTag(d); return t >= T_2230 || t < T_0530; }
+function pad2(n){ return String(n).padStart(2, "0"); }
+function isoZuDatetimeLocal(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function nurOrt(adresse){
+  if (!adresse) return "";
+  const teile = adresse.split(",").map(s => s.trim()).filter(Boolean);
+  if (!teile.length) return adresse;
+  return teile[teile.length - 1].replace(/^\d{4,5}\s*/, "").trim() || adresse;
+}
+function plz(place){
+  if (!place || !place.address_components) return "";
+  const c = place.address_components.find(x => x.types.includes("postal_code"));
+  return c ? c.long_name : "";
+}
+function istFlughafenStuttgart(place){
+  const text = ((place.formatted_address || "") + " " + (place.name || "")).toLowerCase();
+  return plz(place) === PLZ_FLUGHAFEN_STR || (text.includes("flughafen") && text.includes("stuttgart"));
+}
+function setStatus(id, msg, cls){
+  const el = document.getElementById(id);
+  el.textContent = msg || "";
+  el.className = "status" + (cls ? " " + cls : "");
+}
+function anfahrtPreis(km){
+  if (km <= 10) return km * 0.75;
+  return 10 * 0.75 + (km - 10) * 1.50;
+}
+function strecke(origin, destination){
+  return new Promise((resolve, reject) => {
+    new google.maps.DistanceMatrixService().getDistanceMatrix({
+      origins:[origin], destinations:[destination],
+      travelMode: google.maps.TravelMode.DRIVING,
+      unitSystem: google.maps.UnitSystem.METRIC
+    }, (response, status) => {
+      if (status !== "OK") { reject("Distanzberechnung fehlgeschlagen: " + status); return; }
+      const el = response.rows[0].elements[0];
+      if (el.status !== "OK") { reject("Keine Route zwischen " + origin + " und " + destination + " gefunden."); return; }
+      resolve({ km: el.distance.value / 1000, min: el.duration.value / 60 });
+    });
+  });
+}
+function adresseAusPlace(place){
+  const teile = {};
+  (place && place.address_components ? place.address_components : []).forEach((c) => {
+    if (c.types.includes("route")) teile.strasse_name = c.long_name;
+    if (c.types.includes("street_number")) teile.hausnummer = c.long_name;
+    if (c.types.includes("postal_code")) teile.plz = c.long_name;
+    if (c.types.includes("locality")) teile.ort = c.long_name;
+    if (!teile.ort && c.types.includes("postal_town")) teile.ort = c.long_name;
+    if (c.types.includes("country")) teile.land = c.long_name;
+  });
+  const strasse = [teile.strasse_name, teile.hausnummer].filter(Boolean).join(" ");
+  return { strasse, plz: teile.plz || "", ort: teile.ort || "", land: teile.land || "Deutschland" };
+}
+
+// ===================== AUTOCOMPLETE =====================
+function initAutocomplete(){
+  document.getElementById("datum").value = new Date().toISOString().slice(0, 10);
+  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name"] };
+  ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
+    const input = document.getElementById(id);
+    const ac = new google.maps.places.Autocomplete(input, optionen);
+    ac.addListener("place_changed", () => {
+      const p = ac.getPlace();
+      places[id] = (p && p.geometry) ? p : null;
+      if (id === "abhol") rechnungsadresseStatus();
+    });
+    // Wer nach der Auswahl weitertippt, muss neu auswählen (sonst passt Text nicht mehr zur geprüften Adresse)
+    input.addEventListener("input", () => { places[id] = null; });
+  });
+}
+
+// ===================== UI =====================
+// Manuell geänderte Kurzbeschreibung nicht bei jeder Neuberechnung überschreiben
+document.getElementById("agKurz").addEventListener("input", (e) => { e.target.dataset.auto = "0"; });
+
+function setFahrtart(f){
+  fahrtart = f;
+  document.getElementById("fahrtartEinfach").classList.toggle("active", f === "einfach");
+  document.getElementById("fahrtartHinRueck").classList.toggle("active", f === "hinrueck");
+  document.getElementById("rueckfahrtBereich").style.display = f === "hinrueck" ? "block" : "none";
+}
+function zwischenUmschalten(){
+  const feld = document.getElementById("zwischenFeld");
+  const btn = document.getElementById("zwischenToggle");
+  const sichtbar = feld.style.display !== "none";
+  feld.style.display = sichtbar ? "none" : "block";
+  btn.textContent = sichtbar ? "+ Zwischenziel hinzufügen" : "– Zwischenziel entfernen";
+  if (sichtbar) { document.getElementById("zwischen").value = ""; places.zwischen = null; }
+}
+function ruckAbholUmschalten(){
+  const gleich = document.getElementById("ruckAbholGleich").checked;
+  document.getElementById("ruckAbholFeld").style.display = gleich ? "none" : "block";
+  if (gleich) { document.getElementById("ruckAbhol").value = ""; places.ruckAbhol = null; }
+}
+function ruckZielUmschalten(){
+  const gleich = document.getElementById("ruckZielGleich").checked;
+  document.getElementById("ruckZielFeld").style.display = gleich ? "none" : "block";
+  if (gleich) { document.getElementById("ruckZiel").value = ""; places.ruckZiel = null; }
+}
+function setKundentyp(t){
+  kundentyp = t;
+  ["privat", "firma", "hotel"].forEach(x => {
+    document.getElementById("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t);
+    document.getElementById("form" + x.charAt(0).toUpperCase() + x.slice(1)).style.display = x === t ? "block" : "none";
+  });
+}
+function rechnungsadresseStatus(){
+  const gleich = document.getElementById("raGleich").checked;
+  document.getElementById("raFelder").style.display = gleich ? "none" : "block";
+  if (gleich && places.abhol) {
+    const a = adresseAusPlace(places.abhol);
+    document.getElementById("raStrasse").value = a.strasse;
+    document.getElementById("raPlz").value = a.plz;
+    document.getElementById("raOrt").value = a.ort;
+    document.getElementById("raLand").value = a.land;
+  }
+}
+
+// ===================== STRECKEN-/ZEITPLAN (OHNE REGELN, OHNE KALENDER) =====================
+async function fahrtplanBerechnen({ abholPlace, zielPlace, zwischenPlace, abholung }){
+  const A = abholPlace.formatted_address;
+  const Z = zielPlace.formatted_address;
+  const W = zwischenPlace ? zwischenPlace.formatted_address : null;
+
+  const anfahrt = await strecke(BASIS_ADRESSE, A);
+  const kundenLegs = W ? [await strecke(A, W), await strecke(W, Z)] : [await strecke(A, Z)];
+  const rueckfahrt = await strecke(Z, BASIS_ADRESSE);
+  const direkt = W ? await strecke(A, Z) : null;
+
+  const kundenKm = kundenLegs.reduce((s, l) => s + l.km, 0);
+  const kundenFahrMin = kundenLegs.reduce((s, l) => s + l.min, 0);
+  const kundenGesamtMin = Math.ceil(kundenFahrMin + kmPuffer(kundenKm) + PUFFER_EINSTIEG_MIN + (W ? PUFFER_EINSTIEG_MIN : 0));
+  const anfahrtMin = Math.ceil(anfahrt.min + kmPuffer(anfahrt.km));
+  const rueckMin = Math.ceil(rueckfahrt.min + kmPuffer(rueckfahrt.km));
+
+  // Ladestopps EQV: 20 Min. je vollen 250 km (wie im Buchungsformular)
+  const ladeMinuten = (km) => Math.floor(km / 250) * 20;
+  const kmNachAnfahrt = anfahrt.km;
+  const kmNachKunde = anfahrt.km + kundenKm;
+  const kmGesamt = anfahrt.km + kundenKm + rueckfahrt.km;
+  const ladeVor = ladeMinuten(kmNachAnfahrt);
+  const ladeBis = ladeMinuten(kmNachKunde) - ladeVor;
+  const ladeNach = ladeMinuten(kmGesamt) - ladeMinuten(kmNachKunde);
+
+  const ankunft = plusMin(abholung, kundenGesamtMin + ladeBis);
+  const abfahrtBasis = plusMin(abholung, -(anfahrtMin + ladeVor));
+  const rueckkehrBasis = plusMin(ankunft, rueckMin + ladeNach);
+
+  return {
+    abhol: abholPlace, zwischen: zwischenPlace || null, ziel: zielPlace,
+    anfahrtKm: anfahrt.km, kundenKm, rueckKm: rueckfahrt.km,
+    umwegKm: direkt ? Math.max(0, kundenKm - direkt.km) : 0,
+    abholung, ankunft, abfahrtBasis, rueckkehrBasis,
+    abwesenheitMin: Math.round((rueckkehrBasis - abfahrtBasis) / 60000),
+    ladeMin: ladeVor + ladeBis + ladeNach
+  };
+}
+
+// ===================== PREIS (identisch zum Buchungsformular, mit mehr Detail) =====================
+function beinPreisBerechnen(fp, fahrgaeste){
+  const innerhalb = plz(fp.abhol) === PLZ_NECKARTENZLINGEN;
+  const anfahrtBetrag = innerhalb ? 2.50 : anfahrtPreis(fp.anfahrtKm);
+  const kundenBetrag = fp.kundenKm * 1.50;
+  const rueckBetrag = fp.rueckKm * 1.50;
+  const rohsumme = anfahrtBetrag + kundenBetrag + rueckBetrag;
+  const zwischensumme = Math.ceil(rohsumme) + 1;
+  const mindestGegriffen = zwischensumme < 25;
+  const grundpreis = Math.max(zwischensumme, 25);
+
+  const nachtzuschlag = (imNachtfenster(fp.abholung) || imNachtfenster(fp.ankunft)) ? 15 : 0;
+  const zusatzFahrgaeste = Math.max(0, fahrgaeste - 4);
+  const fahrgastzuschlag = zusatzFahrgaeste * 5;
+  const regulaer = grundpreis + fahrgastzuschlag + nachtzuschlag;
+
+  const abholGVV = PLZ_GVV.includes(plz(fp.abhol));
+  const zielGVV = PLZ_GVV.includes(plz(fp.ziel));
+  const abholFlughafen = istFlughafenStuttgart(fp.abhol);
+  const zielFlughafen = istFlughafenStuttgart(fp.ziel);
+  const zwischenGVV = !fp.zwischen || PLZ_GVV.includes(plz(fp.zwischen));
+  const aktionGilt = ((abholGVV && zielFlughafen) || (abholFlughafen && zielGVV)) && zwischenGVV && fp.abholung <= AKTION_BIS;
+  const aktionBasis = fahrgaeste >= 5 ? 55 : 45;
+  const umwegAufschlag = fp.umwegKm * 1.50;
+  const aktionGesamt = aktionBasis + nachtzuschlag + umwegAufschlag;
+  const endpreis = aktionGilt ? aktionGesamt : regulaer;
+
+  return {
+    innerhalb, anfahrtBetrag, kundenBetrag, rueckBetrag, rohsumme, zwischensumme, mindestGegriffen, grundpreis,
+    nachtzuschlag, zusatzFahrgaeste, fahrgastzuschlag, regulaer,
+    aktionGilt, aktionBasis, umwegAufschlag, aktionGesamt, endpreis
+  };
+}
+
+function beinDetailHtml(praefix, b, fp, fahrgaeste){
+  const route = `${nurOrt(fp.abhol.formatted_address)} → ${nurOrt(fp.ziel.formatted_address)}`;
+  let s = `<div class="titel"><span>${praefix}${route}</span><span></span></div>`;
+  s += `<div class="note"><span>Abholung ${datumUhr(fp.abholung)} · Ankunft ${uhr(fp.ankunft)} · Basis: ab ${uhr(fp.abfahrtBasis)}, zurück ${uhr(fp.rueckkehrBasis)} (${Math.floor(fp.abwesenheitMin/60)} Std. ${fp.abwesenheitMin%60} Min.${fp.ladeMin ? `, inkl. ${fp.ladeMin} Min. Laden` : ""})</span><span></span></div>`;
+  s += `<div><span>Anfahrt Basis → Abholort<small>${fp.anfahrtKm.toFixed(1)} km · ${b.innerhalb ? "Pauschale 2,50 € (Abholort in Neckartenzlingen)" : "0,75 €/km bis 10 km, danach 1,50 €/km"}</small></span><span>${fmt(b.anfahrtBetrag)} €</span></div>`;
+  s += `<div><span>Kundenstrecke<small>${fp.kundenKm.toFixed(1)} km × 1,50 €${fp.zwischen ? " (inkl. Zwischenziel)" : ""}</small></span><span>${fmt(b.kundenBetrag)} €</span></div>`;
+  s += `<div><span>Rückfahrt zur Basis<small>${fp.rueckKm.toFixed(1)} km × 1,50 €</small></span><span>${fmt(b.rueckBetrag)} €</span></div>`;
+  s += `<div class="sub2"><span>Summe ${fmt(b.rohsumme)} € aufgerundet + 1 € Pauschale</span><span>${fmt(b.zwischensumme)} €</span></div>`;
+  if (b.mindestGegriffen) s += `<div class="sub2"><span>Mindestpreis 25 € angewendet</span><span></span></div>`;
+  s += `<div><span><strong>Grundpreis</strong></span><span><strong>${fmt(b.grundpreis)} €</strong></span></div>`;
+  s += `<div><span>Fahrgastzuschlag<small>${fahrgaeste} Fahrgäste, ab dem 5.: ${b.zusatzFahrgaeste} × 5 €</small></span><span>${fmt(b.fahrgastzuschlag)} €</span></div>`;
+  s += `<div><span>Nachtzuschlag<small>22:30–5:30 Uhr bei Abholung oder Ankunft</small></span><span>${fmt(b.nachtzuschlag)} €</span></div>`;
+  s += `<div><span><strong>Regulärer Preis</strong></span><span><strong>${fmt(b.regulaer)} €</strong></span></div>`;
+  if (b.aktionGilt) {
+    s += `<div class="titel"><span>Einführungsangebot Flughafentransfer (ersetzt regulären Preis)</span><span></span></div>`;
+    s += `<div><span>Aktionspreis (${fahrgaeste >= 5 ? "ab 5" : "bis 4"} Fahrgäste)</span><span>${fmt(b.aktionBasis)} €</span></div>`;
+    if (fp.umwegKm > 0) s += `<div><span>Umweg durch Zwischenziel<small>${fp.umwegKm.toFixed(1)} km × 1,50 €</small></span><span>${fmt(b.umwegAufschlag)} €</span></div>`;
+    if (b.nachtzuschlag > 0) s += `<div><span>+ Nachtzuschlag</span><span>${fmt(b.nachtzuschlag)} €</span></div>`;
+    s += `<div><span><strong>Aktionspreis gesamt</strong></span><span><strong>${fmt(b.aktionGesamt)} €</strong></span></div>`;
+  }
+  return s;
+}
+
+async function preisBerechnen(){
+  setStatus("status", "", "");
+  const hinRueckAktiv = fahrtart === "hinrueck";
+
+  if (!places.abhol) return setStatus("status", "Bitte Abholadresse aus der Vorschlagsliste auswählen.", "error");
+  if (!places.ziel) return setStatus("status", "Bitte Zieladresse aus der Vorschlagsliste auswählen.", "error");
+  const zwischenAktiv = document.getElementById("zwischenFeld").style.display !== "none" && document.getElementById("zwischen").value.trim() !== "";
+  if (zwischenAktiv && !places.zwischen) return setStatus("status", "Bitte Zwischenziel aus der Vorschlagsliste auswählen.", "error");
+
+  const datumStr = document.getElementById("datum").value;
+  const zeitStr = document.getElementById("uhrzeit").value;
+  if (!datumStr || !zeitStr) return setStatus("status", "Bitte Datum und Uhrzeit angeben.", "error");
+  const abholung = new Date(`${datumStr}T${zeitStr}`);
+
+  let ruckAbholPlace = null, ruckZielPlace = null, ruckAbholung = null;
+  if (hinRueckAktiv) {
+    ruckAbholPlace = document.getElementById("ruckAbholGleich").checked ? places.ziel : places.ruckAbhol;
+    ruckZielPlace = document.getElementById("ruckZielGleich").checked ? places.abhol : places.ruckZiel;
+    if (!ruckAbholPlace) return setStatus("status", "Bitte Abholadresse der Rückfahrt aus der Vorschlagsliste auswählen.", "error");
+    if (!ruckZielPlace) return setStatus("status", "Bitte Zieladresse der Rückfahrt aus der Vorschlagsliste auswählen.", "error");
+    const rd = document.getElementById("ruckDatum").value, rz = document.getElementById("ruckUhrzeit").value;
+    if (!rd || !rz) return setStatus("status", "Bitte Datum und Uhrzeit der Rückfahrt angeben.", "error");
+    ruckAbholung = new Date(`${rd}T${rz}`);
+  }
+
+  const ab12 = Math.max(0, parseInt(document.getElementById("ab12").value || 0));
+  const unter12 = Math.max(0, parseInt(document.getElementById("unter12").value || 0));
+  const fahrgaeste = ab12 + unter12;
+  if (fahrgaeste < 1) return setStatus("status", "Bitte mindestens einen Fahrgast angeben.", "error");
+
+  const btn = document.getElementById("berechnenBtn");
+  btn.disabled = true;
+  setStatus("status", "Strecke wird berechnet …", "");
+
+  try {
+    const hinPlan = await fahrtplanBerechnen({ abholPlace: places.abhol, zielPlace: places.ziel, zwischenPlace: zwischenAktiv ? places.zwischen : null, abholung });
+    const ruckPlan = hinRueckAktiv
+      ? await fahrtplanBerechnen({ abholPlace: ruckAbholPlace, zielPlace: ruckZielPlace, zwischenPlace: null, abholung: ruckAbholung })
+      : null;
+
+    const hin = beinPreisBerechnen(hinPlan, fahrgaeste);
+    const ruck = ruckPlan ? beinPreisBerechnen(ruckPlan, fahrgaeste) : null;
+
+    const regulaer = hin.regulaer + (ruck ? ruck.regulaer : 0);
+    const anyAktionGilt = hin.aktionGilt || (ruck && ruck.aktionGilt);
+    const beidePaketAktion = !!(ruck && hin.aktionGilt && ruck.aktionGilt);
+
+    let endpreisVorRabatt, paketBasis = 0;
+    if (beidePaketAktion) {
+      paketBasis = fahrgaeste >= 5 ? 105 : 85;
+      endpreisVorRabatt = paketBasis + hin.nachtzuschlag + ruck.nachtzuschlag + hin.umwegAufschlag + ruck.umwegAufschlag;
+    } else {
+      endpreisVorRabatt = hin.endpreis + (ruck ? ruck.endpreis : 0);
+    }
+
+    // Gutschein ODER 10 %-Einführungsrabatt (nie beides) - wie im Buchungsformular
+    const gutscheinCode = document.getElementById("gutschein").value.trim();
+    const gutscheinStatusEl = document.getElementById("gutscheinStatus");
+    gutscheinStatusEl.textContent = "";
+    let gutscheinProzent = 0;
+    if (anyAktionGilt && gutscheinCode) {
+      gutscheinStatusEl.textContent = "Gutscheincodes sind mit dem Einführungsangebot nicht kombinierbar (nicht angewendet).";
+    } else if (gutscheinCode) {
+      try {
+        const gAntwort = await fetch(GUTSCHEIN_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: gutscheinCode }) });
+        const gDaten = await gAntwort.json();
+        if (gAntwort.ok && gDaten.gueltig) { gutscheinProzent = gDaten.prozent; gutscheinStatusEl.textContent = `Gutschein angewendet: -${gutscheinProzent}%`; }
+        else gutscheinStatusEl.textContent = gDaten.grund || "Dieser Code ist ungültig.";
+      } catch (e) { gutscheinStatusEl.textContent = "Gutschein konnte nicht geprüft werden."; }
+    }
+
+    const beideVorAktionBis = hinPlan.abholung <= AKTION_BIS && (!ruckPlan || ruckPlan.abholung <= AKTION_BIS);
+    let einfuehrungsProzent = 0;
+    if (gutscheinProzent === 0 && !anyAktionGilt && beideVorAktionBis) einfuehrungsProzent = 10;
+    const standardProzent = gutscheinProzent > 0 ? gutscheinProzent : einfuehrungsProzent;
+    const nachStandard = endpreisVorRabatt * (1 - standardProzent / 100);
+
+    const manuellProzent = Math.min(100, Math.max(0, parseFloat(document.getElementById("manuellRabatt").value || 0)));
+    const nachManuell = nachStandard * (1 - manuellProzent / 100);
+    const sonderzuschlag = Math.max(0, parseFloat(document.getElementById("sonderzuschlag").value || 0));
+    const berechnet = nachManuell + sonderzuschlag;
+    const eigenerRaw = document.getElementById("eigenerPreis").value;
+    const eigenerPreis = eigenerRaw !== "" ? Math.max(0, parseFloat(eigenerRaw)) : null;
+    const gesamtBrutto = Math.round((eigenerPreis !== null ? eigenerPreis : berechnet) * 100) / 100;
+    const netto = gesamtBrutto / 1.19;
+    const mwst = gesamtBrutto - netto;
+
+    // ---------- Anzeige ----------
+    let r = beinDetailHtml(ruckPlan ? "Hinfahrt: " : "", hin, hinPlan, fahrgaeste);
+    if (ruckPlan) {
+      r += beinDetailHtml("Rückfahrt: ", ruck, ruckPlan, fahrgaeste);
+      if (ruckPlan.abfahrtBasis < hinPlan.rueckkehrBasis) {
+        r += `<div class="note"><span>Hinweis: Die Rückfahrt beginnt (inkl. Anfahrt) vor der Rückkehr der Hinfahrt zur Basis – Kalender-Blöcke überschneiden sich.</span><span></span></div>`;
+      }
+    }
+    r += `<div class="titel"><span>Zusammenfassung</span><span></span></div>`;
+    r += `<div class="sub2"><span>Zum Vergleich: regulärer Preis ohne Aktionen</span><span>${fmt(regulaer)} €</span></div>`;
+    if (beidePaketAktion) {
+      r += `<div><span>Einführungsangebot Hin- &amp; Rückfahrt-Paket<small>Paketpreis ${fahrgaeste >= 5 ? "ab 5" : "bis 4"} Fahrgäste ${fmt(paketBasis)} € + Nacht-/Umwegzuschläge</small></span><span>${fmt(endpreisVorRabatt)} €</span></div>`;
+    } else if (anyAktionGilt) {
+      r += `<div><span>Preis mit Einführungsangebot (Flughafen)</span><span>${fmt(endpreisVorRabatt)} €</span></div>`;
+    } else {
+      r += `<div><span>Preis vor Rabatt</span><span>${fmt(endpreisVorRabatt)} €</span></div>`;
+    }
+    if (gutscheinProzent > 0) r += `<div><span>Gutschein ${gutscheinCode.toUpperCase()} (-${gutscheinProzent}%)</span><span>-${fmt(endpreisVorRabatt - nachStandard)} €</span></div>`;
+    if (einfuehrungsProzent > 0) r += `<div><span>Einführungsangebot bis 20.12. (-${einfuehrungsProzent}%)</span><span>-${fmt(endpreisVorRabatt - nachStandard)} €</span></div>`;
+    if (manuellProzent > 0) r += `<div><span>Eigener Rabatt (-${manuellProzent}%)</span><span>-${fmt(nachStandard - nachManuell)} €</span></div>`;
+    if (sonderzuschlag > 0) r += `<div><span>Sonderzuschlag</span><span>+${fmt(sonderzuschlag)} €</span></div>`;
+    if (eigenerPreis !== null) {
+      r += `<div class="sub2"><span>Berechneter Preis</span><span>${fmt(berechnet)} €</span></div>`;
+      r += `<div><span>Eigener Gesamtpreis (überschreibt die Berechnung)</span><span>${fmt(eigenerPreis)} €</span></div>`;
+    }
+    r += `<div class="sub2"><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
+    r += `<div class="sub2"><span>zzgl. 19 % USt.</span><span>${fmt(mwst)} €</span></div>`;
+    r += `<div class="total"><span>Gesamtpreis (brutto)</span><span>${fmt(gesamtBrutto)} €</span></div>`;
+    document.getElementById("tabelle").innerHTML = r;
+    document.getElementById("ergebnis").style.display = "block";
+
+    // ---------- Angebots-Vorbelegung ----------
+    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12 };
+    const kurz = document.getElementById("agKurz");
+    if (!kurz.value.trim() || kurz.dataset.auto === "1") {
+      kurz.value = `Transfer ${nurOrt(hinPlan.abhol.formatted_address)} → ${nurOrt(hinPlan.ziel.formatted_address)}${ruckPlan ? " (Hin- und Rückfahrt)" : ""}`;
+      kurz.dataset.auto = "1";
+    }
+    document.getElementById("agBlockStart").value = isoZuDatetimeLocal(hinPlan.abfahrtBasis);
+    document.getElementById("agBlockEnde").value = isoZuDatetimeLocal(hinPlan.rueckkehrBasis);
+    document.getElementById("rueckBlockZeile").style.display = ruckPlan ? "grid" : "none";
+    if (ruckPlan) {
+      document.getElementById("agRueckBlockStart").value = isoZuDatetimeLocal(ruckPlan.abfahrtBasis);
+      document.getElementById("agRueckBlockEnde").value = isoZuDatetimeLocal(ruckPlan.rueckkehrBasis);
+    }
+    rechnungsadresseStatus();
+    setStatus("status", "", "");
+  } catch (err) {
+    setStatus("status", typeof err === "string" ? err : "Berechnung fehlgeschlagen.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===================== ANGEBOT SENDEN =====================
+function setAngebotStatus(msg, cls){ setStatus("angebotStatus", msg, cls); }
+function gueltigeEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
+
+async function angebotSenden(){
+  setAngebotStatus("", "");
+  if (!letztesErgebnis) return setAngebotStatus("Bitte zuerst den Preis berechnen.", "error");
+  const { gesamtBrutto, hinPlan, ruckPlan, ab12, unter12 } = letztesErgebnis;
+
+  const v = (id) => document.getElementById(id).value.trim();
+  const rechnungsadresse = { strasse: v("raStrasse"), plz: v("raPlz"), ort: v("raOrt"), land: v("raLand") };
+  if (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land) {
+    return setAngebotStatus("Bitte vollständige Rechnungsadresse angeben.", "error");
+  }
+  const kurzbeschreibung = v("agKurz");
+  if (!kurzbeschreibung) return setAngebotStatus("Bitte eine Kurzbeschreibung angeben.", "error");
+  if (!v("agBlockStart") || !v("agBlockEnde")) return setAngebotStatus("Bitte den Kalender-Block der Hinfahrt angeben.", "error");
+  if (ruckPlan && (!v("agRueckBlockStart") || !v("agRueckBlockEnde"))) return setAngebotStatus("Bitte den Kalender-Block der Rückfahrt angeben.", "error");
+
+  let kunde, gastname = "";
+  if (kundentyp === "privat") {
+    if (!v("pVorname") || !v("pNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen angeben.", "error");
+    if (!gueltigeEmail(v("pEmail"))) return setAngebotStatus("Bitte eine gültige E-Mail-Adresse angeben.", "error");
+    kunde = {
+      typ: "privat", kategorie: "privat", anrede: v("pAnrede"), vorname: v("pVorname"), nachname: v("pNachname"),
+      name: `${v("pVorname")} ${v("pNachname")}`.trim(), telefon: v("pTelefon"), email: v("pEmail"), rechnungsadresse
+    };
+  } else {
+    const istHotel = kundentyp === "hotel";
+    const p = istHotel ? "h" : "f";
+    const firmenname = istHotel ? v("hHotelname") : v("fFirmenname");
+    if (!firmenname) return setAngebotStatus(istHotel ? "Bitte den Hotelnamen angeben." : "Bitte den Firmennamen angeben.", "error");
+    if (!v(p + "Vorname") || !v(p + "Nachname")) return setAngebotStatus("Bitte Vor- und Nachnamen des Ansprechpartners angeben.", "error");
+    if (!gueltigeEmail(v(p + "Email"))) return setAngebotStatus("Bitte eine gültige E-Mail-Adresse angeben.", "error");
+    if (istHotel && !v("hGastname")) return setAngebotStatus("Bitte den Gastnamen angeben.", "error");
+    gastname = istHotel ? v("hGastname") : v("fHauptName");
+    const ansprechName = `${v(p + "Vorname")} ${v(p + "Nachname")}`.trim();
+    kunde = {
+      typ: "firma", kategorie: kundentyp, firmenname, rechnungsadresse,
+      buchendePerson: {
+        anrede: v(p + "Anrede"), vorname: v(p + "Vorname"), nachname: v(p + "Nachname"), name: ansprechName,
+        telefon: v(p + "Telefon"), email: v(p + "Email")
+      },
+      zimmer: istHotel ? v("hZimmer") : ""
+    };
+  }
+
+  const bemerkungenBasis = v("agBemerkungen");
+  const zimmerText = kundentyp === "hotel" && v("hZimmer") ? `Zimmer ${v("hZimmer")}` : "";
+  const bemerkungen = [bemerkungenBasis, zimmerText].filter(Boolean).join(" · ");
+
+  const body = {
+    referenz: v("agReferenz").toUpperCase() || null,
+    kunde,
+    fahrt: {
+      beschreibung: kurzbeschreibung,
+      abholadresse: hinPlan.abhol.formatted_address,
+      zieladresse: hinPlan.ziel.formatted_address,
+      zeitpunktISO: hinPlan.abholung.toISOString(),
+      ankunftISO: hinPlan.ankunft.toISOString(),
+      personen: ab12 + unter12,
+      gepaeck: v("agGepaeck"),
+      bemerkungen,
+      gastname,
+      rueckfahrt: ruckPlan ? {
+        abholadresse: ruckPlan.abhol.formatted_address,
+        zieladresse: ruckPlan.ziel.formatted_address,
+        zeitpunktISO: ruckPlan.abholung.toISOString(),
+        ankunftISO: ruckPlan.ankunft.toISOString()
+      } : null
+    },
+    preis: { gesamtBrutto },
+    kalender: {
+      blockStartISO: new Date(v("agBlockStart")).toISOString(),
+      blockEndeISO: new Date(v("agBlockEnde")).toISOString(),
+      rueck: ruckPlan ? {
+        blockStartISO: new Date(v("agRueckBlockStart")).toISOString(),
+        blockEndeISO: new Date(v("agRueckBlockEnde")).toISOString()
+      } : null
+    }
+  };
+
+  const btn = document.getElementById("angebotBtn");
+  btn.disabled = true;
+  setAngebotStatus("Angebot wird verschickt …", "");
+  try {
+    const antwort = await fetch(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const daten = await antwort.json();
+    if (!antwort.ok) throw new Error(daten.fehler || "Angebot konnte nicht verschickt werden.");
+    setAngebotStatus(`✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`, "ok");
+  } catch (err) {
+    setAngebotStatus(err.message || "Angebot konnte nicht verschickt werden.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=initAutocomplete&language=de&region=DE">
+</script>
+</body>
+</html>
