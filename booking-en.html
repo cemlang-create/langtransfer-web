@@ -299,6 +299,19 @@
   <div class="block" id="schritt3">
     <h2>Booking request</h2>
 
+    <div id="flugBlock" style="display:none;">
+      <div class="field" id="flugHinFeld" style="display:none;">
+        <label for="flugHin" id="flugHinLabel">Flight number (optional)</label>
+        <input type="text" id="flugHin" placeholder="e.g. LH 1234" maxlength="20" autocomplete="off">
+        <p class="hinweis" id="flugHinHinweis"></p>
+      </div>
+      <div class="field" id="flugRueckFeld" style="display:none;">
+        <label for="flugRueck" id="flugRueckLabel">Flight number (optional)</label>
+        <input type="text" id="flugRueck" placeholder="e.g. LH 1234" maxlength="20" autocomplete="off">
+        <p class="hinweis" id="flugRueckHinweis"></p>
+      </div>
+    </div>
+
     <div class="toggle">
       <button id="typFirma" onclick="setBuchungstyp('firma')">I'm booking for a company.</button>
       <button id="typPrivat" onclick="setBuchungstyp('privat')">I'm booking privately.</button>
@@ -584,7 +597,7 @@ function initAutocomplete(){
   document.getElementById("datum").min = lokalesDatum(new Date());
   document.getElementById("ruckDatum").min = lokalesDatum(new Date());
   vorbelegungAusStartseite();
-  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name"] };
+  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name","types"] };
   ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
     const input = document.getElementById(id);
     const ac = new google.maps.places.Autocomplete(input, optionen);
@@ -659,6 +672,43 @@ function plz(place){
   const c = place.address_components.find(x => x.types.includes("postal_code"));
   return c ? c.long_name : "";
 }
+const FLUG_TEXTE = {
+  abholung: { label: "Flight number of your arriving flight (optional)", hinweis: "For pickups at the airport, this lets us keep an eye on delays and be at the exit on time." },
+  ziel:     { label: "Flight number of your departing flight (optional)", hinweis: "So we know your departure time and get you to the airport in good time." },
+  beides:   { label: "Flight number (optional)", hinweis: "" }
+};
+const FLUG_HIN = "Outbound: ", FLUG_RUECK = "Return: ";
+
+/** Flughafen erkannt: Google-Typ "airport", Stuttgarter Flughafen oder "Flughafen"/"Airport" in Name bzw. Adresse. */
+function istFlughafen(place){
+  if (!place) return false;
+  if ((place.types || []).includes("airport")) return true;
+  if (istFlughafenStuttgart(place)) return true;
+  const text = ((place.formatted_address || "") + " " + (place.name || "")).toLowerCase();
+  return text.includes("flughafen") || text.includes("airport");
+}
+/** "abholung" (Abholung am Flughafen), "ziel" (Fahrt zum Flughafen), "beides" oder null. */
+function flughafenArt(fahrtplan){
+  if (!fahrtplan) return null;
+  const a = istFlughafen(fahrtplan.abhol), z = istFlughafen(fahrtplan.ziel);
+  return a && z ? "beides" : a ? "abholung" : z ? "ziel" : null;
+}
+/** Zeigt die Flugnummern-Felder nur, wenn ein Flughafen beteiligt ist (Hin- bzw. Rückfahrt getrennt). */
+function flugfelderAktualisieren(){
+  const artHin = flughafenArt(plan), artRueck = flughafenArt(planRueck);
+  const felder = [["Hin", artHin, planRueck ? FLUG_HIN : ""], ["Rueck", artRueck, FLUG_RUECK]];
+  felder.forEach(([name, art, praefix]) => {
+    document.getElementById(`flug${name}Feld`).style.display = art ? "block" : "none";
+    if (art) {
+      document.getElementById(`flug${name}Label`).textContent = praefix + FLUG_TEXTE[art].label;
+      document.getElementById(`flug${name}Hinweis`).textContent = FLUG_TEXTE[art].hinweis;
+    } else {
+      document.getElementById(`flug${name}`).value = "";
+    }
+  });
+  document.getElementById("flugBlock").style.display = (artHin || artRueck) ? "block" : "none";
+}
+
 function istFlughafenStuttgart(place){
   const text = ((place.formatted_address || "") + " " + (place.name || "")).toLowerCase();
   return plz(place) === PLZ_FLUGHAFEN_STR || (text.includes("flughafen") && text.includes("stuttgart"));
@@ -1192,6 +1242,7 @@ async function preisBerechnen(){
     hinRueckAktiv
   };
   document.getElementById("schritt3").style.display = "block";
+  flugfelderAktualisieren();
   document.getElementById("anfrageBtn").style.display =
     document.getElementById("formFirma").style.display !== "none" ||
     document.getElementById("formPrivat").style.display !== "none" ? "block" : "none";
@@ -1371,13 +1422,15 @@ async function buchungsanfrageSenden(){
           ankunftISO: plan.ankunft.toISOString(),
           blockStartISO: plan.abfahrtBasis.toISOString(),
           blockEndeISO: plan.rueckkehrBasis.toISOString(),
+          flugnummer: document.getElementById("flugHinFeld").style.display !== "none" ? document.getElementById("flugHin").value.trim() : "",
           rueckfahrt: planRueck ? {
             abholadresse: planRueck.abhol.formatted_address,
             zieladresse: planRueck.ziel.formatted_address,
             zeitpunktISO: planRueck.abholung.toISOString(),
             ankunftISO: planRueck.ankunft.toISOString(),
             blockStartISO: planRueck.abfahrtBasis.toISOString(),
-            blockEndeISO: planRueck.rueckkehrBasis.toISOString()
+            blockEndeISO: planRueck.rueckkehrBasis.toISOString(),
+            flugnummer: document.getElementById("flugRueckFeld").style.display !== "none" ? document.getElementById("flugRueck").value.trim() : ""
           } : null,
           fahrgaesteAb12: preisPlan.ab12,
           fahrgaesteUnter12: preisPlan.unter12,

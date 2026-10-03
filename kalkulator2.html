@@ -115,6 +115,19 @@
     <div class="tabelle" id="tabelle"></div>
 
     <div id="typBereich" style="display:block;">
+      <div id="flugBlock" style="display:none;">
+        <h2>Flugdaten</h2>
+        <p class="hint" style="margin:-6px 0 10px;">Flughafen erkannt – bitte beim Kunden nach der Flugnummer fragen (nicht verpflichtend).</p>
+        <div class="field" id="flugHinFeld" style="display:none;">
+          <label for="flugHin" id="flugHinLabel">Flugnummer (optional)</label>
+          <input type="text" id="flugHin" placeholder="z. B. LH 1234" maxlength="20">
+        </div>
+        <div class="field" id="flugRueckFeld" style="display:none;">
+          <label for="flugRueck" id="flugRueckLabel">Rückfahrt: Flugnummer (optional)</label>
+          <input type="text" id="flugRueck" placeholder="z. B. LH 1234" maxlength="20">
+        </div>
+      </div>
+
       <h2>Kunde &amp; Angebot</h2>
       <div class="toggle" id="typToggle">
         <button id="typPrivat" class="active" onclick="setKundentyp('privat')">Privat</button>
@@ -153,7 +166,7 @@
         </div>
 
         <div class="field" style="margin-top:6px;">
-          <label>Wer bezahlt die Fahrt?</label>
+          <label>Wer bekommt die Rechnung?</label>
           <label class="check"><input type="radio" name="zahler" value="firma" checked onchange="zahlerGeaendert()"> <span id="zahlerFirmaText">Firma</span></label>
           <label class="check"><input type="radio" name="zahler" value="fahrgast" onchange="zahlerGeaendert()"> Fahrgast</label>
         </div>
@@ -171,6 +184,21 @@
           <div class="field"><label for="fgEmail" style="font-weight:400;">E-Mail</label><input type="email" id="fgEmail"></div>
         </div>
         <div class="field" id="zimmerFeld" style="display:none;"><label for="gZimmer">Zimmernummer (optional)</label><input type="text" id="gZimmer"></div>
+      </div>
+
+      <!-- RECHNUNGSDATEN (Firma / Abteilung / Kostenstelle) -->
+      <div id="rechnungsBlock" style="display:none; margin-top:6px;">
+        <label id="rcTitel">Rechnungsdaten</label>
+        <label class="check" id="rcCheckZeile" style="display:none;"><input type="checkbox" id="rcCheck" onchange="zahlerGeaendert()"> Rechnung auf eine Firma ausstellen (z. B. Arbeitgeber des Fahrgasts)</label>
+        <div id="rcFelder">
+          <p class="hint" id="rcHinweis" style="margin:0 0 8px;"></p>
+          <div class="field"><label for="rcFirma" style="font-weight:400;">Firmenname auf der Rechnung</label><input type="text" id="rcFirma"></div>
+          <div class="row">
+            <div class="field"><label for="rcAnsprech" style="font-weight:400;">Ansprechpartner (z. Hd.)</label><input type="text" id="rcAnsprech"></div>
+            <div class="field"><label for="rcAbteilung" style="font-weight:400;">Abteilung</label><input type="text" id="rcAbteilung"></div>
+          </div>
+          <div class="field"><label for="rcKostenstelle" style="font-weight:400;">Kostenstelle</label><input type="text" id="rcKostenstelle"></div>
+        </div>
       </div>
 
       <!-- RECHNUNGSADRESSE (gemeinsam) -->
@@ -208,7 +236,12 @@
       </div>
       <p class="hint" style="margin-bottom:10px;">Vorbelegt mit Abfahrt/Rückkehr an der Basis aus der Berechnung – bei Tagesaufträgen ggf. anpassen.</p>
 
-      <h2 style="margin-top:22px;">Versand</h2>
+      <h2 style="margin-top:22px;">Bezahlung &amp; Versand</h2>
+      <div class="field">
+        <label>Wie wird die Fahrt bezahlt?</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="link" checked onchange="modusTexteAktualisieren()"> Im Vorfeld per Zahlungslink (Stripe)</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="fahrzeug" onchange="modusTexteAktualisieren()"> Im Fahrzeug per Karte (SumUp)</label>
+      </div>
       <div class="toggle">
         <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
         <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
@@ -295,6 +328,36 @@ function strecke(origin, destination){
     });
   });
 }
+/** Flughafen erkannt: Google-Typ "airport" oder "Flughafen"/"Airport" im Namen bzw. in der Adresse. */
+function istFlughafen(place){
+  if (!place) return false;
+  if ((place.types || []).includes("airport")) return true;
+  if (istFlughafenStuttgart(place)) return true;
+  const text = ((place.formatted_address || "") + " " + (place.name || "")).toLowerCase();
+  return text.includes("flughafen") || text.includes("airport");
+}
+/** "abholung" (Abholung am Flughafen), "ziel" (Fahrt zum Flughafen), "beides" oder null. */
+function flughafenArt(plan){
+  if (!plan) return null;
+  const a = istFlughafen(plan.abhol), z = istFlughafen(plan.ziel);
+  return a && z ? "beides" : a ? "abholung" : z ? "ziel" : null;
+}
+function flugLabel(art, praefix){
+  const text = art === "abholung" ? "Flugnummer des ankommenden Flugs"
+    : art === "ziel" ? "Flugnummer des Abflugs" : "Flugnummer";
+  return `${praefix}${text} (optional)`;
+}
+function flugfelderAktualisieren(hinPlan, ruckPlan){
+  const artHin = flughafenArt(hinPlan), artRueck = flughafenArt(ruckPlan);
+  el("flugHinFeld").style.display = artHin ? "block" : "none";
+  el("flugRueckFeld").style.display = artRueck ? "block" : "none";
+  el("flugBlock").style.display = (artHin || artRueck) ? "block" : "none";
+  if (artHin) el("flugHinLabel").textContent = flugLabel(artHin, ruckPlan ? "Hinfahrt: " : "");
+  else el("flugHin").value = "";
+  if (artRueck) el("flugRueckLabel").textContent = flugLabel(artRueck, "Rückfahrt: ");
+  else el("flugRueck").value = "";
+}
+
 function adresseAusPlace(place){
   const teile = {};
   (place && place.address_components ? place.address_components : []).forEach((c) => {
@@ -312,7 +375,7 @@ function adresseAusPlace(place){
 // ===================== AUTOCOMPLETE =====================
 function initAutocomplete(){
   document.getElementById("datum").value = new Date().toISOString().slice(0, 10);
-  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name"] };
+  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name","types"] };
   ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
     const input = document.getElementById(id);
     const ac = new google.maps.places.Autocomplete(input, optionen);
@@ -330,7 +393,12 @@ function initAutocomplete(){
 // Manuell geänderte Kurzbeschreibung nicht bei jeder Neuberechnung überschreiben
 document.getElementById("agKurz").addEventListener("input", (e) => { e.target.dataset.auto = "0"; });
 
-document.getElementById("typBereich").addEventListener("input", () => empfaengerAktualisieren());
+document.getElementById("typBereich").addEventListener("input", (e) => {
+  // Selbst bearbeitete Rechnungsdaten bleiben stehen (nicht mehr automatisch überschreiben)
+  if (e.target && (e.target.id === "rcFirma" || e.target.id === "rcAnsprech")) { e.target.dataset.touched = "1"; delete e.target.dataset.auto; }
+  rcVorbelegen();
+  empfaengerAktualisieren();
+});
 
 function setFahrtart(f){
   fahrtart = f;
@@ -364,6 +432,7 @@ function aktuellerZahler(){
 
 function setKundentyp(t){
   kundentyp = t;
+  delete el("rcCheck").dataset.gesetzt; // Standardwert des Firmen-Hakens für die neue Kundenart neu setzen
   ["privat", "firma", "hotel"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
   el("formPrivat").style.display = t === "privat" ? "block" : "none";
   el("formGeschaeft").style.display = t === "privat" ? "none" : "block";
@@ -375,13 +444,71 @@ function setKundentyp(t){
   zahlerGeaendert();
 }
 
+/**
+ * Rechnungsmodus:
+ *  "keine"     - Rechnung geht an die Person/das Hotel selbst, keine Zusatzfelder
+ *  "vorbelegt" - Firma bekommt die Rechnung: Firmendaten vorbelegt, änderbar (Name, z. Hd., Abteilung, Kostenstelle)
+ *  "firma"     - Fahrgast bekommt die Rechnung, aber auf eine (andere) Firma ausgestellt
+ */
+function rechnungsmodus(){
+  if (kundentyp === "privat") return "keine";
+  if (aktuellerZahler() === "fahrgast") return el("rcCheck").checked ? "firma" : "keine";
+  return kundentyp === "firma" ? "vorbelegt" : "keine";
+}
+function rcVorbelegen(){
+  if (rechnungsmodus() !== "vorbelegt") return;
+  const quellen = {
+    rcFirma: el("gName").value.trim(),
+    rcAnsprech: `${el("gVorname").value.trim()} ${el("gNachname").value.trim()}`.trim()
+  };
+  Object.keys(quellen).forEach(id => {
+    const f = el(id);
+    if (!f.dataset.touched) { f.value = quellen[id]; f.dataset.auto = "1"; }
+  });
+}
+let letzterRechnungsKontext = null;
+function rechnungsblockAktualisieren(){
+  const fg = aktuellerZahler() === "fahrgast";
+  // Wechselt Kundenart oder Rechnungsempfänger, gehören die Rechnungsdaten zu einer anderen Firma -> leeren
+  const kontext = kundentyp + "|" + aktuellerZahler();
+  if (kontext !== letzterRechnungsKontext) {
+    ["rcFirma", "rcAnsprech", "rcAbteilung", "rcKostenstelle"].forEach(id => {
+      const f = el(id);
+      f.value = "";
+      delete f.dataset.touched;
+      delete f.dataset.auto;
+    });
+    letzterRechnungsKontext = kontext;
+  }
+  const m = rechnungsmodus();
+  el("rechnungsBlock").style.display = kundentyp === "privat" ? "none" : "block";
+  el("rcCheckZeile").style.display = (kundentyp !== "privat" && fg) ? "flex" : "none";
+  el("rcFelder").style.display = m === "keine" ? "none" : "block";
+  el("rcHinweis").textContent = m === "vorbelegt"
+    ? "Aus den Firmendaten vorbelegt – bei Bedarf ändern. Abteilung und Kostenstelle sind optional."
+    : m === "firma" ? "Die Rechnung geht per Mail an den Fahrgast, wird aber auf diese Firma ausgestellt (Name und Adresse der Firma)." : "";
+  el("rcTitel").textContent = m === "firma" ? "Rechnungsdaten (Firma des Fahrgasts)" : "Rechnungsdaten";
+  if (m === "vorbelegt") rcVorbelegen();
+}
+
 function zahlerGeaendert(){
   const fg = aktuellerZahler() === "fahrgast";
   const hotel = kundentyp === "hotel";
   const art = hotel ? "Hotel" : "Firma";
-  el("raTitel").textContent = kundentyp === "privat" ? "Rechnungsadresse" : `Rechnungsadresse (${fg ? "Fahrgast" : art})`;
+  // Beim Firmen-Fahrgast ist die Rechnung an eine Firma die Regel, beim Hotelgast die Ausnahme
+  if (kundentyp !== "privat" && fg && !el("rcCheck").dataset.gesetzt) {
+    el("rcCheck").checked = kundentyp === "firma";
+    el("rcCheck").dataset.gesetzt = "1";
+  }
+  if (!fg) delete el("rcCheck").dataset.gesetzt;
+  rechnungsblockAktualisieren();
+  const m = rechnungsmodus();
+  el("raTitel").textContent = kundentyp === "privat" ? "Rechnungsadresse"
+    : m === "keine" && fg ? "Rechnungsadresse (Fahrgast)"
+    : m === "firma" ? "Rechnungsadresse (Firma)"
+    : `Rechnungsadresse (${art})`;
   el("fgHinweis").textContent = fg
-    ? "Der Fahrgast zahlt selbst: Angebot/Auftragsbestätigung und Rechnung gehen an ihn. Bitte alle Kontaktdaten angeben."
+    ? "Der Fahrgast bekommt die Rechnung: Angebot/Auftragsbestätigung und Rechnung gehen per Mail an ihn. Bitte alle Kontaktdaten angeben."
     : (hotel ? "Name des Hotelgasts (Pflicht). Telefon/E-Mail optional." : "Optional – nur falls der Fahrgast jemand anderes als die buchende Person ist.");
   // Die Adresse des Fahrgasts ist nicht automatisch die Abholadresse (z. B. Hotel) - Felder zum Ausfüllen freigeben
   if (kundentyp !== "privat" && fg && el("raGleich").checked) {
@@ -392,14 +519,23 @@ function zahlerGeaendert(){
   empfaengerAktualisieren();
 }
 
+function aktuelleZahlungsart(){
+  const r = document.querySelector('input[name="zahlungsart"]:checked');
+  return r ? r.value : "link";
+}
 function setModus(m){
   modus = m;
   el("modusAngebot").classList.toggle("active", m === "angebot");
   el("modusAuftrag").classList.toggle("active", m === "auftrag");
   el("angebotBtn").textContent = m === "angebot" ? "Angebot senden" : "Auftrag senden";
-  el("modusHinweis").textContent = m === "angebot"
-    ? "Der Kunde bekommt das Angebot mit den Buttons Annehmen / Änderungen anfragen / Wird nicht mehr benötigt. Kalendertermin und Zahlungslink entstehen erst bei Annahme."
-    : "Der Auftrag gilt sofort als erteilt: Kalendereinträge werden jetzt angelegt und der Kunde bekommt direkt die Bestätigung mit Zahlungslink.";
+  modusTexteAktualisieren();
+}
+function modusTexteAktualisieren(){
+  const fahrzeug = aktuelleZahlungsart() === "fahrzeug";
+  const zahlung = fahrzeug ? "Es gibt keinen Zahlungslink – bezahlt wird per Karte direkt im Fahrzeug." : "Der Kunde bekommt einen Zahlungslink.";
+  el("modusHinweis").textContent = modus === "angebot"
+    ? `Der Kunde bekommt das Angebot mit den Buttons Annehmen / Änderungen anfragen / Wird nicht mehr benötigt. Kalendertermin${fahrzeug ? "" : " und Zahlungslink"} entstehen erst bei Annahme. ${zahlung}`
+    : `Der Auftrag gilt sofort als erteilt: Kalendereinträge werden jetzt angelegt und der Kunde bekommt direkt die Bestätigung. ${zahlung}`;
 }
 
 /** Zeigt, an wen Angebot/Auftrag und Rechnung gehen (der Zahler). */
@@ -644,6 +780,7 @@ async function preisBerechnen(){
 
     // ---------- Angebots-Vorbelegung ----------
     letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12 };
+    flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
     if (!kurz.value.trim() || kurz.dataset.auto === "1") {
       kurz.value = `Transfer ${nurOrt(hinPlan.abhol.formatted_address)} → ${nurOrt(hinPlan.ziel.formatted_address)}${ruckPlan ? " (Hin- und Rückfahrt)" : ""}`;
@@ -726,14 +863,27 @@ async function angebotSenden(){
       } : null,
       zimmer: istHotel ? v("gZimmer") : ""
     };
+
+    // Rechnungsdaten (Firma / Abteilung / Kostenstelle), je nach Rechnungsmodus
+    const modusRechnung = rechnungsmodus();
+    if (modusRechnung !== "keine") {
+      if (!v("rcFirma")) return setAngebotStatus("Bitte den Firmennamen für die Rechnung angeben.", "error");
+      kunde.rechnungFirma = {
+        name: v("rcFirma"), ansprechpartner: v("rcAnsprech"), abteilung: v("rcAbteilung"), kostenstelle: v("rcKostenstelle")
+      };
+    }
   }
 
   const bemerkungenBasis = v("agBemerkungen");
   const zimmerText = kundentyp === "hotel" && v("gZimmer") ? `Zimmer ${v("gZimmer")}` : "";
   const bemerkungen = [bemerkungenBasis, zimmerText].filter(Boolean).join(" · ");
 
+  const flugHin = el("flugHinFeld").style.display !== "none" ? v("flugHin") : "";
+  const flugRueck = ruckPlan && el("flugRueckFeld").style.display !== "none" ? v("flugRueck") : "";
+
   const body = {
     modus,
+    zahlungsart: aktuelleZahlungsart(),
     referenz: v("agReferenz").toUpperCase() || null,
     kunde,
     fahrt: {
@@ -746,11 +896,13 @@ async function angebotSenden(){
       gepaeck: v("agGepaeck"),
       bemerkungen,
       gastname,
+      flugnummer: flugHin,
       rueckfahrt: ruckPlan ? {
         abholadresse: ruckPlan.abhol.formatted_address,
         zieladresse: ruckPlan.ziel.formatted_address,
         zeitpunktISO: ruckPlan.abholung.toISOString(),
-        ankunftISO: ruckPlan.ankunft.toISOString()
+        ankunftISO: ruckPlan.ankunft.toISOString(),
+        flugnummer: flugRueck
       } : null
     },
     preis: { gesamtBrutto },
@@ -765,7 +917,7 @@ async function angebotSenden(){
   };
 
   const istAuftrag = modus === "auftrag";
-  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung mit Zahlungslink.")) return;
+  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
@@ -776,7 +928,7 @@ async function angebotSenden(){
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
       istAuftrag
-        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. Zahlungslink ist beim Kunden, die Kalendereinträge sind angelegt.`
+        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
   } catch (err) {
