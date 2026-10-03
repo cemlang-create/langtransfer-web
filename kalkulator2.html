@@ -24,7 +24,7 @@
     border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);
   }
   input:focus, select:focus, textarea:focus{outline:none;border-color:var(--moss);}
-  input[type=checkbox]{width:17px;height:17px;accent-color:var(--moss);}
+  input[type=checkbox], input[type=radio]{width:17px;height:17px;accent-color:var(--moss);}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
   @media (max-width:560px){ .row, .row3{grid-template-columns:1fr;} }
@@ -136,44 +136,46 @@
         </div>
       </div>
 
-      <!-- FIRMA -->
-      <div id="formFirma" style="display:none;">
-        <div class="field"><label for="fFirmenname">Firmenname</label><input type="text" id="fFirmenname"></div>
-        <div class="row3">
-          <div class="field"><label for="fAnrede">Ansprechpartner: Anrede</label>
-            <select id="fAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
-          <div class="field"><label for="fVorname">Vorname</label><input type="text" id="fVorname"></div>
-          <div class="field"><label for="fNachname">Nachname</label><input type="text" id="fNachname"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label for="fTelefon">Telefon</label><input type="text" id="fTelefon"></div>
-          <div class="field"><label for="fEmail">E-Mail</label><input type="email" id="fEmail"></div>
-        </div>
-        <div class="field"><label for="fHauptName">Hauptfahrgast (optional)</label><input type="text" id="fHauptName"></div>
-      </div>
+      <!-- FIRMA / HOTEL -->
+      <div id="formGeschaeft" style="display:none;">
+        <div class="field"><label for="gName" id="gNameLabel">Firmenname</label><input type="text" id="gName"></div>
 
-      <!-- HOTEL -->
-      <div id="formHotel" style="display:none;">
-        <div class="field"><label for="hHotelname">Hotelname</label><input type="text" id="hHotelname"></div>
+        <label>Buchende Person / Ansprechpartner</label>
         <div class="row3">
-          <div class="field"><label for="hAnrede">Ansprechpartner: Anrede</label>
-            <select id="hAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
-          <div class="field"><label for="hVorname">Vorname</label><input type="text" id="hVorname"></div>
-          <div class="field"><label for="hNachname">Nachname</label><input type="text" id="hNachname"></div>
+          <div class="field"><label for="gAnrede" style="font-weight:400;">Anrede</label>
+            <select id="gAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="gVorname" style="font-weight:400;">Vorname</label><input type="text" id="gVorname"></div>
+          <div class="field"><label for="gNachname" style="font-weight:400;">Nachname</label><input type="text" id="gNachname"></div>
         </div>
         <div class="row">
-          <div class="field"><label for="hTelefon">Telefon (Rezeption/Ansprechpartner)</label><input type="text" id="hTelefon"></div>
-          <div class="field"><label for="hEmail">E-Mail</label><input type="email" id="hEmail"></div>
+          <div class="field"><label for="gTelefon" style="font-weight:400;">Telefon</label><input type="text" id="gTelefon"></div>
+          <div class="field"><label for="gEmail" style="font-weight:400;">E-Mail</label><input type="email" id="gEmail"></div>
+        </div>
+
+        <div class="field" style="margin-top:6px;">
+          <label>Wer bezahlt die Fahrt?</label>
+          <label class="check"><input type="radio" name="zahler" value="firma" checked onchange="zahlerGeaendert()"> <span id="zahlerFirmaText">Firma</span></label>
+          <label class="check"><input type="radio" name="zahler" value="fahrgast" onchange="zahlerGeaendert()"> Fahrgast</label>
+        </div>
+
+        <label id="fgTitel">Fahrgast</label>
+        <p class="hint" id="fgHinweis" style="margin:0 0 8px;"></p>
+        <div class="row3">
+          <div class="field"><label for="fgAnrede" style="font-weight:400;">Anrede</label>
+            <select id="fgAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="fgVorname" style="font-weight:400;">Vorname</label><input type="text" id="fgVorname"></div>
+          <div class="field"><label for="fgNachname" style="font-weight:400;">Nachname</label><input type="text" id="fgNachname"></div>
         </div>
         <div class="row">
-          <div class="field"><label for="hGastname">Gastname</label><input type="text" id="hGastname" placeholder="Name des Hotelgasts"></div>
-          <div class="field"><label for="hZimmer">Zimmernummer (optional)</label><input type="text" id="hZimmer"></div>
+          <div class="field"><label for="fgTelefon" style="font-weight:400;">Telefon</label><input type="text" id="fgTelefon"></div>
+          <div class="field"><label for="fgEmail" style="font-weight:400;">E-Mail</label><input type="email" id="fgEmail"></div>
         </div>
+        <div class="field" id="zimmerFeld" style="display:none;"><label for="gZimmer">Zimmernummer (optional)</label><input type="text" id="gZimmer"></div>
       </div>
 
       <!-- RECHNUNGSADRESSE (gemeinsam) -->
       <div style="margin-top:6px;">
-        <label>Rechnungsadresse</label>
+        <label id="raTitel">Rechnungsadresse</label>
         <label class="check"><input type="checkbox" id="raGleich" checked onchange="rechnungsadresseStatus()"> Rechnungsadresse = Abholadresse</label>
         <div id="raFelder" style="display:none;">
           <div class="field"><label for="raStrasse">Straße und Hausnummer</label><input type="text" id="raStrasse"></div>
@@ -206,6 +208,14 @@
       </div>
       <p class="hint" style="margin-bottom:10px;">Vorbelegt mit Abfahrt/Rückkehr an der Basis aus der Berechnung – bei Tagesaufträgen ggf. anpassen.</p>
 
+      <h2 style="margin-top:22px;">Versand</h2>
+      <div class="toggle">
+        <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
+        <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
+      </div>
+      <p class="hint" id="modusHinweis" style="margin:-6px 0 8px;"></p>
+      <p class="hint" id="empfaengerVorschau" style="margin:0 0 6px;color:var(--ink);"></p>
+
       <button class="primary" id="angebotBtn" onclick="angebotSenden()">Angebot senden</button>
       <div class="status" id="angebotStatus"></div>
     </div>
@@ -232,6 +242,7 @@ const T_2230 = 22 * 60 + 30;
 const places = { abhol: null, zwischen: null, ziel: null, ruckAbhol: null, ruckZiel: null };
 let fahrtart = "einfach";
 let kundentyp = "privat";
+let modus = "angebot"; // "angebot" | "auftrag"
 let letztesErgebnis = null;
 
 // ===================== HILFSFUNKTIONEN =====================
@@ -319,6 +330,8 @@ function initAutocomplete(){
 // Manuell geänderte Kurzbeschreibung nicht bei jeder Neuberechnung überschreiben
 document.getElementById("agKurz").addEventListener("input", (e) => { e.target.dataset.auto = "0"; });
 
+document.getElementById("typBereich").addEventListener("input", () => empfaengerAktualisieren());
+
 function setFahrtart(f){
   fahrtart = f;
   document.getElementById("fahrtartEinfach").classList.toggle("active", f === "einfach");
@@ -343,12 +356,64 @@ function ruckZielUmschalten(){
   document.getElementById("ruckZielFeld").style.display = gleich ? "none" : "block";
   if (gleich) { document.getElementById("ruckZiel").value = ""; places.ruckZiel = null; }
 }
+function el(id){ return document.getElementById(id); }
+function aktuellerZahler(){
+  const r = document.querySelector('input[name="zahler"]:checked');
+  return r ? r.value : "firma";
+}
+
 function setKundentyp(t){
   kundentyp = t;
-  ["privat", "firma", "hotel"].forEach(x => {
-    document.getElementById("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t);
-    document.getElementById("form" + x.charAt(0).toUpperCase() + x.slice(1)).style.display = x === t ? "block" : "none";
-  });
+  ["privat", "firma", "hotel"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
+  el("formPrivat").style.display = t === "privat" ? "block" : "none";
+  el("formGeschaeft").style.display = t === "privat" ? "none" : "block";
+  const hotel = t === "hotel";
+  el("gNameLabel").textContent = hotel ? "Hotelname" : "Firmenname";
+  el("zahlerFirmaText").textContent = hotel ? "Hotel" : "Firma";
+  el("zimmerFeld").style.display = hotel ? "block" : "none";
+  el("fgTitel").textContent = hotel ? "Fahrgast (Hotelgast)" : "Fahrgast";
+  zahlerGeaendert();
+}
+
+function zahlerGeaendert(){
+  const fg = aktuellerZahler() === "fahrgast";
+  const hotel = kundentyp === "hotel";
+  const art = hotel ? "Hotel" : "Firma";
+  el("raTitel").textContent = kundentyp === "privat" ? "Rechnungsadresse" : `Rechnungsadresse (${fg ? "Fahrgast" : art})`;
+  el("fgHinweis").textContent = fg
+    ? "Der Fahrgast zahlt selbst: Angebot/Auftragsbestätigung und Rechnung gehen an ihn. Bitte alle Kontaktdaten angeben."
+    : (hotel ? "Name des Hotelgasts (Pflicht). Telefon/E-Mail optional." : "Optional – nur falls der Fahrgast jemand anderes als die buchende Person ist.");
+  // Die Adresse des Fahrgasts ist nicht automatisch die Abholadresse (z. B. Hotel) - Felder zum Ausfüllen freigeben
+  if (kundentyp !== "privat" && fg && el("raGleich").checked) {
+    el("raGleich").checked = false;
+    ["raStrasse", "raPlz", "raOrt"].forEach(id => el(id).value = "");
+  }
+  rechnungsadresseStatus();
+  empfaengerAktualisieren();
+}
+
+function setModus(m){
+  modus = m;
+  el("modusAngebot").classList.toggle("active", m === "angebot");
+  el("modusAuftrag").classList.toggle("active", m === "auftrag");
+  el("angebotBtn").textContent = m === "angebot" ? "Angebot senden" : "Auftrag senden";
+  el("modusHinweis").textContent = m === "angebot"
+    ? "Der Kunde bekommt das Angebot mit den Buttons Annehmen / Änderungen anfragen / Wird nicht mehr benötigt. Kalendertermin und Zahlungslink entstehen erst bei Annahme."
+    : "Der Auftrag gilt sofort als erteilt: Kalendereinträge werden jetzt angelegt und der Kunde bekommt direkt die Bestätigung mit Zahlungslink.";
+}
+
+/** Zeigt, an wen Angebot/Auftrag und Rechnung gehen (der Zahler). */
+function empfaengerAktualisieren(){
+  const v = (id) => el(id).value.trim();
+  let text = "";
+  if (kundentyp === "privat") {
+    text = `${v("pVorname")} ${v("pNachname")} <${v("pEmail") || "E-Mail fehlt"}>`;
+  } else if (aktuellerZahler() === "fahrgast") {
+    text = `${v("fgVorname")} ${v("fgNachname")} <${v("fgEmail") || "E-Mail fehlt"}> (Fahrgast zahlt)`;
+  } else {
+    text = `${v("gName")} – ${v("gVorname")} ${v("gNachname")} <${v("gEmail") || "E-Mail fehlt"}>`;
+  }
+  el("empfaengerVorschau").textContent = `Mail und Rechnung gehen an: ${text.replace(/\s+/g, " ").trim()}`;
 }
 function rechnungsadresseStatus(){
   const gleich = document.getElementById("raGleich").checked;
@@ -629,29 +694,46 @@ async function angebotSenden(){
     };
   } else {
     const istHotel = kundentyp === "hotel";
-    const p = istHotel ? "h" : "f";
-    const firmenname = istHotel ? v("hHotelname") : v("fFirmenname");
+    const art = istHotel ? "Hotel" : "Firma";
+    const zahlerFg = aktuellerZahler() === "fahrgast";
+
+    const firmenname = v("gName");
     if (!firmenname) return setAngebotStatus(istHotel ? "Bitte den Hotelnamen angeben." : "Bitte den Firmennamen angeben.", "error");
-    if (!v(p + "Vorname") || !v(p + "Nachname")) return setAngebotStatus("Bitte Vor- und Nachnamen des Ansprechpartners angeben.", "error");
-    if (!gueltigeEmail(v(p + "Email"))) return setAngebotStatus("Bitte eine gültige E-Mail-Adresse angeben.", "error");
-    if (istHotel && !v("hGastname")) return setAngebotStatus("Bitte den Gastnamen angeben.", "error");
-    gastname = istHotel ? v("hGastname") : v("fHauptName");
-    const ansprechName = `${v(p + "Vorname")} ${v(p + "Nachname")}`.trim();
+
+    // Buchende Person / Ansprechpartner
+    if (!v("gVorname") || !v("gNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen der buchenden Person / des Ansprechpartners angeben.", "error");
+    if (v("gEmail") && !gueltigeEmail(v("gEmail"))) return setAngebotStatus("Die E-Mail der buchenden Person ist ungültig.", "error");
+    if (!zahlerFg && !v("gEmail")) return setAngebotStatus(`Bitte die E-Mail der buchenden Person angeben – ${art} zahlt, dorthin gehen Angebot und Rechnung.`, "error");
+    if (zahlerFg && !v("gEmail") && !v("gTelefon")) return setAngebotStatus("Bitte Telefon oder E-Mail der buchenden Person angeben.", "error");
+
+    // Fahrgast (beim Hotel immer Pflicht, sonst nur wenn er selbst zahlt)
+    const fgName = `${v("fgVorname")} ${v("fgNachname")}`.trim();
+    if ((istHotel || zahlerFg) && (!v("fgVorname") || !v("fgNachname"))) return setAngebotStatus("Bitte Vor- und Nachnamen des Fahrgasts angeben.", "error");
+    if (zahlerFg && !gueltigeEmail(v("fgEmail"))) return setAngebotStatus("Fahrgast zahlt: Bitte eine gültige E-Mail-Adresse des Fahrgasts angeben (dorthin gehen Angebot und Rechnung).", "error");
+    if (!zahlerFg && v("fgEmail") && !gueltigeEmail(v("fgEmail"))) return setAngebotStatus("Die E-Mail des Fahrgasts ist ungültig.", "error");
+    gastname = fgName;
+
     kunde = {
       typ: "firma", kategorie: kundentyp, firmenname, rechnungsadresse,
+      zahler: zahlerFg ? "fahrgast" : "firma",
       buchendePerson: {
-        anrede: v(p + "Anrede"), vorname: v(p + "Vorname"), nachname: v(p + "Nachname"), name: ansprechName,
-        telefon: v(p + "Telefon"), email: v(p + "Email")
+        anrede: v("gAnrede"), vorname: v("gVorname"), nachname: v("gNachname"),
+        name: `${v("gVorname")} ${v("gNachname")}`.trim(), telefon: v("gTelefon"), email: v("gEmail")
       },
-      zimmer: istHotel ? v("hZimmer") : ""
+      fahrgast: fgName ? {
+        anrede: v("fgAnrede"), vorname: v("fgVorname"), nachname: v("fgNachname"),
+        name: fgName, telefon: v("fgTelefon"), email: v("fgEmail")
+      } : null,
+      zimmer: istHotel ? v("gZimmer") : ""
     };
   }
 
   const bemerkungenBasis = v("agBemerkungen");
-  const zimmerText = kundentyp === "hotel" && v("hZimmer") ? `Zimmer ${v("hZimmer")}` : "";
+  const zimmerText = kundentyp === "hotel" && v("gZimmer") ? `Zimmer ${v("gZimmer")}` : "";
   const bemerkungen = [bemerkungenBasis, zimmerText].filter(Boolean).join(" · ");
 
   const body = {
+    modus,
     referenz: v("agReferenz").toUpperCase() || null,
     kunde,
     fahrt: {
@@ -682,20 +764,31 @@ async function angebotSenden(){
     }
   };
 
+  const istAuftrag = modus === "auftrag";
+  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung mit Zahlungslink.")) return;
+
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
-  setAngebotStatus("Angebot wird verschickt …", "");
+  setAngebotStatus(istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
   try {
     const antwort = await fetch(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const daten = await antwort.json();
-    if (!antwort.ok) throw new Error(daten.fehler || "Angebot konnte nicht verschickt werden.");
-    setAngebotStatus(`✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`, "ok");
+    if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
+    setAngebotStatus(
+      istAuftrag
+        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. Zahlungslink ist beim Kunden, die Kalendereinträge sind angelegt.`
+        : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
+      "ok");
   } catch (err) {
-    setAngebotStatus(err.message || "Angebot konnte nicht verschickt werden.", "error");
+    setAngebotStatus(err.message || "Versand fehlgeschlagen.", "error");
   } finally {
     btn.disabled = false;
   }
 }
+
+// Startzustand der Auswahl-Elemente
+setKundentyp("privat");
+setModus("angebot");
 </script>
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=initAutocomplete&language=de&region=DE">
