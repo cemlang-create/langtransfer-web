@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Pauschal-Kalkulator (intern)</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
   @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
@@ -109,6 +112,16 @@
       <div style="font-weight:600; margin-bottom:12px;">Angebot verschicken</div>
 
       <div class="field">
+        <label for="agReferenz">Bestehende Buchung bearbeiten (Referenz)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="agReferenz" placeholder="leer lassen für ein neues Angebot, sonst z. B. LNJH86" style="text-transform:uppercase; flex:1;">
+          <button type="button" class="link-btn" style="flex:none; white-space:nowrap;" onclick="bestehendeBuchungLaden()">Laden</button>
+        </div>
+        <p class="hint" style="margin:4px 0 0;">"Laden" übernimmt alle vorhandenen Angaben dieser Buchung ins Formular – danach nur noch das ändern, was wirklich anders sein soll, und erneut "Angebot senden" klicken.</p>
+        <div class="status" id="ladenStatus"></div>
+      </div>
+
+      <div class="field">
         <label for="agEigenerPreis">Eigener Pauschalpreis (€, überschreibt die Berechnung oben)</label>
         <input type="number" id="agEigenerPreis" min="0" step="1" placeholder="leer lassen, um den berechneten Preis zu verwenden">
       </div>
@@ -116,6 +129,22 @@
       <div class="field">
         <label for="agKurzbeschreibung">Kurzbeschreibung (erscheint in Mail/Kalender)</label>
         <input type="text" id="agKurzbeschreibung" placeholder="z. B. Shuttle Hochzeitsgesellschaft Restaurant Adler">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="agPersonen">Personenanzahl</label>
+          <input type="number" id="agPersonen" min="1" step="1" value="1">
+        </div>
+        <div class="field">
+          <label for="agGepaeck">Gepäck</label>
+          <input type="text" id="agGepaeck" placeholder="z. B. 2 große Koffer, 1 Rucksack">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="agBemerkungen">Bemerkungen</label>
+        <input type="text" id="agBemerkungen" placeholder="z. B. Sprachen, Anlass, besondere Wünsche">
       </div>
 
       <div class="row">
@@ -347,7 +376,73 @@ async function pauschaleBerechnen(){
 
 // ===================== ANGEBOT MIT ZAHLUNGSLINK VERSCHICKEN =====================
 const PAUSCHALANGEBOT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/pauschalangebotSenden";
+const BUCHUNG_LADEN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/buchungNachReferenzLaden";
 let letztesErgebnis = null;
+
+/** Wandelt ein ISO-Datum in die von <input type="datetime-local"> erwarteten lokalen Feldwerte um. */
+function isoZuDatetimeLocal(iso){
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function bestehendeBuchungLaden(){
+  const statusEl = document.getElementById("ladenStatus");
+  statusEl.textContent = "";
+  statusEl.className = "status";
+  const referenz = document.getElementById("agReferenz").value.trim().toUpperCase();
+  if (!referenz) { statusEl.textContent = "Bitte zuerst eine Referenz eingeben."; statusEl.className = "status error"; return; }
+
+  statusEl.textContent = "Wird geladen …";
+  try {
+    const antwort = await fetch(`${BUCHUNG_LADEN_URL}?referenz=${encodeURIComponent(referenz)}`);
+    const daten = await antwort.json();
+    if (!antwort.ok) throw new Error(daten.fehler || "Buchung konnte nicht geladen werden.");
+
+    const { kunde, fahrt, preis, kalenderBlockStartISO, kalenderBlockEndeISO } = daten;
+
+    document.getElementById("agKurzbeschreibung").value = fahrt.beschreibung || "";
+    document.getElementById("agName").value = kunde.name || "";
+    document.getElementById("agTelefon").value = kunde.mobil || "";
+    document.getElementById("agEmail").value = kunde.email || "";
+    document.getElementById("agStrasse").value = (kunde.rechnungsadresse || {}).strasse || "";
+    document.getElementById("agPlz").value = (kunde.rechnungsadresse || {}).plz || "";
+    document.getElementById("agOrt").value = (kunde.rechnungsadresse || {}).ort || "";
+    document.getElementById("agLand").value = (kunde.rechnungsadresse || {}).land || "Deutschland";
+    document.getElementById("agPersonen").value = fahrt.fahrgaesteAb12 || 1;
+    document.getElementById("agGepaeck").value = fahrt.sonstigesGepaeck || "";
+    document.getElementById("agBemerkungen").value = kunde.bemerkungen || "";
+    document.getElementById("agEigenerPreis").value = preis.gesamtBrutto || "";
+
+    if (fahrt.zeitpunktISO) {
+      const d = new Date(fahrt.zeitpunktISO);
+      const pad = (n) => String(n).padStart(2, "0");
+      document.getElementById("agAbholDatum").value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      document.getElementById("agAbholZeit").value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    document.getElementById("agBlockStart").value = isoZuDatetimeLocal(kalenderBlockStartISO);
+    document.getElementById("agBlockEnde").value = isoZuDatetimeLocal(kalenderBlockEndeISO);
+
+    // Route/Preis für den Versand merken, auch ohne die Stopp-Felder/"Berechnen" erneut zu nutzen.
+    letztesErgebnis = {
+      gesamtBrutto: preis.gesamtBrutto,
+      abholadresse: fahrt.abholadresse,
+      zieladresse: fahrt.zieladresse
+    };
+
+    document.getElementById("ergebnis").style.display = "block";
+    document.getElementById("tabelle").innerHTML =
+      `<div><span>Route</span><span>${fahrt.abholadresse} → ${fahrt.zieladresse}</span></div>` +
+      `<div class="total"><span>Bisheriger Preis (brutto)</span><span>${Number(preis.gesamtBrutto).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div>`;
+
+    statusEl.textContent = `✓ Geladen (aktueller Status: ${daten.status}). Jetzt einzelne Felder anpassen und "Angebot senden" klicken.`;
+    statusEl.className = "status ok";
+  } catch (err) {
+    statusEl.textContent = err.message || "Buchung konnte nicht geladen werden.";
+    statusEl.className = "status error";
+  }
+}
 
 function setAngebotStatus(msg, cls){
   const el = document.getElementById("angebotStatus");
@@ -359,8 +454,12 @@ async function angebotSenden(){
   setAngebotStatus("", "");
   if (!letztesErgebnis) return setAngebotStatus("Bitte zuerst oben auf \"Berechnen\" klicken.", "error");
 
+  const bearbeiteReferenz = document.getElementById("agReferenz").value.trim().toUpperCase();
   const eigenerPreisRaw = document.getElementById("agEigenerPreis").value;
   const gesamtBrutto = eigenerPreisRaw !== "" ? Math.max(0, parseFloat(eigenerPreisRaw)) : letztesErgebnis.gesamtBrutto;
+  const personen = Math.max(1, parseInt(document.getElementById("agPersonen").value || 1));
+  const gepaeck = document.getElementById("agGepaeck").value.trim();
+  const bemerkungen = document.getElementById("agBemerkungen").value.trim();
 
   const kurzbeschreibung = document.getElementById("agKurzbeschreibung").value.trim();
   const name = document.getElementById("agName").value.trim();
@@ -390,12 +489,14 @@ async function angebotSenden(){
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        referenz: bearbeiteReferenz || null,
         kunde: { name, telefon, email, rechnungsadresse: { strasse, plz, ort, land } },
         fahrt: {
           beschreibung: kurzbeschreibung,
           abholadresse: letztesErgebnis.abholadresse,
           zieladresse: letztesErgebnis.zieladresse,
-          zeitpunktISO: new Date(`${abholDatum}T${abholZeit}`).toISOString()
+          zeitpunktISO: new Date(`${abholDatum}T${abholZeit}`).toISOString(),
+          personen, gepaeck, bemerkungen
         },
         preis: { gesamtBrutto },
         kalender: {
