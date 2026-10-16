@@ -21,12 +21,12 @@
   gtag('config', 'AW-18474476304');
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fahrservice & Flughafentransfer – Alternative zum Taxi | LANGtransfer</title>
+<title>Flughafentransfer & Krankenfahrten – Alternative zum Taxi | LANGtransfer</title>
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="description" content="Fahrservice und Shuttle ab Neckartenzlingen: Flughafentransfer, Business, Events und Klinikfahrten – die Alternative zum Taxi mit Festpreis. Jetzt buchen.">
-<meta name="keywords" content="Shuttle, Fahrservice, Fahrdienst, Transferservice, Flughafentransfer, Airport Transfer, Business Shuttle, Eventfahrten, Klinikfahrten, Neckartenzlingen, Esslingen">
+<meta name="description" content="Fahrservice ab Neckartenzlingen: Flughafentransfer, Events, Krankenfahrten (Dialyse, Chemo), Abrechnung mit allen gesetzlichen Kassen. Alternative zum Taxi.">
+<meta name="keywords" content="Shuttle, Fahrservice, Fahrdienst, Transferservice, Flughafentransfer, Airport Transfer, Business Shuttle, Eventfahrten, Krankenfahrten, Dialysefahrten, Chemofahrten, Neckartenzlingen, Esslingen">
 <style>
   @font-face{
     font-family:'Work Sans';
@@ -506,6 +506,19 @@
   @media (max-width:360px){
     .phone-secondary{ display:none; }
   }
+  /* ---------- Krankenfahrten ---------- */
+  #krankenfahrten{ border-top:1px solid var(--line); }
+  .kf-hinweis{ max-width:760px; margin:34px 0 0; padding:18px 22px; background:#f1ece0; border-left:3px solid var(--accent); color:var(--ink-soft); font-size:16px; }
+  .kf-hinweis strong{ color:var(--ink); }
+  .kf-titel{ font-size:22px; font-weight:500; margin:48px 0 14px; }
+  .kf-kliniken{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0 40px; max-width:860px; }
+  .kf-kliniken li{ padding:11px 0; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:16px; line-height:1.45; }
+  .kf-kliniken li strong{ display:block; color:var(--ink); font-weight:600; font-size:14px; letter-spacing:.02em; margin-bottom:2px; }
+  .kf-kliniken li:last-child{ grid-column:1 / -1; }
+  @media (max-width:640px){ .kf-kliniken{ grid-template-columns:1fr; } }
+  .kf-cta{ display:flex; gap:14px; flex-wrap:wrap; margin:36px 0 0; }
+  .btn-outline{ background:transparent; color:var(--ink); border:1px solid rgba(35,35,32,0.4); }
+  .btn-outline:hover{ border-color:var(--ink); transform:translateY(-1px); }
 </style>
 </head>
 <body>
@@ -535,7 +548,7 @@
     <div class="wordmark" role="img" aria-label="LANGtransfer"><span class="lang">LANG</span><span class="transfer">transfer</span></div>
     <div class="hero-side">
       <h1 class="hero-h1">Fahrservice & Shuttle ab Neckartenzlingen – die Alternative zum Taxi</h1>
-      <p class="lead">Ihr privater Fahrservice und Shuttle aus Neckartenzlingen. Ob Flughafentransfer, Business-Termin, Event oder Klinikfahrt – Ihr Fahrdienst bringt Sie sauber, freundlich und zuverlässig ans Ziel.</p>
+      <p class="lead">Ihr privater Fahrservice und Shuttle aus Neckartenzlingen. Ob Flughafentransfer, Business-Termin, Event oder Krankenfahrt – Ihr Fahrdienst bringt Sie sauber, freundlich und zuverlässig ans Ziel.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#buchen">Jetzt buchen</a>
         <a class="btn btn-ghost" href="tel:+491774455445">Jetzt anrufen</a>
@@ -648,7 +661,7 @@
       <h2>Leistungen</h2>
       <p>Für jeden Anlass der passende Transferservice – mit einem vollelektrischen Mercedes-Benz EQV als Shuttle.</p>
     </div>
-    <div class="services-tag">AIRPORT&nbsp;&middot; BUSINESS&nbsp;&middot; EVENT&nbsp;&middot; KLINIK&nbsp;&middot; TAGESPAUSCHALE</div>
+    <div class="services-tag">AIRPORT&nbsp;&middot; BUSINESS&nbsp;&middot; EVENT&nbsp;&middot; KRANKENFAHRT&nbsp;&middot; TAGESPAUSCHALE</div>
     <p class="services-sub">Ihre Alternative zum Taxi: Festpreis statt Taxameter, persönlich statt anonym. <a href="#faq" style="color:var(--accent-deep);">Taxi oder Mietwagen – der Unterschied</a></p>
     <div class="service-list">
       <div class="service-row">
@@ -664,8 +677,8 @@
         <p>Für Hochzeiten, Feiern und besondere Anlässe. Sie genießen den Abend, wir übernehmen die Fahrt.</p>
       </div>
       <div class="service-row">
-        <h3>Klinik</h3>
-        <p>Fahrten zu Arztterminen und Kliniken – ruhig, sicher und mit Aufmerksamkeit für Ihre Situation.</p>
+        <h3>Krankenfahrt</h3>
+        <p>Fahrten zu Dialyse, Chemo- und Strahlentherapie, Arztterminen und Kliniken – ruhig, sicher und mit Abrechnung über Ihre Krankenkasse. <a href="#krankenfahrten" style="color:var(--accent-deep);">Mehr zu Krankenfahrten</a></p>
       </div>
       <div class="service-row">
         <h3>Tagespauschale</h3>
@@ -675,6 +688,76 @@
   </div>
 </section>
 
+
+<section id="krankenfahrten">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Krankenfahrten zu Dialyse, Chemo- und Strahlentherapie</h2>
+      <p>Sie müssen regelmäßig zur Behandlung? Wir fahren Sie sitzend, pünktlich und zuverlässig von der Haustür zur Klinik und wieder zurück. Die Abrechnung machen wir direkt mit allen gesetzlichen Krankenkassen.</p>
+    </div>
+    <div class="service-list">
+      <div class="service-row">
+        <h3>Dialysefahrten</h3>
+        <p>Regelmäßige Termine, zum Beispiel mehrmals pro Woche, planen wir fest mit Ihnen ein – mit Hin- und Rückfahrt.</p>
+      </div>
+      <div class="service-row">
+        <h3>Chemo- und Strahlentherapie</h3>
+        <p>Entspannt zur Behandlung und danach in Ruhe wieder nach Hause – ohne Parkplatzsuche und ohne Hektik.</p>
+      </div>
+      <div class="service-row">
+        <h3>Arzt- und Krankenhausfahrten</h3>
+        <p>Zu Arztterminen, ambulanten Behandlungen und Klinikaufenthalten in der Region.</p>
+      </div>
+      <div class="service-row">
+        <h3>Abrechnung mit der Krankenkasse</h3>
+        <p>Bei ärztlicher Verordnung rechnen wir direkt mit Ihrer gesetzlichen Krankenkasse ab. Sie zahlen nur die gesetzliche Zuzahlung. Welche Unterlagen Sie brauchen, besprechen wir gern am Telefon.</p>
+      </div>
+    </div>
+    <p class="kf-hinweis"><strong>Wichtig:</strong> Unsere Krankenfahrten sind Fahrten im Pkw – sitzend und ohne medizinische Betreuung. Liegendtransporte und Krankentransporte mit Sanitäter bieten wir nicht an.</p>
+
+    <h3 class="kf-titel">Wir fahren zu Kliniken, Krankenhäusern, Dialysezentren und Praxen in der Region, zum Beispiel zu:</h3>
+    <ul class="kf-kliniken">
+      <li><strong>Nürtingen</strong>medius KLINIK NÜRTINGEN</li>
+      <li><strong>Kirchheim unter Teck</strong>medius KLINIK KIRCHHEIM</li>
+      <li><strong>Ostfildern-Ruit</strong>medius KLINIK OSTFILDERN-RUIT</li>
+      <li><strong>Esslingen</strong>Klinikum Esslingen</li>
+      <li><strong>Filderstadt</strong>Filderklinik</li>
+      <li><strong>Reutlingen</strong>Klinikum am Steinenberg</li>
+      <li><strong>Tübingen</strong>Universitätsklinikum Tübingen</li>
+      <li><strong>Böblingen</strong>Klinikverbund Südwest, Standort Böblingen</li>
+      <li><strong>Stuttgart</strong>Alle Kliniken und Krankenhäuser, unter anderem Klinikum Stuttgart (Katharinenhospital, Krankenhaus Bad Cannstatt, Olgahospital), Robert-Bosch-Krankenhaus, Marienhospital und Diakonie-Klinikum</li>
+    </ul>
+
+    <div class="kf-cta">
+      <a class="btn btn-primary" href="#kontaktformular">Krankenfahrt anfragen</a>
+      <a class="btn btn-outline" href="tel:+491774455445">Jetzt anrufen</a>
+    </div>
+
+    <h3 class="kf-titel">Häufige Fragen zur Krankenfahrt</h3>
+    <div class="faq-list">
+      <details>
+        <summary>Was ist eine Krankenfahrt?</summary>
+        <p>Eine Krankenfahrt ist die Fahrt zu einer ärztlich verordneten Behandlung, zum Beispiel zur Dialyse, Chemo- oder Strahlentherapie, im normalen Pkw – sitzend und ohne medizinische Betreuung. Ein Krankentransport mit Sanitäter oder eine liegende Beförderung ist etwas anderes und gehört nicht zu unseren Leistungen.</p>
+      </details>
+      <details>
+        <summary>Brauche ich eine Verordnung für die Krankenfahrt?</summary>
+        <p>Ja. Damit die Krankenkasse die Kosten übernimmt, muss die Fahrt ärztlich verordnet sein, bei manchen Fahrten zusätzlich vorab von Ihrer Krankenkasse genehmigt werden. Was in Ihrem Fall nötig ist, klären wir gern gemeinsam am Telefon.</p>
+      </details>
+      <details>
+        <summary>Was kostet mich die Krankenfahrt?</summary>
+        <p>Bei einer ärztlich verordneten und von der Krankenkasse übernommenen Fahrt rechnen wir direkt mit Ihrer gesetzlichen Krankenkasse ab. Sie zahlen nur die gesetzliche Zuzahlung.</p>
+      </details>
+      <details>
+        <summary>Fahren Sie auch regelmäßig, zum Beispiel mehrmals pro Woche?</summary>
+        <p>Ja. Wiederkehrende Termine wie Dialyse oder Chemotherapie planen wir fest mit Ihnen ein, mit Hin- und Rückfahrt.</p>
+      </details>
+      <details>
+        <summary>Wie buche ich eine Krankenfahrt?</summary>
+        <p>Rufen Sie uns an unter <a href="tel:+491774455445">+49 177 44 55 445</a> oder schicken Sie uns eine Anfrage über das <a href="#kontaktformular">Kontaktformular</a> – wir melden uns zeitnah bei Ihnen.</p>
+      </details>
+    </div>
+  </div>
+</section>
 
 <section class="fleet" id="fahrzeug">
   <div class="wrap">
@@ -783,7 +866,7 @@
       </details>
       <details>
         <summary>Wohin fahren Sie außer zum Flughafen Stuttgart?</summary>
-        <p>Zu vielen Zielen: zu Flughäfen wie Karlsruhe/Baden-Baden, Friedrichshafen oder Memmingen, zu Bahnhöfen und Orten in ganz Baden-Württemberg, zu Business-Terminen, Events, Hochzeiten und Firmenfeiern, zu Kliniken und Arztterminen sowie zu Ausflügen und Tagesfahrten. Fragen Sie uns einfach an.</p>
+        <p>Zu vielen Zielen: zu Flughäfen wie Karlsruhe/Baden-Baden, Friedrichshafen oder Memmingen, zu Bahnhöfen und Orten in ganz Baden-Württemberg, zu Business-Terminen, Events, Hochzeiten und Firmenfeiern, zu Krankenfahrten (Dialyse, Chemo- und Strahlentherapie), Arztterminen und Kliniken sowie zu Ausflügen und Tagesfahrten. Fragen Sie uns einfach an.</p>
       </details>
     </div>
   </div>
@@ -793,8 +876,9 @@
   <div class="wrap about">
     <div class="about-text">
       <h2>Über uns</h2>
-      <p>Viele fragen uns, woher die Idee zu unserem Fahrservice kommt: Wir sind seit vielen Jahren im Gastgewerbe zuhause und vermieten Ferienwohnungen. Uns liegt am Herzen, dass sich unsere Gäste von Anfang bis Ende rundum wohlfühlen – und dazu gehört für uns auch die Mobilität. Ob Abholung vom Flughafen oder Bahnhof oder die Fahrt zu einem schönen Ausflugsziel in der Umgebung: Wir sind für unsere Gäste da und bringen sie auch wieder sicher zurück.</p>
-      <p>Ob Flughafentransfer zum Flughafen Stuttgart, nach Karlsruhe/Baden-Baden, Friedrichshafen oder Memmingen, Fahrten zu Kliniken in Nürtingen, Kirchheim unter Teck, Reutlingen, Tübingen oder Filderstadt, zum Outlet-Shopping nach Metzingen oder ins Musicaltheater Stuttgart – wir bringen Sie zuverlässig ans Ziel, auch zu vielen weiteren Orten in der Region.</p>
+      <p>Viele fragen uns, woher die Idee zu unserem Fahrservice kommt: Wir sind seit vielen Jahren im Gastgewerbe zuhause und vermieten Ferienwohnungen. Dort haben wir gelernt, worauf es ankommt: Zeit für den Einzelnen, Pünktlichkeit und das Gefühl, gut aufgehoben zu sein. Genau diese Haltung steckt heute in LANGtransfer – für alle, die zuverlässig und freundlich von A nach B kommen möchten.</p>
+      <p>Wir fahren Familien und Privatpersonen, Geschäftsreisende und Mitarbeiter von Unternehmen, Gäste von Hotels und Veranstaltungen sowie Patienten auf dem Weg zu Dialyse oder Chemotherapie – und natürlich auch Urlaubsgäste.</p>
+      <p>Ob Flughafentransfer zum Flughafen Stuttgart, nach Karlsruhe/Baden-Baden, Friedrichshafen oder Memmingen, Krankenfahrten zu Kliniken in Nürtingen, Kirchheim unter Teck, Ostfildern-Ruit, Esslingen, Reutlingen, Tübingen, Böblingen, Filderstadt oder Stuttgart, zum Outlet-Shopping nach Metzingen oder ins Musicaltheater Stuttgart – wir bringen Sie zuverlässig ans Ziel, auch zu vielen weiteren Orten in der Region.</p>
     </div>
   </div>
 </section>

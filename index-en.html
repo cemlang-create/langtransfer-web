@@ -21,12 +21,12 @@
   gtag('config', 'AW-18474476304');
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chauffeur Service & Airport Transfer – Taxi Alternative | LANGtransfer</title>
+<title>Airport Transfer & Medical Rides – Taxi Alternative | LANGtransfer</title>
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="description" content="Chauffeur service and shuttle from Neckartenzlingen: airport transfers, business, events and medical appointments – a fixed-price alternative to a taxi.">
-<meta name="keywords" content="shuttle, chauffeur service, private hire, transfer service, airport transfer, business shuttle, event rides, medical rides, Neckartenzlingen, Esslingen">
+<meta name="description" content="Chauffeur service from Neckartenzlingen: airport transfers, events and rides to dialysis and chemotherapy, billed directly to all statutory health insurers.">
+<meta name="keywords" content="shuttle, chauffeur service, private hire, transfer service, airport transfer, business shuttle, event rides, medical rides, dialysis rides, chemotherapy rides, Neckartenzlingen, Esslingen">
 <style>
   @font-face{
     font-family:'Work Sans';
@@ -506,6 +506,19 @@
   @media (max-width:360px){
     .phone-secondary{ display:none; }
   }
+  /* ---------- Krankenfahrten ---------- */
+  #krankenfahrten{ border-top:1px solid var(--line); }
+  .kf-hinweis{ max-width:760px; margin:34px 0 0; padding:18px 22px; background:#f1ece0; border-left:3px solid var(--accent); color:var(--ink-soft); font-size:16px; }
+  .kf-hinweis strong{ color:var(--ink); }
+  .kf-titel{ font-size:22px; font-weight:500; margin:48px 0 14px; }
+  .kf-kliniken{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0 40px; max-width:860px; }
+  .kf-kliniken li{ padding:11px 0; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:16px; line-height:1.45; }
+  .kf-kliniken li strong{ display:block; color:var(--ink); font-weight:600; font-size:14px; letter-spacing:.02em; margin-bottom:2px; }
+  .kf-kliniken li:last-child{ grid-column:1 / -1; }
+  @media (max-width:640px){ .kf-kliniken{ grid-template-columns:1fr; } }
+  .kf-cta{ display:flex; gap:14px; flex-wrap:wrap; margin:36px 0 0; }
+  .btn-outline{ background:transparent; color:var(--ink); border:1px solid rgba(35,35,32,0.4); }
+  .btn-outline:hover{ border-color:var(--ink); transform:translateY(-1px); }
 </style>
 </head>
 <body>
@@ -664,8 +677,8 @@
         <p>For weddings, celebrations and special occasions. You enjoy the evening, we take care of the drive.</p>
       </div>
       <div class="service-row">
-        <h3>Medical</h3>
-        <p>Rides to doctor's appointments and clinics – calm, safe, and with attention to your situation.</p>
+        <h3>Medical rides</h3>
+        <p>Rides to dialysis, chemotherapy, radiation therapy, doctor's appointments and clinics – seated, calm and safe, billed directly to your statutory health insurer. <a href="#krankenfahrten" style="color:var(--accent-deep);">More about medical rides</a></p>
       </div>
       <div class="service-row">
         <h3>Day rate</h3>
@@ -675,6 +688,76 @@
   </div>
 </section>
 
+
+<section id="krankenfahrten">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Rides to dialysis, chemotherapy and radiation therapy</h2>
+      <p>Do you need to get to treatment regularly? We take you seated, on time and reliably from your front door to the clinic and back. We bill directly to all statutory health insurers.</p>
+    </div>
+    <div class="service-list">
+      <div class="service-row">
+        <h3>Dialysis rides</h3>
+        <p>Regular appointments, for example several times a week, are scheduled with you in advance – including the return trip.</p>
+      </div>
+      <div class="service-row">
+        <h3>Chemotherapy and radiation therapy</h3>
+        <p>Relaxed to your treatment and calmly back home afterwards – no searching for parking, no stress.</p>
+      </div>
+      <div class="service-row">
+        <h3>Doctor and clinic rides</h3>
+        <p>To doctor's appointments, outpatient treatments and hospital stays in the region.</p>
+      </div>
+      <div class="service-row">
+        <h3>Billing with your health insurer</h3>
+        <p>With a doctor's prescription, we bill your statutory health insurer directly. You only pay the statutory co-payment. We are happy to explain by phone which documents you need.</p>
+      </div>
+    </div>
+    <p class="kf-hinweis"><strong>Please note:</strong> Our medical rides ("Krankenfahrten") are made in a passenger car – seated and without medical supervision. We do not offer stretcher transport or ambulance transport with paramedics.</p>
+
+    <h3 class="kf-titel">We drive to hospitals, clinics, dialysis centres and practices in the region, for example to:</h3>
+    <ul class="kf-kliniken">
+      <li><strong>Nürtingen</strong>medius KLINIK NÜRTINGEN</li>
+      <li><strong>Kirchheim unter Teck</strong>medius KLINIK KIRCHHEIM</li>
+      <li><strong>Ostfildern-Ruit</strong>medius KLINIK OSTFILDERN-RUIT</li>
+      <li><strong>Esslingen</strong>Klinikum Esslingen</li>
+      <li><strong>Filderstadt</strong>Filderklinik</li>
+      <li><strong>Reutlingen</strong>Klinikum am Steinenberg</li>
+      <li><strong>Tübingen</strong>Universitätsklinikum Tübingen</li>
+      <li><strong>Böblingen</strong>Klinikverbund Südwest, Böblingen site</li>
+      <li><strong>Stuttgart</strong>All hospitals and clinics, including Klinikum Stuttgart (Katharinenhospital, Krankenhaus Bad Cannstatt, Olgahospital), Robert-Bosch-Krankenhaus, Marienhospital and Diakonie-Klinikum</li>
+    </ul>
+
+    <div class="kf-cta">
+      <a class="btn btn-primary" href="#kontaktformular">Request a medical ride</a>
+      <a class="btn btn-outline" href="tel:+491774455445">Call now</a>
+    </div>
+
+    <h3 class="kf-titel">Frequently asked questions about medical rides</h3>
+    <div class="faq-list">
+      <details>
+        <summary>What is a medical ride (“Krankenfahrt”)?</summary>
+        <p>A Krankenfahrt is a ride to a medically prescribed treatment, for example dialysis, chemotherapy or radiation therapy, in a normal passenger car – seated and without medical supervision. Ambulance or stretcher transport is something different and is not part of our service.</p>
+      </details>
+      <details>
+        <summary>Do I need a prescription for the ride?</summary>
+        <p>Yes. For your health insurer to cover the costs, the ride has to be prescribed by a doctor and, for some rides, approved by your insurer in advance. We are happy to clarify by phone what you need in your case.</p>
+      </details>
+      <details>
+        <summary>What do I have to pay?</summary>
+        <p>For a ride that is prescribed by a doctor and covered by your statutory health insurer, we bill your insurer directly. You only pay the statutory co-payment.</p>
+      </details>
+      <details>
+        <summary>Can you drive regularly, for example several times a week?</summary>
+        <p>Yes. Recurring appointments such as dialysis or chemotherapy are scheduled with you in advance, including the return trip.</p>
+      </details>
+      <details>
+        <summary>How do I book a medical ride?</summary>
+        <p>Call us on <a href="tel:+491774455445">+49 177 44 55 445</a> or send an enquiry via the <a href="#kontaktformular">contact form</a> – we will get back to you promptly.</p>
+      </details>
+    </div>
+  </div>
+</section>
 
 <section class="fleet" id="fahrzeug">
   <div class="wrap">
@@ -783,7 +866,7 @@
       </details>
       <details>
         <summary>Where else do you drive besides Stuttgart Airport?</summary>
-        <p>To many destinations: airports such as Karlsruhe/Baden-Baden, Friedrichshafen or Memmingen, railway stations and places throughout Baden-Württemberg, business appointments, events, weddings and company parties, clinics and medical appointments, as well as day trips and excursions. Just ask.</p>
+        <p>To many destinations: airports such as Karlsruhe/Baden-Baden, Friedrichshafen or Memmingen, railway stations and places throughout Baden-Württemberg, business appointments, events, weddings and company parties, medical rides (dialysis, chemotherapy, radiation therapy), clinics and doctor's appointments, as well as day trips and excursions. Just ask.</p>
       </details>
     </div>
   </div>
@@ -793,8 +876,9 @@
   <div class="wrap about">
     <div class="about-text">
       <h2>About us</h2>
-      <p>Many people ask us where the idea for our chauffeur service came from: we've been at home in the hospitality industry for many years and rent out holiday apartments. It matters to us that our guests feel comfortable from start to finish – and for us, that includes getting around. Whether it's pickup from the airport or train station, or a trip to a lovely destination nearby: we're there for our guests and bring them safely back again.</p>
-      <p>Whether it's an airport transfer to Stuttgart Airport, Karlsruhe/Baden-Baden, Friedrichshafen or Memmingen, rides to clinics in Nürtingen, Kirchheim unter Teck, Reutlingen, Tübingen or Filderstadt, outlet shopping in Metzingen, or the Stuttgart musical theatre – we get you there reliably, and to many other places in the region too.</p>
+      <p>Many people ask us where the idea for our chauffeur service came from: we've been at home in the hospitality industry for many years and rent out holiday apartments. That's where we learned what matters: time for the individual, punctuality and the feeling of being well looked after. That same attitude is behind LANGtransfer today – for everyone who wants to get from A to B reliably and in a friendly way.</p>
+      <p>We drive families and private customers, business travellers and employees of companies, guests of hotels and events, and patients on their way to dialysis or chemotherapy – and of course holiday guests, too.</p>
+      <p>Whether it's an airport transfer to Stuttgart Airport, Karlsruhe/Baden-Baden, Friedrichshafen or Memmingen, medical rides to clinics in Nürtingen, Kirchheim unter Teck, Ostfildern-Ruit, Esslingen, Reutlingen, Tübingen, Böblingen, Filderstadt or Stuttgart, outlet shopping in Metzingen, or the Stuttgart musical theatre – we get you there reliably, and to many other places in the region too.</p>
     </div>
   </div>
 </section>
