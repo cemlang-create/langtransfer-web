@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Krankenfahrten (intern)</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --err:#b23b2f; --ok:#2f6b45; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);padding:32px 20px 100px;}
+  .card{max-width:820px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:28px;}
+  h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;}
+  h2{font-size:1.05rem;margin:28px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:var(--moss-dark);}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:5px;}
+  input, select, textarea{width:100%;font-family:inherit;font-size:15px;padding:9px 11px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--moss);}
+  input[type=checkbox], input[type=radio]{width:17px;height:17px;accent-color:var(--moss);padding:0;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .row, .row3{grid-template-columns:1fr;} }
+  .toggle{display:flex;margin-bottom:18px;border:1px solid #cfc9b8;border-radius:6px;overflow:hidden;}
+  .toggle button{flex:1;padding:10px;background:#fff;border:none;font-family:inherit;font-size:14px;cursor:pointer;color:var(--muted);}
+  .toggle button.active{background:var(--moss);color:#fff;font-weight:600;}
+  .link-btn{background:none;border:none;color:var(--moss-dark);font-weight:600;font-size:13.5px;cursor:pointer;padding:0;margin:0 14px 0 0;text-decoration:underline;font-family:inherit;}
+  .primary{width:100%;background:var(--moss);color:#fff;border:none;border-radius:6px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;font-family:inherit;}
+  .primary:disabled{opacity:0.5;cursor:default;}
+  .sekundaer{background:#fff;color:var(--ink);border:1px solid #cfc9b8;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;}
+  .sekundaer:disabled{opacity:0.5;cursor:default;}
+  .status{margin-top:10px;font-size:14px;min-height:1.2em;white-space:pre-line;}
+  .status.error{color:var(--err);} .status.ok{color:var(--ok);}
+  .hint{font-size:12.5px;color:var(--muted);margin:3px 0 0;}
+  .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-bottom:10px;}
+  .wochentage{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:6px;}
+  .wochentage label{display:flex;align-items:center;gap:6px;font-weight:400;margin:0;cursor:pointer;}
+  .preisbox{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;font-size:14.5px;line-height:1.7;}
+  .preisbox strong{font-weight:600;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th, td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{font-size:12.5px;color:var(--muted);font-weight:600;}
+  td input[type=time]{padding:5px 7px;font-size:14px;width:110px;}
+  .x{background:none;border:none;color:var(--err);font-size:18px;cursor:pointer;}
+  .tabellenrahmen{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:6px;}
+  .grau{color:var(--muted);}
+  .auftragsliste div{padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:12px;font-size:14px;}
+  .auftragsliste div:hover{background:#f6f2e8;}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;background:#eee;color:var(--muted);}
+  .badge.ok{background:#dcefe3;color:var(--ok);} .badge.warn{background:#f6e7c8;color:var(--moss-dark);} .badge.err{background:#f3d9d4;color:var(--err);}
+  #bereichNeu, #bereichVerwalten{display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Krankenfahrten</h1>
+  <p class="sub">Intern. Auftrag mit Terminserie anlegen, Bestätigung per Mail, Zuzahlungsrechnung je Fahrt. Enthält Gesundheitsdaten – bitte nicht weitergeben.</p>
+
+  <div class="field">
+    <label for="adminKey">Admin-Passwort</label>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="adminKey" autocomplete="off" placeholder="einmalig eingeben, wird in diesem Browser gemerkt">
+      <button type="button" class="sekundaer" onclick="passwortSpeichern()">Speichern</button>
+    </div>
+    <div class="status" id="statusAdmin"></div>
+  </div>
+
+  <div class="toggle">
+    <button id="tabNeu" class="active" onclick="zeigeTab('neu')">Neuer Auftrag</button>
+    <button id="tabVerwalten" onclick="zeigeTab('verwalten')">Aufträge verwalten</button>
+  </div>
+
+  <!-- ===================== NEUER AUFTRAG ===================== -->
+  <div id="bereichNeu" style="display:block;">
+    <h2 style="margin-top:6px;border-top:none;padding-top:0;">Patient</h2>
+    <div class="row3">
+      <div class="field"><label for="pAnrede">Anrede</label>
+        <select id="pAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+      <div class="field"><label for="pVorname">Vorname</label><input type="text" id="pVorname"></div>
+      <div class="field"><label for="pNachname">Nachname</label><input type="text" id="pNachname"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="pTelefon">Telefon</label><input type="text" id="pTelefon"></div>
+      <div class="field"><label for="pEmail">E-Mail (dorthin geht die Bestätigung)</label><input type="email" id="pEmail"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="kasse">Krankenkasse</label><input type="text" id="kasse" placeholder="z. B. AOK Baden-Württemberg"></div>
+      <div class="field"><label for="anlass">Anlass</label>
+        <select id="anlass"><option>Dialyse</option><option>Chemotherapie</option><option>Strahlentherapie</option><option>Arzttermin</option><option>Sonstiges</option></select></div>
+    </div>
+    <label class="check"><input type="checkbox" id="befreit" onchange="preisAktualisieren()"> Patient ist von der Zuzahlung befreit (Befreiungsausweis) – es wird keine Zuzahlungsrechnung erzeugt</label>
+
+    <h2>Strecke</h2>
+    <div class="field"><label for="abhol">Abholadresse (zu Hause)</label><input type="text" id="abhol" autocomplete="off" placeholder="Straße, Hausnummer, Ort"></div>
+    <div class="field"><label for="ziel">Ziel (Klinik, Dialysezentrum, Praxis)</label><input type="text" id="ziel" autocomplete="off" placeholder="z. B. Klinikum Esslingen"></div>
+    <div class="field"><label for="zielName">Anzeigename des Ziels (erscheint in Mail und Kalender)</label><input type="text" id="zielName"></div>
+    <div class="row">
+      <div class="field"><label for="km">Kilometer je Fahrt</label><input type="number" id="km" min="0" step="0.1" oninput="preisAktualisieren()"><div class="hint" id="kmHinweis">Wird nach Auswahl beider Adressen berechnet, ist aber änderbar.</div></div>
+      <div class="field"><label for="dauer">Fahrtdauer (Min.) für den Kalender</label><input type="number" id="dauer" min="5" step="1" value="30"></div>
+    </div>
+
+    <label>Rechnungsadresse des Patienten (für die Zuzahlungsrechnung)</label>
+    <label class="check"><input type="checkbox" id="raGleich" checked onchange="rechnungsadresseStatus()"> = Abholadresse</label>
+    <div id="raFelder" style="display:none;">
+      <div class="field"><label for="raStrasse" style="font-weight:400;">Straße und Hausnummer</label><input type="text" id="raStrasse"></div>
+      <div class="row">
+        <div class="field"><label for="raPlz" style="font-weight:400;">PLZ</label><input type="text" id="raPlz"></div>
+        <div class="field"><label for="raOrt" style="font-weight:400;">Ort</label><input type="text" id="raOrt"></div>
+      </div>
+      <div class="field"><label for="raLand" style="font-weight:400;">Land</label><input type="text" id="raLand" value="Deutschland"></div>
+    </div>
+
+    <h2>Tarif und Zuzahlung</h2>
+    <div class="row">
+      <div class="field"><label for="grundpreis">Grundpreis je Fahrt (€)</label><input type="number" id="grundpreis" min="0" step="0.01" oninput="preisAktualisieren()"></div>
+      <div class="field"><label for="preisProKm">Preis je Kilometer (€)</label><input type="number" id="preisProKm" min="0" step="0.01" oninput="preisAktualisieren()"></div>
+    </div>
+    <div class="hint" style="margin:-8px 0 10px;">Beides wird in diesem Browser gemerkt. Fahrpreis = Grundpreis + Kilometer × Preis je km.</div>
+    <div class="preisbox" id="preisbox">Tarif und Kilometer eintragen, dann erscheint hier die Zuzahlung.</div>
+
+    <h2>Termine</h2>
+    <label>Wochentage</label>
+    <div class="wochentage" id="wochentage">
+      <label><input type="checkbox" value="1"> Mo</label><label><input type="checkbox" value="2"> Di</label><label><input type="checkbox" value="3"> Mi</label>
+      <label><input type="checkbox" value="4"> Do</label><label><input type="checkbox" value="5"> Fr</label><label><input type="checkbox" value="6"> Sa</label><label><input type="checkbox" value="0"> So</label>
+    </div>
+    <div style="margin-bottom:12px;">
+      <button type="button" class="link-btn" onclick="wochentagePreset([1,3,5])">Mo/Mi/Fr</button>
+      <button type="button" class="link-btn" onclick="wochentagePreset([2,4,6])">Di/Do/Sa</button>
+      <button type="button" class="link-btn" onclick="wochentagePreset([1,2,3,4,5])">Mo–Fr</button>
+    </div>
+    <div class="row">
+      <div class="field"><label for="von">Von (Datum)</label><input type="date" id="von"></div>
+      <div class="field"><label for="bis">Bis (Datum)</label><input type="date" id="bis"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="hinZeit">Abholung Hinfahrt (Uhrzeit)</label><input type="time" id="hinZeit" value="07:30"></div>
+      <div class="field"><label for="rueckZeit">Abholung Rückfahrt (Uhrzeit, leer = nach Behandlung auf Abruf)</label><input type="time" id="rueckZeit"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="mitRueck" checked onchange="preisAktualisieren()"> Mit Rückfahrt (jede Richtung ist eine eigene Fahrt mit eigener Zuzahlung)</label>
+    <button type="button" class="sekundaer" onclick="termineErzeugen()">Termine erzeugen</button>
+    <span class="grau" style="font-size:13px; margin-left:10px;">ersetzt die Liste unten</span>
+
+    <div style="margin:14px 0 8px; display:flex; gap:8px; align-items:center;">
+      <input type="date" id="einzelDatum" style="max-width:190px;">
+      <button type="button" class="sekundaer" onclick="einzelTerminHinzufuegen()">Einzelnen Termin hinzufügen</button>
+    </div>
+    <div class="tabellenrahmen"><table>
+      <thead><tr><th>Datum</th><th>Hinfahrt</th><th>Rückfahrt</th><th></th></tr></thead>
+      <tbody id="terminTabelle"></tbody>
+    </table></div>
+    <div class="hint" id="terminSumme" style="margin-top:8px;"></div>
+
+    <h2>Versand</h2>
+    <div class="field"><label for="bemerkungen">Bemerkungen (nur intern, im Kalender)</label><input type="text" id="bemerkungen" placeholder="z. B. Rollator, 2. Stock, Klingel Müller"></div>
+    <label class="check"><input type="checkbox" id="kalender" checked> Termine in meinen Kalender eintragen (nur Fahrten mit fester Uhrzeit)</label>
+    <label class="check"><input type="checkbox" id="einwilligung"> Der Patient hat in die Verarbeitung seiner Gesundheitsdaten (Krankenkasse, Behandlung, Termine) für die Fahrten und die Abrechnung eingewilligt. Das wird mit Datum im Auftrag vermerkt.</label>
+    <button class="primary" id="sendenBtn" onclick="auftragSenden()">Bestätigung an den Patienten senden</button>
+    <div class="status" id="statusNeu"></div>
+  </div>
+
+  <!-- ===================== AUFTRÄGE VERWALTEN ===================== -->
+  <div id="bereichVerwalten">
+    <button type="button" class="sekundaer" onclick="listeLaden()">Liste laden</button>
+    <div class="status" id="statusListe"></div>
+    <div class="auftragsliste" id="auftragsliste" style="margin-top:6px;"></div>
+
+    <div id="detail" style="display:none;">
+      <h2 id="detailTitel"></h2>
+      <div class="preisbox" id="detailInfo"></div>
+      <div style="margin:14px 0 8px;">
+        <button type="button" class="link-btn" onclick="auswahlOffene()">Alle bis heute offenen auswählen</button>
+        <button type="button" class="link-btn" onclick="auswahlLeeren()">Auswahl leeren</button>
+      </div>
+      <div class="tabellenrahmen"><table>
+        <thead><tr><th></th><th>Datum</th><th>Fahrt</th><th>Zeit</th><th>Zuzahlung</th><th>Status</th></tr></thead>
+        <tbody id="fahrtenTabelle"></tbody>
+      </table></div>
+      <label class="check" style="margin-top:12px;"><input type="checkbox" id="bezahlt" checked> Zuzahlung wurde bereits bezahlt (z. B. im Fahrzeug) – steht so auf der Rechnung</label>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">
+        <button type="button" class="sekundaer" id="rechnungBtn" onclick="rechnungSenden(false)">Rechnungen für Auswahl senden</button>
+        <button type="button" class="sekundaer" id="erneutBtn" onclick="rechnungSenden(true)">Erneut senden</button>
+        <button type="button" class="sekundaer" id="absagenBtn" onclick="fahrtenAbsagen()">Auswahl absagen</button>
+      </div>
+      <div class="hint">Mehrere ausgewählte Fahrten ergeben mehrere Rechnungen (je Fahrt eine), aber nur eine E-Mail mit allen PDFs. Zukünftige, abgesagte oder befreite Fahrten werden nicht fakturiert.</div>
+      <div class="status" id="statusDetail"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== KONFIGURATION =====================
+const BASIS = "https://europe-west1-lang-transfer.cloudfunctions.net";
+const API = {
+  anlegen: BASIS + "/krankenfahrtAnlegen",
+  laden: BASIS + "/krankenfahrtLaden",
+  rechnung: BASIS + "/krankenfahrtRechnung",
+  absagen: BASIS + "/krankenfahrtAbsagen"
+};
+const BASIS_ADRESSE = "Neckarburg 3, 72654 Neckartenzlingen";
+
+// ===================== HILFSFUNKTIONEN =====================
+const $ = (id) => document.getElementById(id);
+function setStatus(id, msg, cls){ const e = $(id); e.textContent = msg || ""; e.className = "status" + (cls ? " " + cls : ""); }
+function speicherLesen(k){ try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+function speicherSchreiben(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+const rund2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const eur = (n) => Number(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+function heuteLokal(){ return new Date().toLocaleDateString("sv-SE"); }
+function datumKurz(ymd){ return new Date(ymd + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }); }
+
+/** Fahrpreis je Fahrt = Grundpreis + Kilometer × Preis je km (gleiche Formel wie im Backend). */
+function fahrpreisBerechnen(grundpreis, preisProKm, km){ return rund2(Number(grundpreis) + Number(km) * Number(preisProKm)); }
+/** Zuzahlung je Fahrt: 10 %, mindestens 5 €, höchstens 10 €, nie mehr als der Fahrpreis; befreit = 0. */
+function zuzahlungBerechnen(fahrpreis, befreit){
+  const preis = rund2(fahrpreis);
+  if (befreit || !(preis > 0)) return 0;
+  return rund2(Math.min(Math.min(10, Math.max(5, rund2(preis * 0.10))), preis));
+}
+
+// ===================== ZUGANG =====================
+function passwortSpeichern(){
+  const v = $("adminKey").value.trim();
+  if (!v) return setStatus("statusAdmin", "Bitte das Passwort eingeben.", "error");
+  speicherSchreiben("lt_admin_key", v);
+  $("adminKey").value = "";
+  $("adminKey").placeholder = "gespeichert (zum Ändern neu eingeben)";
+  setStatus("statusAdmin", "Passwort in diesem Browser gespeichert.", "ok");
+}
+async function api(name, body){
+  const key = speicherLesen("lt_admin_key");
+  if (!key) throw new Error("Bitte oben zuerst das Admin-Passwort speichern.");
+  const antwort = await fetch(API[name], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: key }) });
+  let daten = {};
+  try { daten = await antwort.json(); } catch (e) {}
+  if (!antwort.ok) throw new Error(daten.fehler || `Fehler ${antwort.status}`);
+  return daten;
+}
+function zeigeTab(t){
+  $("tabNeu").classList.toggle("active", t === "neu");
+  $("tabVerwalten").classList.toggle("active", t === "verwalten");
+  $("bereichNeu").style.display = t === "neu" ? "block" : "none";
+  $("bereichVerwalten").style.display = t === "verwalten" ? "block" : "none";
+  if (t === "verwalten") listeLaden();
+}
+
+// ===================== ORTSSUCHE / STRECKE =====================
+const places = { abhol: null, ziel: null };
+
+function adresseAusPlace(place){
+  const teile = {};
+  (place && place.address_components ? place.address_components : []).forEach((c) => {
+    if (c.types.includes("route")) teile.strasse_name = c.long_name;
+    if (c.types.includes("street_number")) teile.hausnummer = c.long_name;
+    if (c.types.includes("postal_code")) teile.plz = c.long_name;
+    if (c.types.includes("locality")) teile.ort = c.long_name;
+    if (!teile.ort && c.types.includes("postal_town")) teile.ort = c.long_name;
+    if (c.types.includes("country")) teile.land = c.long_name;
+  });
+  return { strasse: [teile.strasse_name, teile.hausnummer].filter(Boolean).join(" "), plz: teile.plz || "", ort: teile.ort || "", land: teile.land || "Deutschland" };
+}
+function rechnungsadresseStatus(){
+  const gleich = $("raGleich").checked;
+  $("raFelder").style.display = gleich ? "none" : "block";
+  if (gleich && places.abhol) {
+    const a = adresseAusPlace(places.abhol);
+    $("raStrasse").value = a.strasse; $("raPlz").value = a.plz; $("raOrt").value = a.ort; $("raLand").value = a.land;
+  }
+}
+function strecke(origin, destination){
+  return new Promise((resolve, reject) => {
+    new google.maps.DistanceMatrixService().getDistanceMatrix({
+      origins: [origin], destinations: [destination],
+      travelMode: google.maps.TravelMode.DRIVING, unitSystem: google.maps.UnitSystem.METRIC
+    }, (response, status) => {
+      if (status !== "OK") return reject("Distanzberechnung fehlgeschlagen: " + status);
+      const el = response.rows[0].elements[0];
+      if (el.status !== "OK") return reject("Keine Route gefunden.");
+      resolve({ km: el.distance.value / 1000, min: el.duration.value / 60 });
+    });
+  });
+}
+async function streckeBerechnen(){
+  if (!places.abhol || !places.ziel) return;
+  $("kmHinweis").textContent = "Strecke wird berechnet …";
+  try {
+    const s = await strecke(places.abhol.formatted_address, places.ziel.formatted_address);
+    $("km").value = (Math.round(s.km * 10) / 10).toFixed(1);
+    $("dauer").value = Math.max(10, Math.round(s.min));
+    $("kmHinweis").textContent = "Von Google berechnet (Abholadresse → Ziel), änderbar.";
+    preisAktualisieren();
+  } catch (e) {
+    $("kmHinweis").textContent = (typeof e === "string" ? e : "Strecke konnte nicht berechnet werden.") + " Bitte Kilometer von Hand eintragen.";
+  }
+}
+window.initKf = function(){
+  const optionen = { componentRestrictions: { country: "de" }, fields: ["formatted_address", "address_components", "geometry", "name", "types"] };
+  [["abhol", "abhol"], ["ziel", "ziel"]].forEach(([id, schluessel]) => {
+    const input = $(id);
+    const ac = new google.maps.places.Autocomplete(input, optionen);
+    ac.addListener("place_changed", () => {
+      const p = ac.getPlace();
+      places[schluessel] = (p && p.geometry) ? p : null;
+      if (schluessel === "abhol") rechnungsadresseStatus();
+      if (schluessel === "ziel" && places.ziel && !$("zielName").value.trim()) {
+        const n = (places.ziel.name || "").trim();
+        if (n && n !== (places.ziel.formatted_address || "").split(",")[0].trim()) $("zielName").value = n;
+      }
+      streckeBerechnen();
+    });
+    input.addEventListener("input", () => { places[schluessel] = null; });
+  });
+};
+
+// ===================== TARIF / PREIS =====================
+function preisAktualisieren(){
+  const befreit = $("befreit").checked;
+  const grund = parseFloat($("grundpreis").value), proKm = parseFloat($("preisProKm").value), km = parseFloat($("km").value);
+  if ($("grundpreis").value !== "") speicherSchreiben("lt_kf_grundpreis", $("grundpreis").value);
+  if ($("preisProKm").value !== "") speicherSchreiben("lt_kf_preisprokm", $("preisProKm").value);
+  const box = $("preisbox");
+  if (isNaN(grund) || isNaN(proKm) || isNaN(km)) { box.textContent = "Tarif und Kilometer eintragen, dann erscheint hier die Zuzahlung."; terminSummeAktualisieren(); return; }
+  const fahrpreis = fahrpreisBerechnen(grund, proKm, km);
+  const zuz = zuzahlungBerechnen(fahrpreis, befreit);
+  box.innerHTML =
+    `Fahrpreis je Fahrt: <strong>${eur(fahrpreis)}</strong> (${eur(grund)} + ${km.toLocaleString("de-DE")} km × ${eur(proKm)})<br>` +
+    (befreit ? `Zuzahlung je Fahrt: <strong>0,00 €</strong> (Patient ist befreit)` : `Zuzahlung je Fahrt: <strong>${eur(zuz)}</strong> (10 %, mind. 5 €, max. 10 €)`);
+  terminSummeAktualisieren();
+}
+
+// ===================== TERMINE =====================
+let termine = []; // { datum:"JJJJ-MM-TT", hin:"07:30", rueck:"12:30"|"" }
+
+function wochentagePreset(tage){
+  document.querySelectorAll("#wochentage input").forEach((c) => { c.checked = tage.includes(Number(c.value)); });
+}
+function termineErzeugen(){
+  const tage = [...document.querySelectorAll("#wochentage input:checked")].map((c) => Number(c.value));
+  if (!tage.length) return setStatus("statusNeu", "Bitte mindestens einen Wochentag wählen.", "error");
+  if (!$("von").value || !$("bis").value) return setStatus("statusNeu", "Bitte Von- und Bis-Datum angeben.", "error");
+  if (!$("hinZeit").value) return setStatus("statusNeu", "Bitte die Uhrzeit der Hinfahrt angeben.", "error");
+  const neu = [];
+  const ende = new Date($("bis").value + "T12:00:00");
+  for (let d = new Date($("von").value + "T12:00:00"); d <= ende; d.setDate(d.getDate() + 1)) {
+    if (tage.includes(d.getDay())) neu.push({ datum: d.toLocaleDateString("sv-SE"), hin: $("hinZeit").value, rueck: $("rueckZeit").value || "" });
+    if (neu.length > 120) return setStatus("statusNeu", "Das sind mehr als 120 Termine – bitte den Zeitraum verkürzen.", "error");
+  }
+  if (!neu.length) return setStatus("statusNeu", "Im gewählten Zeitraum liegt kein passender Wochentag.", "error");
+  termine = neu;
+  setStatus("statusNeu", "", "");
+  termineRendern();
+}
+function einzelTerminHinzufuegen(){
+  if (!$("einzelDatum").value) return;
+  if (termine.some((t) => t.datum === $("einzelDatum").value)) return setStatus("statusNeu", "Dieses Datum steht schon in der Liste.", "error");
+  if (termine.length >= 120) return setStatus("statusNeu", "Maximal 120 Termine je Auftrag.", "error");
+  termine.push({ datum: $("einzelDatum").value, hin: $("hinZeit").value || "07:30", rueck: $("rueckZeit").value || "" });
+  termine.sort((a, b) => a.datum.localeCompare(b.datum));
+  setStatus("statusNeu", "", "");
+  termineRendern();
+}
+function termineRendern(){
+  const tb = $("terminTabelle");
+  tb.innerHTML = "";
+  termine.forEach((t, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${datumKurz(t.datum)}</td><td><input type="time" value="${t.hin}"></td><td><input type="time" value="${t.rueck}"></td><td><button type="button" class="x" title="Termin entfernen">×</button></td>`;
+    const [hinIn, rueckIn] = tr.querySelectorAll("input");
+    hinIn.addEventListener("input", () => { t.hin = hinIn.value; });
+    rueckIn.addEventListener("input", () => { t.rueck = rueckIn.value; });
+    tr.querySelector(".x").addEventListener("click", () => { termine.splice(i, 1); termineRendern(); });
+    tb.appendChild(tr);
+  });
+  terminSummeAktualisieren();
+}
+function terminSummeAktualisieren(){
+  const n = termine.length * ($("mitRueck").checked ? 2 : 1);
+  const grund = parseFloat($("grundpreis").value), proKm = parseFloat($("preisProKm").value), km = parseFloat($("km").value);
+  let zusatz = "";
+  if (!isNaN(grund) && !isNaN(proKm) && !isNaN(km)) {
+    const zuz = zuzahlungBerechnen(fahrpreisBerechnen(grund, proKm, km), $("befreit").checked);
+    zusatz = ` · Zuzahlungen insgesamt: ${eur(zuz * n)}`;
+  }
+  $("terminSumme").textContent = termine.length ? `${termine.length} Tage, ${n} Fahrten${zusatz}` : "Noch keine Termine.";
+}
+
+// ===================== AUFTRAG SENDEN =====================
+async function auftragSenden(){
+  setStatus("statusNeu", "", "");
+  const v = (id) => $(id).value.trim();
+  if (!v("pVorname") || !v("pNachname")) return setStatus("statusNeu", "Bitte Vor- und Nachnamen des Patienten angeben.", "error");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v("pEmail"))) return setStatus("statusNeu", "Bitte eine gültige E-Mail-Adresse des Patienten angeben.", "error");
+  if (!places.abhol || !places.ziel) return setStatus("statusNeu", "Bitte Abholadresse und Ziel aus der Vorschlagsliste auswählen.", "error");
+  const km = parseFloat($("km").value), grund = parseFloat($("grundpreis").value), proKm = parseFloat($("preisProKm").value);
+  if (!(km > 0)) return setStatus("statusNeu", "Bitte die Kilometer je Fahrt angeben.", "error");
+  if (isNaN(grund) || isNaN(proKm)) return setStatus("statusNeu", "Bitte Grundpreis und Preis je Kilometer angeben.", "error");
+  if (!termine.length) return setStatus("statusNeu", "Bitte zuerst Termine erzeugen.", "error");
+  if (!$("einwilligung").checked) return setStatus("statusNeu", "Bitte bestätigen, dass die Einwilligung des Patienten in die Verarbeitung seiner Gesundheitsdaten vorliegt.", "error");
+  if (termine.some((t) => !t.hin)) return setStatus("statusNeu", "Bei mindestens einem Termin fehlt die Uhrzeit der Hinfahrt.", "error");
+  const befreit = $("befreit").checked;
+  const rechnungsadresse = { strasse: v("raStrasse"), plz: v("raPlz"), ort: v("raOrt"), land: v("raLand") };
+  if (!befreit && !(rechnungsadresse.strasse && rechnungsadresse.plz && rechnungsadresse.ort && rechnungsadresse.land)) {
+    return setStatus("statusNeu", "Bitte die vollständige Rechnungsadresse angeben (für die Zuzahlungsrechnung).", "error");
+  }
+  const mitRueck = $("mitRueck").checked;
+  const body = {
+    patient: { anrede: v("pAnrede"), vorname: v("pVorname"), nachname: v("pNachname"), telefon: v("pTelefon"), email: v("pEmail"), rechnungsadresse },
+    krankenkasse: v("kasse"), anlass: $("anlass").value, zuzahlungsbefreit: befreit,
+    tarif: { grundpreis: grund, preisProKm: proKm },
+    route: { abholadresse: places.abhol.formatted_address, zieladresse: places.ziel.formatted_address, zielName: v("zielName"), km, dauerMin: parseInt($("dauer").value || 30) },
+    termine: termine.map((t) => ({ hinISO: new Date(`${t.datum}T${t.hin}`).toISOString(), rueckISO: (mitRueck && t.rueck) ? new Date(`${t.datum}T${t.rueck}`).toISOString() : null })),
+    mitRueckfahrt: mitRueck, kalenderEintragen: $("kalender").checked, bemerkungen: v("bemerkungen"), einwilligung: true
+  };
+  const n = termine.length * (mitRueck ? 2 : 1);
+  if (!confirm(`Bestätigung an ${body.patient.email} senden?\n\n${termine.length} Tage, ${n} Fahrten${$("kalender").checked ? ", Termine kommen in deinen Kalender" : ""}.`)) return;
+
+  const btn = $("sendenBtn");
+  btn.disabled = true;
+  setStatus("statusNeu", "Wird gesendet …", "");
+  try {
+    const d = await api("anlegen", body);
+    setStatus("statusNeu",
+      `✓ Bestätigung verschickt. Referenz: ${d.referenz}\n${d.anzahlFahrten} Fahrten, Fahrpreis ${eur(d.fahrpreisJeFahrt)}, Zuzahlung je Fahrt ${eur(d.zuzahlungJeFahrt)}.` +
+      (d.kalenderFehler ? `\n⚠ ${d.kalenderFehler} Kalendereinträge konnten nicht angelegt werden.` : ""), "ok");
+  } catch (e) {
+    setStatus("statusNeu", e.message || "Senden fehlgeschlagen.", "error");
+  } finally { btn.disabled = false; }
+}
+
+// ===================== AUFTRÄGE VERWALTEN =====================
+let aktuellerAuftrag = null;
+
+async function listeLaden(){
+  setStatus("statusListe", "Wird geladen …", "");
+  try {
+    const d = await api("laden", { liste: true });
+    const box = $("auftragsliste");
+    box.innerHTML = "";
+    if (!d.liste.length) { setStatus("statusListe", "Noch keine Aufträge.", ""); return; }
+    setStatus("statusListe", "", "");
+    d.liste.forEach((a) => {
+      const z = document.createElement("div");
+      z.innerHTML = `<span><strong>${a.referenz}</strong> · ${a.patient} · ${a.ziel}</span><span class="grau">${a.anzahlFahrten} Fahrten · ${a.offen} offen</span>`;
+      z.addEventListener("click", () => auftragOeffnen(a.referenz));
+      box.appendChild(z);
+    });
+  } catch (e) { setStatus("statusListe", e.message, "error"); }
+}
+async function auftragOeffnen(referenz, nachAktion){
+  if (!nachAktion) setStatus("statusDetail", "", "");   // nach einer Aktion die Erfolgsmeldung stehen lassen
+  try {
+    const d = await api("laden", { referenz });
+    aktuellerAuftrag = d.auftrag;
+    detailRendern();
+    $("detail").style.display = "block";
+    if (!nachAktion) $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { setStatus("statusListe", e.message, "error"); }
+}
+function fahrtStatus(f){
+  if (f.status === "abgesagt") return { text: "abgesagt", cls: "err", waehlbar: false };
+  if (!(f.zuzahlung > 0)) return { text: "keine Zuzahlung", cls: "", waehlbar: false };
+  if (f.rechnungsnummer) return { text: f.rechnungsnummer, cls: "ok", waehlbar: true, fakturiert: true };
+  if (f.datum > heuteLokal()) return { text: "geplant", cls: "", waehlbar: true, zukunft: true };
+  return { text: "offen", cls: "warn", waehlbar: true };
+}
+function detailRendern(){
+  const a = aktuellerAuftrag;
+  $("detailTitel").textContent = `${a.referenz} – ${a.patient.name}`;
+  $("detailInfo").innerHTML = `Ziel: <strong>${a.route.zielName || a.route.zieladresse}</strong> · ${a.route.km.toLocaleString("de-DE")} km<br>` +
+    `Fahrpreis je Fahrt ${eur(a.fahrpreisJeFahrt)} · Zuzahlung je Fahrt ${a.zuzahlungsbefreit ? "<strong>befreit</strong>" : "<strong>" + eur(a.zuzahlungJeFahrt) + "</strong>"}<br>` +
+    `<span class="grau">${a.patient.email}${a.krankenkasse ? " · " + a.krankenkasse : ""}${a.anlass ? " · " + a.anlass : ""}</span>`;
+  const tb = $("fahrtenTabelle");
+  tb.innerHTML = "";
+  a.fahrten.forEach((f) => {
+    const s = fahrtStatus(f);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><input type="checkbox" data-id="${f.id}" ${s.waehlbar ? "" : "disabled"}></td>` +
+      `<td>${datumKurz(f.datum)}</td><td>${f.typ === "hin" ? "Hinfahrt" : "Rückfahrt"}</td>` +
+      `<td>${f.startISO ? new Date(f.startISO).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : '<span class="grau">auf Abruf</span>'}</td>` +
+      `<td>${eur(f.zuzahlung)}</td><td><span class="badge ${s.cls}">${s.text}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+function ausgewaehlteIds(){ return [...document.querySelectorAll("#fahrtenTabelle input:checked")].map((c) => c.dataset.id); }
+function auswahlLeeren(){ document.querySelectorAll("#fahrtenTabelle input").forEach((c) => { c.checked = false; }); }
+function auswahlOffene(){
+  auswahlLeeren();
+  aktuellerAuftrag.fahrten.forEach((f) => {
+    const s = fahrtStatus(f);
+    if (s.waehlbar && !s.fakturiert && !s.zukunft) { const c = document.querySelector(`#fahrtenTabelle input[data-id="${f.id}"]`); if (c) c.checked = true; }
+  });
+  const n = ausgewaehlteIds().length;
+  setStatus("statusDetail", n ? `${n} offene Fahrten ausgewählt.` : "Keine offenen Fahrten bis heute.", "");
+}
+async function aktionAusfuehren(name, body, btnIds, textLaufend){
+  const ids = ausgewaehlteIds();
+  if (!ids.length) return setStatus("statusDetail", "Bitte zuerst Fahrten in der Tabelle auswählen.", "error");
+  btnIds.forEach((b) => { $(b).disabled = true; });
+  setStatus("statusDetail", textLaufend, "");
+  try {
+    const d = await api(name, { referenz: aktuellerAuftrag.referenz, fahrtIds: ids, ...body });
+    return d;
+  } finally { btnIds.forEach((b) => { $(b).disabled = false; }); }
+}
+async function rechnungSenden(erneut){
+  try {
+    if (!erneut && !confirm("Rechnungen für die ausgewählten Fahrten erzeugen und per Mail an den Patienten senden?")) return;
+    const d = await aktionAusfuehren("rechnung", { erneut, bezahlt: $("bezahlt").checked }, ["rechnungBtn", "erneutBtn", "absagenBtn"], "Rechnungen werden erzeugt …");
+    if (!d) return;
+    const grund = (d.uebersprungen || []).length ? "\nÜbersprungen: " + d.uebersprungen.map((u) => `${u.id} (${u.grund})`).join(", ") : "";
+    setStatus("statusDetail", d.versendet ? `✓ ${d.versendet} Rechnung(en) verschickt: ${d.nummern.join(", ")}${grund}` : "Es wurde nichts verschickt." + grund, d.versendet ? "ok" : "error");
+    await auftragOeffnen(aktuellerAuftrag.referenz, true);
+  } catch (e) { setStatus("statusDetail", e.message, "error"); }
+}
+async function fahrtenAbsagen(){
+  try {
+    if (!confirm("Ausgewählte Fahrten absagen? Kalendereinträge werden gelöscht, es wird keine Rechnung erzeugt.")) return;
+    const d = await aktionAusfuehren("absagen", {}, ["rechnungBtn", "erneutBtn", "absagenBtn"], "Wird abgesagt …");
+    if (!d) return;
+    const grund = (d.uebersprungen || []).length ? "\nNicht abgesagt: " + d.uebersprungen.map((u) => `${u.id} (${u.grund})`).join(", ") : "";
+    setStatus("statusDetail", `✓ ${d.abgesagt} Fahrt(en) abgesagt.${grund}`, "ok");
+    await auftragOeffnen(aktuellerAuftrag.referenz, true);
+  } catch (e) { setStatus("statusDetail", e.message, "error"); }
+}
+
+// ===================== START =====================
+(function start(){
+  $("grundpreis").value = speicherLesen("lt_kf_grundpreis");
+  $("preisProKm").value = speicherLesen("lt_kf_preisprokm");
+  if (speicherLesen("lt_admin_key")) $("adminKey").placeholder = "gespeichert (zum Ändern neu eingeben)";
+  const heute = new Date();
+  $("von").value = heute.toLocaleDateString("sv-SE");
+  const plus4 = new Date(heute.getTime() + 27 * 86400000);
+  $("bis").value = plus4.toLocaleDateString("sv-SE");
+  preisAktualisieren();
+  terminSummeAktualisieren();
+})();
+</script>
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=initKf&language=de&region=DE">
+</script>
+</body>
+</html>
