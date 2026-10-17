@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Auftrag ändern (intern)</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --err:#b23b2f; --ok:#2f6b45; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);padding:32px 20px 100px;}
+  .card{max-width:720px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:28px;}
+  h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;}
+  h2{font-size:1.05rem;margin:26px 0 12px;padding-top:16px;border-top:1px solid var(--line);color:var(--moss-dark);}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:5px;}
+  input, select{width:100%;font-family:inherit;font-size:15px;padding:9px 11px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
+  input:focus, select:focus{outline:none;border-color:var(--moss);}
+  input:disabled, select:disabled{background:#f1efe9;color:var(--muted);cursor:not-allowed;}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--moss);padding:0;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .row, .row3{grid-template-columns:1fr;} }
+  .primary{width:100%;background:var(--moss);color:#fff;border:none;border-radius:6px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;font-family:inherit;}
+  .primary:disabled{opacity:0.5;cursor:default;}
+  .sekundaer{background:#fff;color:var(--ink);border:1px solid #cfc9b8;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .status{margin-top:10px;font-size:14px;min-height:1.2em;white-space:pre-line;}
+  .status.error{color:var(--err);} .status.ok{color:var(--ok);}
+  .hint{font-size:12.5px;color:var(--muted);margin:3px 0 0;}
+  .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-bottom:10px;}
+  .infobox{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;font-size:14.5px;line-height:1.7;margin-top:16px;}
+  .warnbox{background:#fbeeea;border:1px solid #e9c3ba;color:#7a2d22;border-radius:6px;padding:12px 16px;font-size:14px;line-height:1.55;margin-top:12px;}
+  #formular{display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Auftrag ändern</h1>
+  <p class="sub">Intern. Name, E-Mail, Telefon, Rechnungsadresse und „Rechnung auf Firma“ eines bestehenden Auftrags ändern. Fahrt, Preis und Zeiten bleiben unberührt.</p>
+
+  <div class="field">
+    <label for="adminKey">Admin-Passwort</label>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="adminKey" autocomplete="off" placeholder="dasselbe wie bei den Krankenfahrten (wird in diesem Browser gemerkt)">
+      <button type="button" class="sekundaer" onclick="passwortSpeichern()">Speichern</button>
+    </div>
+    <div class="status" id="statusAdmin"></div>
+  </div>
+
+  <div class="field">
+    <label for="referenz">Referenz des Auftrags</label>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="referenz" style="text-transform:uppercase;" placeholder="z. B. DLTJ95" onkeydown="if(event.key==='Enter'){laden();}">
+      <button type="button" class="sekundaer" onclick="laden()">Laden</button>
+    </div>
+    <div class="status" id="statusLaden"></div>
+  </div>
+
+  <div id="formular">
+    <div class="infobox" id="info"></div>
+    <div class="warnbox" id="warnung" style="display:none;"></div>
+
+    <div id="felder"></div>
+
+    <button class="primary" id="speichernBtn" onclick="speichern()">Änderungen speichern</button>
+    <div class="status" id="statusSpeichern"></div>
+    <p class="hint">Gilt für alles, was danach entsteht (Mails, Rechnung). Bereits verschickte Mails ändern sich nicht. Namen und Kontaktdaten im Kalendereintrag werden automatisch mitgeändert.</p>
+  </div>
+</div>
+
+<script>
+const BASIS = "https://europe-west1-lang-transfer.cloudfunctions.net";
+const API = { laden: BASIS + "/buchungAdminLaden", aendern: BASIS + "/buchungAdminAendern" };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function setStatus(id, msg, cls){ const e = $(id); e.textContent = msg || ""; e.className = "status" + (cls ? " " + cls : ""); }
+function speicherLesen(k){ try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+function speicherSchreiben(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+const eur = (n) => Number(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+
+function passwortSpeichern(){
+  const v = $("adminKey").value.trim();
+  if (!v) return setStatus("statusAdmin", "Bitte das Passwort eingeben.", "error");
+  speicherSchreiben("lt_admin_key", v);
+  $("adminKey").value = "";
+  $("adminKey").placeholder = "gespeichert (zum Ändern neu eingeben)";
+  setStatus("statusAdmin", "Passwort in diesem Browser gespeichert.", "ok");
+}
+async function api(name, body){
+  const key = speicherLesen("lt_admin_key");
+  if (!key) throw new Error("Bitte oben zuerst das Admin-Passwort speichern.");
+  const antwort = await fetch(API[name], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: key }) });
+  let daten = {};
+  try { daten = await antwort.json(); } catch (e) {}
+  if (!antwort.ok) throw new Error(daten.fehler || `Fehler ${antwort.status}`);
+  return daten;
+}
+
+// ---------- Formular aufbauen ----------
+let geladen = null;
+
+const anredeAuswahl = (id, wert) =>
+  `<select id="${id}" data-name="1">${["", "Frau", "Herr", "divers"].map((a) => `<option value="${a}" ${a === (wert || "") ? "selected" : ""}>${a || "–"}</option>`).join("")}</select>`;
+const textfeld = (id, label, wert, extra) => `<div class="field"><label for="${id}">${label}</label><input type="${(extra && extra.typ) || "text"}" id="${id}" value="${esc(wert)}" ${(extra && extra.kontakt) ? 'data-kontakt="1"' : ""}></div>`;
+
+/** Name zerlegen, falls ein älterer Auftrag nur "name" kennt. */
+function namensteile(p){
+  if (p && (p.vorname || p.nachname)) return { vorname: p.vorname || "", nachname: p.nachname || "" };
+  const teile = String((p && p.name) || "").trim().split(/\s+/);
+  return { vorname: teile.slice(0, -1).join(" ") || teile[0] || "", nachname: teile.length > 1 ? teile[teile.length - 1] : "" };
+}
+function personBlock(praefix, titel, p, mitTelefonFeld){
+  const n = namensteile(p || {});
+  return `<h2>${titel}</h2>
+    <div class="row3">
+      <div class="field"><label for="${praefix}Anrede">Anrede</label>${anredeAuswahl(praefix + "Anrede", p && p.anrede)}</div>
+      ${textfeld(praefix + "Vorname", "Vorname", n.vorname)}
+      ${textfeld(praefix + "Nachname", "Nachname", n.nachname)}
+    </div>
+    <div class="row">
+      ${textfeld(praefix + "Email", "E-Mail", p && p.email, { typ: "email", kontakt: true })}
+      ${textfeld(praefix + "Telefon", "Telefon", mitTelefonFeld(p), { kontakt: true })}
+    </div>`;
+}
+
+function formularAufbauen(){
+  const k = geladen.kunde;
+  const istFirma = k.typ === "firma";
+  const a = k.rechnungsadresse || {};
+  const rf = k.rechnungFirma || null;
+  let html = "";
+  if (istFirma) {
+    html += `<h2>${k.kategorie === "hotel" ? "Hotel" : "Firma"}</h2>` + textfeld("firmenname", "Firmen- bzw. Hotelname", k.firmenname);
+    html += personBlock("bp", "Buchende Person / Ansprechpartner", k.buchendePerson, (p) => p && p.telefon);
+    if (k.zahler === "fahrgast" && k.fahrgast) html += personBlock("fg", "Fahrgast (bekommt Angebot und Rechnung)", k.fahrgast, (p) => p && p.telefon);
+  } else {
+    html += personBlock("pr", "Kunde", k, (p) => p && p.mobil);
+  }
+  html += `<h2>Rechnungsadresse</h2>
+    ${textfeld("raStrasse", "Straße und Hausnummer", a.strasse)}
+    <div class="row">${textfeld("raPlz", "PLZ", a.plz)}${textfeld("raOrt", "Ort", a.ort)}</div>
+    ${textfeld("raLand", "Land", a.land || "Deutschland")}`;
+  html += `<h2>Rechnung auf eine Firma</h2>
+    <label class="check"><input type="checkbox" id="rfAn" ${rf && rf.name ? "checked" : ""} onchange="rfUmschalten()"> Rechnung auf eine Firma ausstellen (Adresse oben = Firmenadresse)</label>
+    <div id="rfFelder" style="display:${rf && rf.name ? "block" : "none"};">
+      ${textfeld("rfName", "Firmenname auf der Rechnung", rf && rf.name)}
+      <div class="row">${textfeld("rfAnsprech", "Ansprechpartner (z. Hd.)", rf && rf.ansprechpartner)}${textfeld("rfAbteilung", "Abteilung", rf && rf.abteilung)}</div>
+      ${textfeld("rfKst", "Kostenstelle", rf && rf.kostenstelle)}
+      <div class="hint">Die Mails gehen weiterhin an die E-Mail-Adresse oben, nur die Rechnung wird auf die Firma ausgestellt.</div>
+    </div>`;
+  $("felder").innerHTML = html;
+  rfUmschalten();
+
+  // Schon fakturiert: alles außer E-Mail und Telefon sperren
+  const gesperrt = !!geladen.rechnungsnummer;
+  document.querySelectorAll("#felder input, #felder select").forEach((el) => { el.disabled = gesperrt && !el.dataset.kontakt; });
+  const w = $("warnung");
+  if (gesperrt) {
+    w.style.display = "block";
+    w.textContent = `Zu diesem Auftrag wurde bereits die Rechnung ${geladen.rechnungsnummer} erstellt. Name, Adresse und Rechnungsfirma sind gesperrt, weil eine ausgestellte Rechnung nicht überschrieben werden darf (Berichtigung bzw. Storno über deinen Steuerberater). E-Mail und Telefon kannst du weiter ändern.`;
+  } else { w.style.display = "none"; }
+}
+function rfUmschalten(){
+  const an = $("rfAn").checked;
+  $("rfFelder").style.display = an ? "block" : "none";
+}
+
+// ---------- Laden / Speichern ----------
+async function laden(){
+  const ref = $("referenz").value.trim().toUpperCase();
+  setStatus("statusSpeichern", "", "");
+  if (!ref) return setStatus("statusLaden", "Bitte eine Referenz eingeben.", "error");
+  setStatus("statusLaden", "Wird geladen …", "");
+  try {
+    geladen = await api("laden", { referenz: ref });
+    $("referenz").value = geladen.referenz;
+    const f = geladen.fahrt || {};
+    const datum = f.zeitpunktISO ? new Date(f.zeitpunktISO).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " Uhr" : "";
+    $("info").innerHTML = `<strong>${esc(geladen.referenz)}</strong> · Status: ${esc(geladen.status)}<br>` +
+      `${esc(f.von)} → ${esc(f.nach)}${datum ? " · " + esc(datum) : ""}${geladen.preisBrutto != null ? " · " + eur(geladen.preisBrutto) : ""}<br>` +
+      `Rechnung: ${geladen.rechnungsnummer ? "<strong>" + esc(geladen.rechnungsnummer) + "</strong> (bereits erstellt)" : "noch keine"}`;
+    formularAufbauen();
+    $("formular").style.display = "block";
+    setStatus("statusLaden", "", "");
+  } catch (e) {
+    $("formular").style.display = "none";
+    setStatus("statusLaden", e.message, "error");
+  }
+}
+const wert = (id) => { const e = $(id); return e ? e.value.trim() : ""; };
+function personAuslesen(p){ return { anrede: wert(p + "Anrede"), vorname: wert(p + "Vorname"), nachname: wert(p + "Nachname"), email: wert(p + "Email"), telefon: wert(p + "Telefon") }; }
+
+async function speichern(){
+  if (!geladen) return;
+  setStatus("statusSpeichern", "", "");
+  const istFirma = geladen.kunde.typ === "firma";
+  const kunde = {
+    rechnungsadresse: { strasse: wert("raStrasse"), plz: wert("raPlz"), ort: wert("raOrt"), land: wert("raLand") },
+    rechnungFirma: $("rfAn").checked ? { name: wert("rfName"), ansprechpartner: wert("rfAnsprech"), abteilung: wert("rfAbteilung"), kostenstelle: wert("rfKst") } : null
+  };
+  if ($("rfAn").checked && !wert("rfName")) return setStatus("statusSpeichern", "Bitte den Firmennamen für die Rechnung eintragen (oder den Haken entfernen).", "error");
+  if (istFirma) {
+    kunde.firmenname = wert("firmenname");
+    kunde.buchendePerson = personAuslesen("bp");
+    if ($("fgEmail")) kunde.fahrgast = personAuslesen("fg");
+  } else {
+    const p = personAuslesen("pr");
+    Object.assign(kunde, { anrede: p.anrede, vorname: p.vorname, nachname: p.nachname, email: p.email, mobil: p.telefon });
+  }
+  const btn = $("speichernBtn");
+  btn.disabled = true;
+  setStatus("statusSpeichern", "Wird gespeichert …", "");
+  try {
+    const d = await api("aendern", { referenz: geladen.referenz, kunde });
+    if (!d.geaendert.length) {
+      setStatus("statusSpeichern", "Es gab keine Änderungen.", "");
+    } else {
+      setStatus("statusSpeichern", `✓ Gespeichert: ${d.geaendert.join(", ")}.` +
+        (d.kalenderAngepasst ? `\nKalendereintrag angepasst.` : "") +
+        (d.kalenderFehler ? `\n⚠ Der Kalendereintrag konnte nicht angepasst werden, bitte von Hand ändern.` : ""), "ok");
+      const ref = geladen.referenz;
+      const meldung = $("statusSpeichern").textContent;
+      await laden();
+      setStatus("statusSpeichern", meldung, "ok");
+    }
+  } catch (e) {
+    setStatus("statusSpeichern", e.message, "error");
+  } finally { btn.disabled = false; }
+}
+
+if (speicherLesen("lt_admin_key")) $("adminKey").placeholder = "gespeichert (zum Ändern neu eingeben)";
+</script>
+</body>
+</html>
