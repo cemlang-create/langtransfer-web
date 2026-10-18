@@ -50,12 +50,20 @@
   .tabelle .note{color:var(--muted);font-size:13px;}
   .ergebnis{display:none;}
   #typBereich{display:none;}
+  /* Eingebettet im Portal (portal.html?...): ohne eigenen Kopf, Rahmen und Passwortfeld */
+  html.embedded body{ padding:0; background:transparent; }
+  html.embedded .card{ max-width:none; border:none; padding:0; background:transparent; }
+  html.embedded .embedded-aus{ display:none !important; }
 </style>
 </head>
 <body>
+<script>
+  // Eingebettet im Portal? Dann Kopf und Passwortfeld ausblenden (Zugang kommt vom Portal-Login).
+  if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");
+</script>
 <div class="card">
-  <h1>Preis-Kalkulator 2</h1>
-  <p class="sub">Intern. Wie das Buchungsformular (inkl. aktueller Aktionen &amp; Rabatte), aber ohne Verfügbarkeitsprüfung und ohne Regeln wie 3-Stunden-Grenze oder Nachtzeiten. Der <a href="kalkulator.html" style="color:var(--moss-dark);">alte Kalkulator</a> bleibt bestehen.</p>
+  <h1 class="embedded-aus">Preis-Kalkulator 2</h1>
+  <p class="sub embedded-aus">Intern. Wie das Buchungsformular (inkl. aktueller Aktionen &amp; Rabatte), aber ohne Verfügbarkeitsprüfung und ohne Regeln wie 3-Stunden-Grenze oder Nachtzeiten. Der <a href="kalkulator.html" style="color:var(--moss-dark);">alte Kalkulator</a> bleibt bestehen.</p>
 
   <div class="toggle">
     <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
@@ -267,6 +275,26 @@ const PLZ_GVV = ["72654", "72655", "72657", "72658", "72666", "72667", "72631"];
 const PLZ_FLUGHAFEN_STR = "70629";
 const AKTION_BIS = new Date("2026-12-20T23:59:59");
 const GUTSCHEIN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/gutscheinPruefen";
+// Zugang: das Passwort kommt vom Portal-Login (gleicher Browserspeicher).
+function adminKeyLesen(){ try { return localStorage.getItem("lt_admin_key") || ""; } catch (e) { return ""; } }
+/**
+ * Sendet an die Backend-Funktion. Meldet das Backend einen Kalenderkonflikt (HTTP 409 mit Liste),
+ * wird nachgefragt; nur nach Bestätigung wird mit konfliktUeberschreiben: true wiederholt.
+ * (Das Backend prüft den Kalender immer, der Betreiber darf Konflikte aber bewusst überschreiben.)
+ */
+async function fetchMitKonflikt(url, optionen){
+  const antwort = await fetch(url, optionen);
+  if (antwort.status !== 409) return antwort;
+  let daten = {};
+  try { daten = await antwort.clone().json(); } catch (e) {}
+  if (!daten.konflikte) return antwort;
+  const zeit = (iso) => new Date(iso).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const uhr = (iso) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const zeilen = daten.konflikte.map((k) => `${k.fahrt} (${zeit(k.blockStartISO)} bis ${uhr(k.blockEndeISO)}): ` + k.mit.map((m) => `„${m.titel}“ (${uhr(m.startISO)}–${uhr(m.endeISO)})`).join(", "));
+  if (!confirm("Im Kalender ist in diesem Zeitraum schon etwas eingetragen:\n\n" + zeilen.join("\n") + "\n\nTrotzdem senden? Der Auftrag wird dann zusätzlich eingetragen.")) return antwort;
+  const neu = JSON.parse(optionen.body); neu.konfliktUeberschreiben = true;
+  return fetch(url, Object.assign({}, optionen, { body: JSON.stringify(neu) }));
+}
 const PAUSCHALANGEBOT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/pauschalangebotSenden";
 
 const PUFFER_EINSTIEG_MIN = 5;
@@ -922,11 +950,12 @@ async function angebotSenden(){
   const istAuftrag = modus === "auftrag";
   if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
+  if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
   setAngebotStatus(istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
   try {
-    const antwort = await fetch(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
@@ -947,6 +976,15 @@ setModus("angebot");
 </script>
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=initAutocomplete&language=de&region=DE">
+</script>
+<script>
+  // Eingebettet: Höhe ans Portal melden, damit der Rahmen mitwächst (kein doppelter Scrollbalken).
+  (function () {
+    if (!document.documentElement.classList.contains("embedded") || window.parent === window) return;
+    var melden = function () { window.parent.postMessage({ type: "lt-hoehe", hoehe: document.documentElement.scrollHeight }, "*"); };
+    if (window.ResizeObserver) new ResizeObserver(melden).observe(document.body);
+    window.addEventListener("load", melden); melden();
+  })();
 </script>
 </body>
 </html>

@@ -375,6 +375,26 @@ async function pauschaleBerechnen(){
 }
 
 // ===================== ANGEBOT MIT ZAHLUNGSLINK VERSCHICKEN =====================
+// Zugang: das Passwort kommt vom Portal-Login (gleicher Browserspeicher).
+function adminKeyLesen(){ try { return localStorage.getItem("lt_admin_key") || ""; } catch (e) { return ""; } }
+/**
+ * Sendet an die Backend-Funktion. Meldet das Backend einen Kalenderkonflikt (HTTP 409 mit Liste),
+ * wird nachgefragt; nur nach Bestätigung wird mit konfliktUeberschreiben: true wiederholt.
+ * (Das Backend prüft den Kalender immer, der Betreiber darf Konflikte aber bewusst überschreiben.)
+ */
+async function fetchMitKonflikt(url, optionen){
+  const antwort = await fetch(url, optionen);
+  if (antwort.status !== 409) return antwort;
+  let daten = {};
+  try { daten = await antwort.clone().json(); } catch (e) {}
+  if (!daten.konflikte) return antwort;
+  const zeit = (iso) => new Date(iso).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const uhr = (iso) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const zeilen = daten.konflikte.map((k) => `${k.fahrt} (${zeit(k.blockStartISO)} bis ${uhr(k.blockEndeISO)}): ` + k.mit.map((m) => `„${m.titel}“ (${uhr(m.startISO)}–${uhr(m.endeISO)})`).join(", "));
+  if (!confirm("Im Kalender ist in diesem Zeitraum schon etwas eingetragen:\n\n" + zeilen.join("\n") + "\n\nTrotzdem senden? Der Auftrag wird dann zusätzlich eingetragen.")) return antwort;
+  const neu = JSON.parse(optionen.body); neu.konfliktUeberschreiben = true;
+  return fetch(url, Object.assign({}, optionen, { body: JSON.stringify(neu) }));
+}
 const PAUSCHALANGEBOT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/pauschalangebotSenden";
 const BUCHUNG_LADEN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/buchungNachReferenzLaden";
 let letztesErgebnis = null;
@@ -394,9 +414,10 @@ async function bestehendeBuchungLaden(){
   const referenz = document.getElementById("agReferenz").value.trim().toUpperCase();
   if (!referenz) { statusEl.textContent = "Bitte zuerst eine Referenz eingeben."; statusEl.className = "status error"; return; }
 
+  if (!adminKeyLesen()) { statusEl.textContent = "Bitte zuerst im Portal anmelden (portal.html)."; statusEl.className = "status error"; return; }
   statusEl.textContent = "Wird geladen …";
   try {
-    const antwort = await fetch(`${BUCHUNG_LADEN_URL}?referenz=${encodeURIComponent(referenz)}`);
+    const antwort = await fetch(BUCHUNG_LADEN_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenz, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || "Buchung konnte nicht geladen werden.");
 
@@ -480,15 +501,17 @@ async function angebotSenden(){
   if (!abholDatum || !abholZeit) return setAngebotStatus("Bitte Abholdatum und -uhrzeit angeben.", "error");
   if (!blockStart || !blockEnde) return setAngebotStatus("Bitte den Kalender-Zeitraum angeben.", "error");
 
+  if (!adminKeyLesen()) return setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error");
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
   setAngebotStatus("Angebot wird verschickt …", "");
 
   try {
-    const antwort = await fetch(PAUSCHALANGEBOT_URL, {
+    const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        adminKey: adminKeyLesen(),
         referenz: bearbeiteReferenz || null,
         kunde: { name, telefon, email, rechnungsadresse: { strasse, plz, ort, land } },
         fahrt: {
