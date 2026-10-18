@@ -174,7 +174,7 @@
       <div class="field"><label for="hinZeit">Abholung Hinfahrt (Uhrzeit)</label><input type="time" id="hinZeit" value="07:30"></div>
       <div class="field"><label for="rueckZeit">Abholung Rückfahrt (Uhrzeit, leer = nach Behandlung auf Abruf)</label><input type="time" id="rueckZeit"></div>
     </div>
-    <label class="check"><input type="checkbox" id="mitRueck" checked onchange="preisAktualisieren()"> Mit Rückfahrt (jede Richtung ist eine eigene Fahrt mit eigener Zuzahlung)</label>
+    <label class="check"><input type="checkbox" id="mitRueck" checked onchange="preisAktualisieren(); verfZuruecksetzen()"> Mit Rückfahrt (jede Richtung ist eine eigene Fahrt mit eigener Zuzahlung)</label>
     <button type="button" class="sekundaer" onclick="termineErzeugen()">Termine erzeugen</button>
     <span class="grau" style="font-size:13px; margin-left:10px;">ersetzt die Liste unten</span>
 
@@ -400,6 +400,7 @@ function termineErzeugen(){
   }
   if (!neu.length) return setStatus("statusNeu", "Im gewählten Zeitraum liegt kein passender Wochentag.", "error");
   termine = neu;
+  verfErgebnis = null;   // neue Serie: bisherige Prüfergebnisse gelten nicht mehr
   setStatus("statusNeu", "", "");
   termineRendern();
 }
@@ -415,17 +416,19 @@ function einzelTerminHinzufuegen(){
 function termineRendern(){
   const tb = $("terminTabelle");
   tb.innerHTML = "";
-  verfErgebnis = null; $("verfInfo").textContent = "";
   termine.forEach((t, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${datumKurz(t.datum)}</td><td><input type="time" value="${t.hin}"></td><td><input type="time" value="${t.rueck}"></td><td class="kal" data-i="${i}"></td><td><button type="button" class="x" title="Termin entfernen">×</button></td>`;
     const [hinIn, rueckIn] = tr.querySelectorAll("input");
-    hinIn.addEventListener("input", () => { t.hin = hinIn.value; verfZuruecksetzen(); });
-    rueckIn.addEventListener("input", () => { t.rueck = rueckIn.value; verfZuruecksetzen(); });
+    // Wird die Zeit EINER Zeile geändert, ist nur deren Prüfergebnis veraltet
+    hinIn.addEventListener("input", () => { t.hin = hinIn.value; zeileVerfZuruecksetzen(t.datum); });
+    rueckIn.addEventListener("input", () => { t.rueck = rueckIn.value; zeileVerfZuruecksetzen(t.datum); });
+    // Termin entfernen: die Ergebnisse der anderen Zeilen bleiben gültig (sie hängen am Datum)
     tr.querySelector(".x").addEventListener("click", () => { termine.splice(i, 1); termineRendern(); });
     tb.appendChild(tr);
   });
   kalenderSpaltenAktualisieren();
+  verfInfoAktualisieren();
   terminSummeAktualisieren();
 }
 function terminSummeAktualisieren(){
@@ -617,25 +620,53 @@ function kalenderChip(e, bezeichnung){
 function kalenderSpaltenAktualisieren(){
   document.querySelectorAll("#terminTabelle td.kal").forEach((td) => {
     const t = termine[Number(td.dataset.i)];
-    if (!verfErgebnis || !t) { td.innerHTML = '<span class="grau">–</span>'; return; }
+    if (!t || !zeileGeprueft(t)) { td.innerHTML = '<span class="grau">–</span>'; return; }
     td.innerHTML = kalenderChip(verfErgebnis[`${t.datum}|hin`], "Hin") + " " + ($("mitRueck").checked ? kalenderChip(verfErgebnis[`${t.datum}|rueck`], "Rück") : "");
   });
 }
 function verfZuruecksetzen(){
   if (!verfErgebnis) return;
-  verfErgebnis = null; $("verfInfo").textContent = ""; kalenderSpaltenAktualisieren();
+  verfErgebnis = null; kalenderSpaltenAktualisieren(); verfInfoAktualisieren();
 }
-async function verfuegbarkeitPruefen(still){
+/** Nur eine Zeile (Datum) wurde geändert: deren Ergebnis ist veraltet, die übrigen bleiben gültig. */
+function zeileVerfZuruecksetzen(datum){
+  if (!verfErgebnis) return;
+  delete verfErgebnis[`${datum}|hin`]; delete verfErgebnis[`${datum}|rueck`];
+  kalenderSpaltenAktualisieren(); verfInfoAktualisieren();
+}
+function zeileGeprueft(t){
+  return !!verfErgebnis && !!verfErgebnis[`${t.datum}|hin`] && (!$("mitRueck").checked || !!verfErgebnis[`${t.datum}|rueck`]);
+}
+/** Zusammenfassung über die aktuell angezeigten Zeilen (gelöschte zählen nicht mehr mit). */
+function verfInfoAktualisieren(){
+  const e = $("verfInfo");
+  if (!verfErgebnis || !termine.some(zeileGeprueft)) { e.textContent = ""; return; }
+  let belegt = 0, aufAbruf = 0, offen = 0;
+  termine.forEach((t) => {
+    if (!zeileGeprueft(t)) { offen += 1; return; }
+    ["hin", "rueck"].forEach((typ) => { const r = verfErgebnis[`${t.datum}|${typ}`]; if (r && r.belegt) belegt += 1; if (r && r.aufAbruf && $("mitRueck").checked) aufAbruf += 1; });
+  });
+  const teile = [];
+  teile.push(belegt ? `<span style="color:var(--err);font-weight:600;">${belegt} Fahrt(en) mit belegtem Kalender.</span> Fahrten entfernen, Zeiten ändern oder den Auftrag bewusst trotzdem anlegen.`
+                    : `<span style="color:var(--ok);font-weight:600;">${offen ? "Alle geprüften Fahrten sind im Kalender frei." : "Alle Fahrten sind im Kalender frei."}</span>${aufAbruf ? ` (${aufAbruf} Rückfahrten auf Abruf werden nicht geprüft.)` : ""}`);
+  if (offen) teile.push(`<span class="warnung">${offen} Termin(e) noch nicht geprüft.</span> „Kalender prüfen“ ergänzt nur diese.`);
+  e.innerHTML = teile.join(" ");
+}
+async function verfuegbarkeitPruefen(still, alle){
   if (!termine.length) { if (!still) setStatus("statusNeu", "Bitte zuerst Termine erzeugen.", "error"); return; }
   if (termine.some((t) => !t.hin)) { if (!still) setStatus("statusNeu", "Bei mindestens einem Termin fehlt die Uhrzeit der Hinfahrt.", "error"); return; }
+  // Normalfall: nur die noch ungeprüften Zeilen. Sind alle geprüft (oder wird alles verlangt), wird alles neu geprüft.
+  let zeilen = (alle || !verfErgebnis) ? termine : termine.filter((t) => !zeileGeprueft(t));
+  if (!zeilen.length) zeilen = termine;
+  const vollstaendig = zeilen.length === termine.length;
   $("verfInfo").textContent = "Kalender wird geprüft …";
   try {
-    const z = zeitenLesen();
-    const d = await api("verfuegbarkeit", { route: { dauerMin: z.dauerMin, anfahrtMin: z.anfahrtMin, rueckMin: z.rueckMin }, wartezeitMin: z.wartezeitMin, termine: termineAlsPayload(), mitRueckfahrt: $("mitRueck").checked });
-    verfErgebnis = {};
+    const z = zeitenLesen(), mitRueck = $("mitRueck").checked;
+    const payload = zeilen.map((t) => ({ hinISO: new Date(`${t.datum}T${t.hin}`).toISOString(), rueckISO: (mitRueck && t.rueck) ? new Date(`${t.datum}T${t.rueck}`).toISOString() : null }));
+    const d = await api("verfuegbarkeit", { route: { dauerMin: z.dauerMin, anfahrtMin: z.anfahrtMin, rueckMin: z.rueckMin }, wartezeitMin: z.wartezeitMin, termine: payload, mitRueckfahrt: mitRueck });
+    if (vollstaendig || !verfErgebnis) verfErgebnis = {};
     d.ergebnis.forEach((e) => { verfErgebnis[`${e.datum}|${e.typ}`] = e; });
-    kalenderSpaltenAktualisieren();
-    $("verfInfo").innerHTML = d.belegt ? `<span style="color:var(--err);font-weight:600;">${d.belegt} Fahrt(en) mit belegtem Kalender.</span> Fahrten entfernen, Zeiten ändern oder den Auftrag bewusst trotzdem anlegen.` : `<span style="color:var(--ok);font-weight:600;">Alle Fahrten sind im Kalender frei.</span>${d.aufAbruf ? ` (${d.aufAbruf} Rückfahrten auf Abruf werden nicht geprüft.)` : ""}`;
+    kalenderSpaltenAktualisieren(); verfInfoAktualisieren();
   } catch (e) { $("verfInfo").textContent = e.message || "Prüfung fehlgeschlagen."; }
 }
 
@@ -652,7 +683,7 @@ async function auftragAnlegen(body){
       (d.konfliktUeberschrieben ? `\nHinweis: Bei ${d.konfliktUeberschrieben} Fahrt(en) war der Kalender belegt, die Termine wurden bewusst zusätzlich eingetragen.` : "") +
       (d.kalenderFehler ? `\n⚠ ${d.kalenderFehler} Kalendereinträge konnten nicht angelegt werden.` : ""), "ok");
   } catch (e) {
-    if (e.status === 409 && e.daten && e.daten.konflikte) { setStatus("statusNeu", "", ""); konfliktZeigen(e.daten.konflikte); verfuegbarkeitPruefen(true); }
+    if (e.status === 409 && e.daten && e.daten.konflikte) { setStatus("statusNeu", "", ""); konfliktZeigen(e.daten.konflikte); verfuegbarkeitPruefen(true, true); }
     else setStatus("statusNeu", e.message || "Senden fehlgeschlagen.", "error");
   } finally { btn.disabled = false; }
 }
