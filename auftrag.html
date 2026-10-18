@@ -37,14 +37,22 @@
   .infobox{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;font-size:14.5px;line-height:1.7;margin-top:16px;}
   .warnbox{background:#fbeeea;border:1px solid #e9c3ba;color:#7a2d22;border-radius:6px;padding:12px 16px;font-size:14px;line-height:1.55;margin-top:12px;}
   #formular{display:none;}
+  /* Eingebettet im Portal (portal.html?...): ohne eigenen Kopf, Rahmen und Passwortfeld */
+  html.embedded body{ padding:0; background:transparent; }
+  html.embedded .card{ max-width:none; border:none; padding:0; background:transparent; }
+  html.embedded .embedded-aus{ display:none !important; }
 </style>
 </head>
 <body>
+<script>
+  // Eingebettet im Portal? Dann Kopf und Passwortfeld ausblenden (Zugang kommt vom Portal-Login).
+  if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");
+</script>
 <div class="card">
-  <h1>Auftrag ändern</h1>
-  <p class="sub">Intern. Name, E-Mail, Telefon, Rechnungsadresse und „Rechnung auf Firma“ eines bestehenden Auftrags ändern. Fahrt, Preis und Zeiten bleiben unberührt.</p>
+  <h1 class="embedded-aus">Auftrag ändern</h1>
+  <p class="sub embedded-aus">Intern. Name, E-Mail, Telefon, Rechnungsadresse und „Rechnung auf Firma“ eines bestehenden Auftrags ändern. Fahrt, Preis und Zeiten bleiben unberührt.</p>
 
-  <div class="field">
+  <div class="field embedded-aus">
     <label for="adminKey">Admin-Passwort</label>
     <div style="display:flex; gap:8px;">
       <input type="password" id="adminKey" autocomplete="off" placeholder="dasselbe wie bei den Krankenfahrten (wird in diesem Browser gemerkt)">
@@ -53,7 +61,7 @@
     <div class="status" id="statusAdmin"></div>
   </div>
 
-  <div class="field">
+  <div class="field" id="referenzBlock">
     <label for="referenz">Referenz des Auftrags</label>
     <div style="display:flex; gap:8px;">
       <input type="text" id="referenz" style="text-transform:uppercase;" placeholder="z. B. DLTJ95" onkeydown="if(event.key==='Enter'){laden();}">
@@ -63,7 +71,7 @@
   </div>
 
   <div id="formular">
-    <div class="infobox" id="info"></div>
+    <div class="infobox embedded-aus" id="info"></div>
     <div class="warnbox" id="warnung" style="display:none;"></div>
 
     <div id="felder"></div>
@@ -236,6 +244,19 @@ async function speichern(){
 }
 
 if (speicherLesen("lt_admin_key")) $("adminKey").placeholder = "gespeichert (zum Ändern neu eingeben)";
+
+// Aufruf aus dem Portal: auftrag.html?embedded=1&referenz=XYZ lädt den Auftrag sofort
+const refAusUrl = new URLSearchParams(location.search).get("referenz");
+if (refAusUrl) { $("referenz").value = refAusUrl.toUpperCase(); $("referenzBlock").style.display = "none"; laden(); }
+</script>
+<script>
+  // Eingebettet: Höhe ans Portal melden, damit der Rahmen mitwächst (kein doppelter Scrollbalken).
+  (function () {
+    if (!document.documentElement.classList.contains("embedded") || window.parent === window) return;
+    var melden = function () { window.parent.postMessage({ type: "lt-hoehe", hoehe: document.documentElement.scrollHeight }, "*"); };
+    if (window.ResizeObserver) new ResizeObserver(melden).observe(document.body);
+    window.addEventListener("load", melden); melden();
+  })();
 </script>
 </body>
 </html>
