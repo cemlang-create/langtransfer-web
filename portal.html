@@ -270,7 +270,7 @@ async function ansichtAuftraege(params, noch){
   $("main").innerHTML = `<h2 class="seite">Aufträge</h2><p class="unter">Suchen, filtern und einen Auftrag öffnen.</p>
     <div class="filter">
       <input type="search" id="fSuche" placeholder="Suche: Name, Referenz, E-Mail, Ort, Rechnungsnummer" value="${esc(suche)}">
-      <select id="fStatus">${opt("alle", "Alle Status", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Rechnung fehlt", status)}${opt("storniert", "Storniert", status)}</select>
+      <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Rechnung fehlt", status)}${opt("storniert", "Storniert", status)}</select>
       <select id="fZeit">${opt("alle", "Alle Zeiten", zeit)}${opt("kommend", "Kommende", zeit)}${opt("vergangen", "Vergangene", zeit)}</select>
     </div>
     <div id="listeBox"><div class="laden">Wird geladen …</div></div>`;
@@ -293,7 +293,10 @@ async function ansichtAuftraege(params, noch){
     try {
       const d = await api("buchungenListe", { status: a.status, zeit: a.zeit, suche: a.suche, limit: 100 });
       if (!noch() || nr !== abfrageNr) return;   // veraltete Antwort
-      if (!d.liste.length) { $("listeBox").innerHTML = `<div class="tabellenrahmen"><div class="leer">Keine Aufträge gefunden.</div></div>`; return; }
+      // Hinweis auf ausgeblendete stornierte Aufträge (nur bei "Alle"); der Link schaltet den Filter um
+      const stornoHinweis = d.ausgeblendet ? ` ${d.ausgeblendet} stornierte${d.ausgeblendet === 1 ? "r Auftrag" : " Aufträge"} ausgeblendet · <a href="#" data-storno>anzeigen</a>` : "";
+      const stornoLink = () => { const a = $("listeBox").querySelector("[data-storno]"); if (a) a.addEventListener("click", (ev) => { ev.preventDefault(); $("fStatus").value = "storniert"; neuLaden(); }); };
+      if (!d.liste.length) { $("listeBox").innerHTML = `<div class="tabellenrahmen"><div class="leer">Keine Aufträge gefunden.${stornoHinweis ? `<div class="klein" style="margin-top:6px;">${stornoHinweis}</div>` : ""}</div></div>`; stornoLink(); return; }
       $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Status</th></tr></thead><tbody>` +
         d.liste.map((r) => `<tr data-ref="${esc(r.referenz)}">
           <td>${esc(zeitText(r.zeitpunktISO))}</td>
@@ -302,7 +305,8 @@ async function ansichtAuftraege(params, noch){
           <td>${esc(r.von)} → ${esc(r.nach)}</td>
           <td>${r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
           <td>${statusBadge(r.status)}${r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}</td></tr>`).join("") +
-        `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge</p>`);
+        `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
+      stornoLink();
       document.querySelectorAll("#listeBox tbody tr").forEach((tr) => tr.addEventListener("click", () => { location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref); }));
     } catch (e) { if (noch() && nr === abfrageNr) $("listeBox").innerHTML = `<div class="meldung error">${esc(e.message)}</div>`; }
   }
