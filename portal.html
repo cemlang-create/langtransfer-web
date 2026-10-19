@@ -87,6 +87,10 @@
   .werkzeuge{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px;}
   .rahmenkarte{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 22px 10px;margin-top:18px;}
   .rahmenkarte h3{margin:16px 0 0;font-size:1.05rem;}
+  .reiter{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--line);}
+  .reiter button{background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;font:inherit;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .reiter button:hover{color:var(--ink);}
+  .reiter button.aktiv{color:var(--moss-dark);border-bottom-color:var(--moss);}
   iframe.maske{width:100%;border:0;display:block;min-height:480px;background:transparent;}
   iframe.vollbreit{background:#fff;border:1px solid var(--line);border-radius:8px;padding:0;min-height:70vh;}
   .laden{color:var(--muted);padding:20px 0;}
@@ -219,7 +223,7 @@ function route(){
   aktivMarkieren(abschnitt === "auftrag" ? "auftraege" : abschnitt);
   window.scrollTo(0, 0);
   if (abschnitt === "auftraege" && sichtbar("auftraege")) return ansichtAuftraege(params, noch);
-  if (abschnitt === "auftrag" && teile[1] && sichtbar("auftraege")) return ansichtAuftrag(teile[1], noch);
+  if (abschnitt === "auftrag" && teile[1] && sichtbar("auftraege")) return ansichtAuftrag(teile[1], noch, params);
   if (abschnitt === "neu" && sichtbar("neuerAuftrag")) return ansichtRahmen("Neuer Auftrag", "Preis berechnen und Angebot oder Auftrag an den Kunden senden.", "kalkulator2.html?embedded=1", true);
   if (abschnitt === "krankenfahrten" && sichtbar("krankenfahrten")) return ansichtRahmen("Krankenfahrten", "Terminserien anlegen, Bestätigung senden, Zuzahlungsrechnungen je Fahrt.", "krankenfahrt.html?embedded=1", true);
   return ansichtUebersicht(noch);
@@ -314,7 +318,7 @@ async function ansichtAuftraege(params, noch){
 }
 
 // ===================== ANSICHT: EINZELNER AUFTRAG =====================
-async function ansichtAuftrag(referenz, noch){
+async function ansichtAuftrag(referenz, noch, params){
   $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a><div class="laden">Wird geladen …</div>`;
   async function laden(){
     try {
@@ -322,6 +326,10 @@ async function ansichtAuftrag(referenz, noch){
       if (!noch()) return;
       const k = d.kunde || {}, f = d.fahrt || {};
       const name = k.typ === "firma" ? `${k.firmenname || ""}` : `${k.anrede || ""} ${k.name || ""}`.trim();
+      const hatRechnung = d.status === "bestaetigt" || !!d.rechnungsnummer;
+      // Route und Zeit eines Pauschal- oder Vermittlungsauftrags ändert man über "Neuer Auftrag" (bestehende Buchung überschreiben)
+      const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
+        ? `Route und Zeit ändern: im Menü „Neuer Auftrag“ bei „Bestehende Buchung überschreiben“ die Referenz <strong>${esc(d.referenz)}</strong> eintragen. Den Preis änderst du im Reiter „Rechnung“.` : "";
       const knoepfe = [];
       if (d.status === "angefragt") { knoepfe.push(["bestaetigen", "Bestätigen", "gold"]); knoepfe.push(["ablehnen", "Ablehnen", "rot"]); }
       if (d.status === "bestaetigt") { knoepfe.push(["ablehnen", "Stornieren", "rot"]); }
@@ -333,10 +341,25 @@ async function ansichtAuftrag(referenz, noch){
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
-        ${(d.status === "bestaetigt" || d.rechnungsnummer) ? `<div class="rahmenkarte"><h3>Rechnung</h3>
-          <iframe class="maske" src="rechnung.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}" title="Rechnung"></iframe></div>` : ""}
-        <div class="rahmenkarte"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
-          <iframe class="maske" src="auftrag.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}" title="Auftrag ändern"></iframe></div>`;
+        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">Rechnung${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
+        <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
+          ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
+          <div class="platz"></div></div>
+        ${hatRechnung ? `<div class="rahmenkarte" id="tabRechnung" style="display:none;"><div class="platz"></div></div>` : ""}`;
+      // Reiter: Der Inhalt wird beim ersten Öffnen geladen und bleibt danach erhalten
+      const rahmenAdresse = { auftrag: `auftrag.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}`, rechnung: `rechnung.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}` };
+      const zeigeTab = (tab) => {
+        ["auftrag", "rechnung"].forEach((t) => {
+          const karte = $(t === "auftrag" ? "tabAuftrag" : "tabRechnung"); if (!karte) return;
+          karte.style.display = t === tab ? "" : "none";
+          if (t === tab && !karte.querySelector("iframe")) karte.querySelector(".platz").innerHTML = `<iframe class="maske" src="${rahmenAdresse[t]}" title="${t === "auftrag" ? "Auftrag ändern" : "Rechnung"}"></iframe>`;
+          else if (t === tab && t === "rechnung") { const f = karte.querySelector("iframe"); try { f.contentWindow.postMessage({ type: "lt-aktualisieren" }, "*"); } catch (e) { /* nicht erreichbar */ } }
+        });
+        document.querySelectorAll("#reiter button").forEach((b) => b.classList.toggle("aktiv", b.dataset.tab === tab));
+        history.replaceState(null, "", `#/auftrag/${encodeURIComponent(d.referenz)}${hatRechnung ? "?tab=" + tab : ""}`);
+      };
+      document.querySelectorAll("#reiter button").forEach((b) => b.addEventListener("click", () => zeigeTab(b.dataset.tab)));
+      zeigeTab(hatRechnung && hashLesen().params.get("tab") === "rechnung" ? "rechnung" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
       document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
     } catch (e) { if (noch()) $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a><div class="meldung error">${esc(e.message)}</div>`; }
   }

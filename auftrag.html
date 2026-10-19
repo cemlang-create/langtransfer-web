@@ -178,7 +178,7 @@ function formularAufbauen(){
   const w = $("warnung");
   if (gesperrt) {
     w.style.display = "block";
-    w.textContent = `Zu diesem Auftrag wurde bereits die Rechnung ${geladen.rechnungsnummer} erstellt. Name, Adresse und Rechnungsfirma sind gesperrt, weil eine ausgestellte Rechnung nicht überschrieben werden darf (Berichtigung bzw. Storno über deinen Steuerberater). E-Mail und Telefon kannst du weiter ändern.`;
+    w.textContent = `Zu diesem Auftrag wurde bereits die Rechnung ${geladen.rechnungsnummer} erstellt. Name, Adresse und Rechnungsfirma sind gesperrt, weil eine ausgestellte Rechnung nicht überschrieben werden darf. Zum Ändern erstellst du zuerst im Reiter „Rechnung“ eine Stornorechnung. E-Mail, Telefon und Sprache kannst du weiter ändern.`;
   } else { w.style.display = "none"; }
 }
 function rfUmschalten(){

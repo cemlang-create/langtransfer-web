@@ -246,6 +246,8 @@ async function kontaktNachladen(){
   } catch (e) { /* Auffrischen ist optional */ }
 }
 window.addEventListener("focus", kontaktNachladen);
+// Das Portal meldet beim Wechsel auf diesen Reiter, dass die Kontaktdaten inzwischen geändert sein könnten
+window.addEventListener("message", (ev) => { if (ev.data && ev.data.type === "lt-aktualisieren") kontaktNachladen(); });
 
 // ---------- Positionen ----------
 function positionenRendern(){
