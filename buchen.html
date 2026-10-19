@@ -364,23 +364,29 @@
           </select>
         </div>
         <div>
-          <label for="fBuchendVorname">Vorname buchende Person<span class="pflicht"> *</span></label>
-          <input type="text" id="fBuchendVorname">
+          <label for="fBuchendTitel">Titel buchende Person</label>
+          <input type="text" id="fBuchendTitel" list="titelListe" placeholder="optional, z. B. Dr." autocomplete="off">
         </div>
       </div>
       <div class="row">
         <div>
+          <label for="fBuchendVorname">Vorname buchende Person<span class="pflicht"> *</span></label>
+          <input type="text" id="fBuchendVorname">
+        </div>
+        <div>
           <label for="fBuchendNachname">Nachname buchende Person<span class="pflicht"> *</span></label>
           <input type="text" id="fBuchendNachname">
         </div>
+      </div>
+      <div class="row">
         <div>
           <label for="fBuchendTelefon">Telefonnummer buchende Person<span class="pflicht"> *</span></label>
           <input type="text" id="fBuchendTelefon">
         </div>
-      </div>
-      <div class="field">
-        <label for="fBuchendEmail">E-Mail buchende Person<span class="pflicht"> *</span></label>
-        <input type="email" id="fBuchendEmail">
+        <div>
+          <label for="fBuchendEmail">E-Mail buchende Person<span class="pflicht"> *</span></label>
+          <input type="email" id="fBuchendEmail">
+        </div>
       </div>
 
       <div class="field">
@@ -403,9 +409,13 @@
             </select>
           </div>
           <div>
-            <label for="fHauptName">Name Hauptfahrgast<span class="pflicht"> *</span></label>
-            <input type="text" id="fHauptName">
+            <label for="fHauptTitel">Titel Hauptfahrgast</label>
+            <input type="text" id="fHauptTitel" list="titelListe" placeholder="optional, z. B. Dr." autocomplete="off">
           </div>
+        </div>
+        <div class="field">
+          <label for="fHauptName">Name Hauptfahrgast<span class="pflicht"> *</span></label>
+          <input type="text" id="fHauptName">
         </div>
         <div class="field">
           <label for="fHauptMobil">Mobilfunknummer Hauptfahrgast</label>
@@ -432,13 +442,19 @@
           </select>
         </div>
         <div>
+          <label for="pTitel">Titel</label>
+          <input type="text" id="pTitel" list="titelListe" placeholder="optional, z. B. Dr." autocomplete="off">
+        </div>
+      </div>
+      <div class="row">
+        <div>
           <label for="pVorname">Vorname<span class="pflicht"> *</span></label>
           <input type="text" id="pVorname">
         </div>
-      </div>
-      <div class="field">
-        <label for="pNachname">Nachname<span class="pflicht"> *</span></label>
-        <input type="text" id="pNachname">
+        <div>
+          <label for="pNachname">Nachname<span class="pflicht"> *</span></label>
+          <input type="text" id="pNachname">
+        </div>
       </div>
 
       <div class="field">
@@ -1358,6 +1374,8 @@ async function buchungsanfrageSenden(){
     };
     const selbst = document.querySelector('input[name="fSelbstFahrgast"]:checked');
     const buchendAnrede = document.getElementById("fBuchendAnrede").value;
+    const buchendTitel = document.getElementById("fBuchendTitel").value.trim();
+    const hauptTitel = document.getElementById("fHauptTitel").value.trim();
     const buchendVorname = document.getElementById("fBuchendVorname").value.trim();
     const buchendNachname = document.getElementById("fBuchendNachname").value.trim();
     const buchendTelefon = document.getElementById("fBuchendTelefon").value.trim();
@@ -1380,15 +1398,16 @@ async function buchungsanfrageSenden(){
     const buchendName = `${buchendVorname} ${buchendNachname}`.trim();
     kunde = {
       typ: "firma", firmenname, rechnungsadresse,
-      buchendePerson: { anrede: buchendAnrede, vorname: buchendVorname, nachname: buchendNachname, name: buchendName, telefon: buchendTelefon, email: buchendEmail, istHauptfahrgast: selbst.value === "ja" },
+      buchendePerson: { anrede: buchendAnrede, titel: buchendTitel, vorname: buchendVorname, nachname: buchendNachname, name: buchendName, telefon: buchendTelefon, email: buchendEmail, istHauptfahrgast: selbst.value === "ja" },
       hauptfahrgast: selbst.value === "ja"
-        ? { anrede: buchendAnrede, name: buchendName, mobil: buchendTelefon }
-        : { anrede: hauptAnrede, name: hauptName, mobil: hauptMobil },
+        ? { anrede: buchendAnrede, titel: buchendTitel, name: buchendName, mobil: buchendTelefon }
+        : { anrede: hauptAnrede, titel: hauptTitel, name: hauptName, mobil: hauptMobil },
       bemerkungen,
       zahlung: "Rechnung nach der Fahrt, zahlbar sofort"
     };
   } else {
     const anrede = document.getElementById("pAnrede").value;
+    const titel = document.getElementById("pTitel").value.trim();
     const vorname = document.getElementById("pVorname").value.trim();
     const nachname = document.getElementById("pNachname").value.trim();
     const rechnungsadresse = {
@@ -1411,7 +1430,7 @@ async function buchungsanfrageSenden(){
 
     const name = `${vorname} ${nachname}`.trim();
     kunde = {
-      typ: "privat", anrede, vorname, nachname, name, rechnungsadresse, mobil, email, bemerkungen,
+      typ: "privat", anrede, titel, vorname, nachname, name, rechnungsadresse, mobil, email, bemerkungen,
       zahlung: "beim Fahrer, nur Kartenzahlung"
     };
   }
@@ -1523,5 +1542,6 @@ async function buchungsanfrageSenden(){
   })();
 </script>
 
+<datalist id="titelListe"><option value="Dr."><option value="Prof."><option value="Prof. Dr."><option value="Dr. med."><option value="Dr. Dr."><option value="Dipl.-Ing."><option value="Mag."></datalist>
 </body>
 </html>

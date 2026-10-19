@@ -50,6 +50,8 @@
   .tabelle .note{color:var(--muted);font-size:13px;}
   .ergebnis{display:none;}
   #typBereich{display:none;}
+  .row4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .row4{grid-template-columns:1fr 1fr;} }
   /* Eingebettet im Portal (portal.html?...): ohne eigenen Kopf, Rahmen und Passwortfeld */
   html.embedded body{ padding:0; background:transparent; }
   html.embedded .card{ max-width:none; border:none; padding:0; background:transparent; }
@@ -148,9 +150,10 @@
 
       <!-- PRIVAT -->
       <div id="formPrivat">
-        <div class="row3">
+        <div class="row4">
           <div class="field"><label for="pAnrede">Anrede</label>
             <select id="pAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="pTitel">Titel</label><input type="text" id="pTitel" list="titelListe" placeholder="optional" autocomplete="off"></div>
           <div class="field"><label for="pVorname">Vorname</label><input type="text" id="pVorname"></div>
           <div class="field"><label for="pNachname">Nachname</label><input type="text" id="pNachname"></div>
         </div>
@@ -165,9 +168,10 @@
         <div class="field"><label for="gName" id="gNameLabel">Firmenname</label><input type="text" id="gName"></div>
 
         <label>Buchende Person / Ansprechpartner</label>
-        <div class="row3">
+        <div class="row4">
           <div class="field"><label for="gAnrede" style="font-weight:400;">Anrede</label>
             <select id="gAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="gTitel" style="font-weight:400;">Titel</label><input type="text" id="gTitel" list="titelListe" placeholder="optional" autocomplete="off"></div>
           <div class="field"><label for="gVorname" style="font-weight:400;">Vorname</label><input type="text" id="gVorname"></div>
           <div class="field"><label for="gNachname" style="font-weight:400;">Nachname</label><input type="text" id="gNachname"></div>
         </div>
@@ -184,9 +188,10 @@
 
         <label id="fgTitel">Fahrgast</label>
         <p class="hint" id="fgHinweis" style="margin:0 0 8px;"></p>
-        <div class="row3">
+        <div class="row4">
           <div class="field"><label for="fgAnrede" style="font-weight:400;">Anrede</label>
             <select id="fgAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="fgAkadTitel" style="font-weight:400;">Titel</label><input type="text" id="fgAkadTitel" list="titelListe" placeholder="optional" autocomplete="off"></div>
           <div class="field"><label for="fgVorname" style="font-weight:400;">Vorname</label><input type="text" id="fgVorname"></div>
           <div class="field"><label for="fgNachname" style="font-weight:400;">Nachname</label><input type="text" id="fgNachname"></div>
         </div>
@@ -857,7 +862,7 @@ async function angebotSenden(){
     if (!v("pVorname") || !v("pNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen angeben.", "error");
     if (!gueltigeEmail(v("pEmail"))) return setAngebotStatus("Bitte eine gültige E-Mail-Adresse angeben.", "error");
     kunde = {
-      typ: "privat", kategorie: "privat", anrede: v("pAnrede"), vorname: v("pVorname"), nachname: v("pNachname"),
+      typ: "privat", kategorie: "privat", anrede: v("pAnrede"), titel: v("pTitel"), vorname: v("pVorname"), nachname: v("pNachname"),
       name: `${v("pVorname")} ${v("pNachname")}`.trim(), telefon: v("pTelefon"), email: v("pEmail"), rechnungsadresse
     };
   } else {
@@ -885,11 +890,11 @@ async function angebotSenden(){
       typ: "firma", kategorie: kundentyp, firmenname, rechnungsadresse,
       zahler: zahlerFg ? "fahrgast" : "firma",
       buchendePerson: {
-        anrede: v("gAnrede"), vorname: v("gVorname"), nachname: v("gNachname"),
+        anrede: v("gAnrede"), titel: v("gTitel"), vorname: v("gVorname"), nachname: v("gNachname"),
         name: `${v("gVorname")} ${v("gNachname")}`.trim(), telefon: v("gTelefon"), email: v("gEmail")
       },
       fahrgast: fgName ? {
-        anrede: v("fgAnrede"), vorname: v("fgVorname"), nachname: v("fgNachname"),
+        anrede: v("fgAnrede"), titel: v("fgAkadTitel"), vorname: v("fgVorname"), nachname: v("fgNachname"),
         name: fgName, telefon: v("fgTelefon"), email: v("fgEmail")
       } : null,
       zimmer: istHotel ? v("gZimmer") : ""
@@ -986,5 +991,6 @@ setModus("angebot");
     window.addEventListener("load", melden); melden();
   })();
 </script>
+<datalist id="titelListe"><option value="Dr."><option value="Prof."><option value="Prof. Dr."><option value="Dr. med."><option value="Dr. Dr."><option value="Dipl.-Ing."><option value="Mag."></datalist>
 </body>
 </html>

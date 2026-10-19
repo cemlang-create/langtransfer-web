@@ -36,6 +36,8 @@
   .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-bottom:10px;}
   .infobox{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;font-size:14.5px;line-height:1.7;margin-top:16px;}
   .warnbox{background:#fbeeea;border:1px solid #e9c3ba;color:#7a2d22;border-radius:6px;padding:12px 16px;font-size:14px;line-height:1.55;margin-top:12px;}
+  .row4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .row4{grid-template-columns:1fr 1fr;} }
   #formular{display:none;}
   /* Eingebettet im Portal (portal.html?...): ohne eigenen Kopf, Rahmen und Passwortfeld */
   html.embedded body{ padding:0; background:transparent; }
@@ -127,8 +129,9 @@ function namensteile(p){
 function personBlock(praefix, titel, p, mitTelefonFeld){
   const n = namensteile(p || {});
   return `<h2>${titel}</h2>
-    <div class="row3">
+    <div class="row4">
       <div class="field"><label for="${praefix}Anrede">Anrede</label>${anredeAuswahl(praefix + "Anrede", p && p.anrede)}</div>
+      <div class="field"><label for="${praefix}Titel">Titel</label><input type="text" id="${praefix}Titel" list="titelListe" placeholder="optional" autocomplete="off" value="${esc(p && p.titel)}"></div>
       ${textfeld(praefix + "Vorname", "Vorname", n.vorname)}
       ${textfeld(praefix + "Nachname", "Nachname", n.nachname)}
     </div>
@@ -203,7 +206,7 @@ async function laden(){
   }
 }
 const wert = (id) => { const e = $(id); return e ? e.value.trim() : ""; };
-function personAuslesen(p){ return { anrede: wert(p + "Anrede"), vorname: wert(p + "Vorname"), nachname: wert(p + "Nachname"), email: wert(p + "Email"), telefon: wert(p + "Telefon") }; }
+function personAuslesen(p){ return { anrede: wert(p + "Anrede"), titel: wert(p + "Titel"), vorname: wert(p + "Vorname"), nachname: wert(p + "Nachname"), email: wert(p + "Email"), telefon: wert(p + "Telefon") }; }
 
 async function speichern(){
   if (!geladen) return;
@@ -220,7 +223,7 @@ async function speichern(){
     if ($("fgEmail")) kunde.fahrgast = personAuslesen("fg");
   } else {
     const p = personAuslesen("pr");
-    Object.assign(kunde, { anrede: p.anrede, vorname: p.vorname, nachname: p.nachname, email: p.email, mobil: p.telefon });
+    Object.assign(kunde, { anrede: p.anrede, titel: p.titel, vorname: p.vorname, nachname: p.nachname, email: p.email, mobil: p.telefon });
   }
   const btn = $("speichernBtn");
   btn.disabled = true;
@@ -258,5 +261,6 @@ if (refAusUrl) { $("referenz").value = refAusUrl.toUpperCase(); $("referenzBlock
     window.addEventListener("load", melden); melden();
   })();
 </script>
+<datalist id="titelListe"><option value="Dr."><option value="Prof."><option value="Prof. Dr."><option value="Dr. med."><option value="Dr. Dr."><option value="Dipl.-Ing."><option value="Mag."></datalist>
 </body>
 </html>

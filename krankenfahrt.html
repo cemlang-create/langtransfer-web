@@ -69,6 +69,8 @@
   .konfliktbox ul{margin:8px 0 12px;padding-left:18px;} .konfliktbox li{margin-bottom:5px;}
   .konfliktbox .knoepfe{display:flex;flex-wrap:wrap;gap:10px;}
   .warnung{color:var(--moss-dark);font-weight:600;}
+  .row4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .row4{grid-template-columns:1fr 1fr;} }
   /* Eingebettet im Portal (portal.html?...): ohne eigenen Kopf, Rahmen und Passwortfeld */
   html.embedded body{ padding:0; background:transparent; }
   html.embedded .card{ max-width:none; border:none; padding:0; background:transparent; }
@@ -103,9 +105,10 @@
   <!-- ===================== NEUER AUFTRAG ===================== -->
   <div id="bereichNeu" style="display:block;">
     <h2 style="margin-top:6px;border-top:none;padding-top:0;">Patient</h2>
-    <div class="row3">
+    <div class="row4">
       <div class="field"><label for="pAnrede">Anrede</label>
         <select id="pAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+      <div class="field"><label for="pTitel">Titel</label><input type="text" id="pTitel" list="titelListe" placeholder="optional" autocomplete="off"></div>
       <div class="field"><label for="pVorname">Vorname</label><input type="text" id="pVorname"></div>
       <div class="field"><label for="pNachname">Nachname</label><input type="text" id="pNachname"></div>
     </div>
@@ -465,7 +468,7 @@ async function auftragSenden(){
   }
   const mitRueck = $("mitRueck").checked, z = zeitenLesen();
   const body = {
-    patient: { anrede: v("pAnrede"), vorname: v("pVorname"), nachname: v("pNachname"), telefon: v("pTelefon"), email: v("pEmail"), rechnungsadresse },
+    patient: { anrede: v("pAnrede"), titel: v("pTitel"), vorname: v("pVorname"), nachname: v("pNachname"), telefon: v("pTelefon"), email: v("pEmail"), rechnungsadresse },
     krankenkasse: v("kasse"), anlass: $("anlass").value, zuzahlungsbefreit: befreit,
     tarif: { grundpreis: grund, preisProKm: proKm, mindestpreis: mindest },
     route: { abholadresse: places.abhol.formatted_address, zieladresse: places.ziel.formatted_address, zielName: v("zielName"), km, dauerMin: z.dauerMin, anfahrtMin: z.anfahrtMin, rueckMin: z.rueckMin },
@@ -829,5 +832,6 @@ async function fahrtenAbsagen(){
     window.addEventListener("load", melden); melden();
   })();
 </script>
+<datalist id="titelListe"><option value="Dr."><option value="Prof."><option value="Prof. Dr."><option value="Dr. med."><option value="Dr. Dr."><option value="Dipl.-Ing."><option value="Mag."></datalist>
 </body>
 </html>
