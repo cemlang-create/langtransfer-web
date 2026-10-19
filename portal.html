@@ -337,7 +337,7 @@ async function ansichtAuftrag(referenz, noch){
           <iframe class="maske" src="rechnung.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}" title="Rechnung"></iframe></div>` : ""}
         <div class="rahmenkarte"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
           <iframe class="maske" src="auftrag.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}" title="Auftrag ändern"></iframe></div>`;
-      document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer)));
+      document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
     } catch (e) { if (noch()) $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a><div class="meldung error">${esc(e.message)}</div>`; }
   }
   await laden();
@@ -347,8 +347,10 @@ async function ansichtAuftrag(referenz, noch){
   window.__fokusAuftrag = beiFokus;
   window.addEventListener("focus", beiFokus);
 }
-async function aktionAusfuehren(referenz, aktion, beschriftung, rechnungsnummer){
-  if (aktion === "ablehnen") {
+async function aktionAusfuehren(referenz, aktion, beschriftung, rechnungsnummer, status){
+  if (aktion === "ablehnen" && status === "angebot") {
+    if (!confirm(`${beschriftung}? Der Kunde wird nicht benachrichtigt.`)) return;
+  } else if (aktion === "ablehnen") {
     const hinweis = rechnungsnummer ? `\n\nAchtung: Zu diesem Auftrag gibt es die gültige Rechnung ${rechnungsnummer}. Sie bleibt bestehen. Bitte im Bereich „Rechnung“ eine Stornorechnung erstellen, falls nicht gefahren wird.` : "";
     if (!confirm(`${beschriftung}? Der Kunde wird informiert und der Kalendereintrag entfernt.${hinweis}`)) return;
   }
