@@ -257,6 +257,11 @@
         <label>Wie wird die Fahrt bezahlt?</label>
         <label class="check"><input type="radio" name="zahlungsart" value="link" checked onchange="modusTexteAktualisieren()"> Im Vorfeld per Zahlungslink (Stripe)</label>
         <label class="check"><input type="radio" name="zahlungsart" value="fahrzeug" onchange="modusTexteAktualisieren()"> Im Fahrzeug per Karte (SumUp)</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="rechnung" onchange="modusTexteAktualisieren()"> Auf Rechnung (nach der Fahrt, zahlbar sofort per Überweisung)</label>
+      </div>
+      <div class="field">
+        <label for="agSprache">Sprache von Angebot, Bestätigung und Rechnung</label>
+        <select id="agSprache"><option value="de">Deutsch</option><option value="en">English</option></select>
       </div>
       <div class="toggle">
         <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
@@ -566,11 +571,17 @@ function setModus(m){
   el("angebotBtn").textContent = m === "angebot" ? "Angebot senden" : "Auftrag senden";
   modusTexteAktualisieren();
 }
+function zahlungsInfoText(){
+  const art = aktuelleZahlungsart();
+  return art === "fahrzeug" ? "Es gibt keinen Zahlungslink – bezahlt wird per Karte direkt im Fahrzeug."
+    : art === "rechnung" ? "Es gibt keinen Zahlungslink – der Kunde bekommt nach der Fahrt eine Rechnung (zahlbar sofort per Überweisung)."
+    : "Der Kunde bekommt einen Zahlungslink.";
+}
 function modusTexteAktualisieren(){
-  const fahrzeug = aktuelleZahlungsart() === "fahrzeug";
-  const zahlung = fahrzeug ? "Es gibt keinen Zahlungslink – bezahlt wird per Karte direkt im Fahrzeug." : "Der Kunde bekommt einen Zahlungslink.";
+  const ohneLink = aktuelleZahlungsart() !== "link";
+  const zahlung = zahlungsInfoText();
   el("modusHinweis").textContent = modus === "angebot"
-    ? `Der Kunde bekommt das Angebot mit den Buttons Annehmen / Änderungen anfragen / Wird nicht mehr benötigt. Kalendertermin${fahrzeug ? "" : " und Zahlungslink"} entstehen erst bei Annahme. ${zahlung}`
+    ? `Der Kunde bekommt das Angebot mit den Buttons Annehmen / Änderungen anfragen / Wird nicht mehr benötigt. Kalendertermin${ohneLink ? "" : " und Zahlungslink"} entstehen erst bei Annahme. ${zahlung}`
     : `Der Auftrag gilt sofort als erteilt: Kalendereinträge werden jetzt angelegt und der Kunde bekommt direkt die Bestätigung. ${zahlung}`;
 }
 
@@ -920,6 +931,7 @@ async function angebotSenden(){
   const body = {
     modus,
     zahlungsart: aktuelleZahlungsart(),
+    sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
     kunde,
     fahrt: {
@@ -953,7 +965,7 @@ async function angebotSenden(){
   };
 
   const istAuftrag = modus === "auftrag";
-  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
+  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
@@ -965,7 +977,7 @@ async function angebotSenden(){
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
       istAuftrag
-        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
+        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
   } catch (err) {

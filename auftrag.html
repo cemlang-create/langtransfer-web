@@ -146,7 +146,10 @@ function formularAufbauen(){
   const istFirma = k.typ === "firma";
   const a = k.rechnungsadresse || {};
   const rf = k.rechnungFirma || null;
-  let html = "";
+  let html = `<h2 style="margin-top:6px;border-top:none;padding-top:0;">Sprache</h2>
+    <div class="field"><label for="auftragSprache">Sprache von Angebot, Bestätigung und Kundenseiten</label>
+      <select id="auftragSprache" data-kontakt="1"><option value="de" ${geladen.sprache !== "en" ? "selected" : ""}>Deutsch</option><option value="en" ${geladen.sprache === "en" ? "selected" : ""}>English</option></select>
+      <div class="hint">Die Sprache einer bereits erstellten Rechnung bleibt unverändert. Bei einer neuen Rechnung wählst du sie im Rechnungsentwurf.</div></div>`;
   if (istFirma) {
     html += `<h2>${k.kategorie === "hotel" ? "Hotel" : "Firma"}</h2>` + textfeld("firmenname", "Firmen- bzw. Hotelname", k.firmenname);
     html += personBlock("bp", "Buchende Person / Ansprechpartner", k.buchendePerson, (p) => p && p.telefon);
@@ -229,7 +232,7 @@ async function speichern(){
   btn.disabled = true;
   setStatus("statusSpeichern", "Wird gespeichert …", "");
   try {
-    const d = await api("aendern", { referenz: geladen.referenz, kunde });
+    const d = await api("aendern", { referenz: geladen.referenz, kunde, sprache: $("auftragSprache").value });
     if (!d.geaendert.length) {
       setStatus("statusSpeichern", "Es gab keine Änderungen.", "");
     } else {

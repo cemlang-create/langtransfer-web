@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Rechnung (intern)</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --err:#b23b2f; --ok:#2f6b45; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);padding:32px 20px 100px;font-size:15px;}
+  .card{max-width:860px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:26px;}
+  h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;}
+  h2{font-size:1.05rem;margin:26px 0 12px;padding-top:16px;border-top:1px solid var(--line);color:var(--moss-dark);}
+  h2.erste{margin-top:6px;border-top:none;padding-top:0;}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px;}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:5px;}
+  input, select, textarea{width:100%;font-family:inherit;font-size:15px;padding:9px 11px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--moss);}
+  input:disabled, select:disabled, textarea:disabled{background:#f1efe9;color:var(--muted);}
+  input[type=checkbox], input[type=radio]{width:17px;height:17px;accent-color:var(--moss);padding:0;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:640px){ .row{grid-template-columns:1fr;} }
+  .field{margin-bottom:14px;}
+  .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;}
+  .hint{font-size:12.5px;color:var(--muted);margin:3px 0 0;}
+  .box{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;line-height:1.65;}
+  .warn{background:#fbeeea;border:1px solid #e9c3ba;color:#7a2d22;border-radius:6px;padding:12px 16px;line-height:1.55;margin:10px 0;}
+  .primary{background:var(--moss);color:#fff;border:none;border-radius:6px;padding:12px 18px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .primary:disabled{opacity:.5;cursor:default;}
+  .sekundaer{background:#fff;color:var(--ink);border:1px solid #cfc9b8;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;}
+  .sekundaer:disabled{opacity:.5;cursor:default;}
+  .sekundaer.rot{color:var(--err);border-color:#e0b4ad;}
+  .status{margin-top:12px;font-size:14px;min-height:1.2em;white-space:pre-line;}
+  .status.error{color:var(--err);} .status.ok{color:var(--ok);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th, td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{font-size:12.5px;color:var(--muted);font-weight:600;}
+  td.zahl, th.zahl{text-align:right;white-space:nowrap;}
+  .pos input, .pos select{padding:7px 8px;font-size:14px;}
+  .tabellenrahmen{overflow-x:auto;border:1px solid var(--line);border-radius:6px;}
+  .x{background:none;border:none;color:var(--err);font-size:20px;cursor:pointer;padding:0 6px;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:600;background:#eee;color:var(--muted);white-space:nowrap;}
+  .badge.ok{background:#dcefe3;color:var(--ok);} .badge.err{background:#f3d9d4;color:var(--err);} .badge.warn{background:#f6e7c8;color:var(--moss-dark);}
+  .summen{margin-left:auto;max-width:360px;margin-top:14px;}
+  .summen div{display:flex;justify-content:space-between;padding:3px 0;}
+  .summen .gesamt{border-top:1px solid #cfc9b8;margin-top:6px;padding-top:8px;font-weight:700;font-size:1.05rem;}
+  .grau{color:var(--muted);}
+  /* Eingebettet im Portal */
+  html.embedded body{ padding:0; background:transparent; }
+  html.embedded .card{ max-width:none; border:none; padding:0; background:transparent; }
+  html.embedded .embedded-aus{ display:none !important; }
+</style>
+</head>
+<body>
+<script>
+  if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");
+</script>
+<div class="card">
+  <h1 class="embedded-aus">Rechnung</h1>
+  <p class="sub embedded-aus">Intern. Rechnungsentwurf mit Positionen prüfen, Vorschau ansehen, Rechnung erzeugen. Bereits ausgestellte Rechnungen werden nur per Stornorechnung korrigiert.</p>
+
+  <div class="field embedded-aus">
+    <label for="adminKey">Admin-Passwort</label>
+    <input type="password" id="adminKey" autocomplete="off" placeholder="wird aus dem Portal übernommen">
+    <button type="button" class="sekundaer" style="margin-top:8px;" onclick="passwortSpeichern()">Speichern</button>
+  </div>
+  <div class="field embedded-aus">
+    <label for="referenz">Referenz des Auftrags</label>
+    <div style="display:flex;gap:8px;"><input type="text" id="referenz" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter'){laden();}"><button type="button" class="sekundaer" onclick="laden()">Laden</button></div>
+  </div>
+
+  <div class="status" id="statusLaden"></div>
+
+  <div id="inhalt" style="display:none;">
+    <div class="box" id="empfaengerBox"></div>
+
+    <div id="verlaufBereich" style="display:none;">
+      <h2>Rechnungen zu diesem Auftrag</h2>
+      <div class="tabellenrahmen"><table>
+        <thead><tr><th>Nummer</th><th>Art</th><th>Datum</th><th class="zahl">Betrag</th><th>Status</th><th></th></tr></thead>
+        <tbody id="verlaufTabelle"></tbody>
+      </table></div>
+      <div class="status" id="statusVerlauf"></div>
+    </div>
+
+    <div id="aktuelleBox" style="display:none;">
+      <div class="warn" id="aktuelleHinweis"></div>
+      <label class="check"><input type="checkbox" id="stornoSenden" checked> Stornorechnung per E-Mail an den Kunden senden</label>
+      <button type="button" class="sekundaer rot" id="stornoBtn" onclick="stornoErstellen()">Stornorechnung erstellen</button>
+      <div class="status" id="statusStorno"></div>
+    </div>
+
+    <div id="entwurf" style="display:none;">
+      <h2 class="erste" id="entwurfTitel">Neue Rechnung</h2>
+      <div class="row">
+        <div class="field"><label for="sprache">Sprache der Rechnung</label>
+          <select id="sprache" onchange="spracheGeaendert()"><option value="de">Deutsch</option><option value="en">English</option></select></div>
+        <div class="field"><label for="leistungsdatum">Leistungsdatum</label><input type="date" id="leistungsdatum"></div>
+      </div>
+      <div class="field">
+        <label>Zahlungsart</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="bezahlt" onchange="zahlungsartGeaendert()"> Bereits bezahlt (Karte im Fahrzeug, Zahlungslink)</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="ueberweisung" onchange="zahlungsartGeaendert()"> Per Überweisung: zahlbar sofort ohne Abzug, mit IBAN auf der Rechnung</label>
+        <div class="warn" id="bankWarnung" style="display:none;">Für Überweisungsrechnungen fehlt die Bankverbindung. Bitte <code>RECHNUNG_BANK</code> in <code>index.js</code> ausfüllen (gültige IBAN, BIC und Bank sind optional) und die Funktionen neu ausrollen. Die Vorschau funktioniert trotzdem.</div>
+      </div>
+
+      <h2>Positionen</h2>
+      <p class="hint" style="margin-top:-6px;">Preise sind Bruttopreise. Netto und Umsatzsteuer werden je Steuersatz herausgerechnet. Ein Rabatt ist eine Position mit negativem Preis.</p>
+      <div class="tabellenrahmen pos"><table>
+        <thead><tr><th>Beschreibung</th><th style="width:78px;">Menge</th><th style="width:112px;">Einzelpreis (€)</th><th style="width:88px;">USt</th><th class="zahl" style="width:96px;">Summe</th><th style="width:34px;"></th></tr></thead>
+        <tbody id="positionen"></tbody>
+      </table></div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+        <button type="button" class="sekundaer" onclick="positionHinzufuegen()">+ Position</button>
+        <button type="button" class="sekundaer" onclick="positionHinzufuegen('trinkgeld')">+ Trinkgeld</button>
+      </div>
+      <div class="summen" id="summen"></div>
+
+      <div class="field" style="margin-top:16px;"><label for="hinweis">Hinweis auf der Rechnung (optional)</label><textarea id="hinweis" rows="2" maxlength="500" placeholder="z. B. Zahlungsreferenz, Kostenstelle, Dank an den Kunden"></textarea></div>
+      <label class="check"><input type="checkbox" id="senden" checked> Rechnung per E-Mail an den Kunden senden</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
+        <button type="button" class="sekundaer" id="vorschauBtn" onclick="vorschau()">Vorschau (PDF)</button>
+        <button type="button" class="primary" id="erzeugenBtn" onclick="erzeugen()">Rechnung erzeugen</button>
+      </div>
+      <div class="status" id="statusEntwurf"></div>
+    </div>
+
+    <div class="warn" id="nichtMoeglich" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+const BASIS = "https://europe-west1-lang-transfer.cloudfunctions.net";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const rund2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const eur = (n) => Number(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+function setStatus(id, msg, cls){ const e = $(id); e.textContent = msg || ""; e.className = "status" + (cls ? " " + cls : ""); }
+function speicherLesen(k){ try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+function passwortSpeichern(){ const v = $("adminKey").value.trim(); if (!v) return; try { localStorage.setItem("lt_admin_key", v); } catch (e) {} $("adminKey").value = ""; $("adminKey").placeholder = "gespeichert"; }
+async function api(aktion, body){
+  const key = speicherLesen("lt_admin_key");
+  if (!key) throw new Error("Bitte zuerst im Portal anmelden (Admin-Passwort fehlt).");
+  const antwort = await fetch(`${BASIS}/rechnungAdmin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ aktion, referenz: daten ? daten.referenz : $("referenz").value.trim().toUpperCase() }, body, { adminKey: key })) });
+  let d = {}; try { d = await antwort.json(); } catch (e) {}
+  if (!antwort.ok) throw new Error(d.fehler || `Fehler ${antwort.status}`);
+  return d;
+}
+
+// ---------- Berechnung (gleiche Regeln wie im Backend) ----------
+function berechnen(pos){
+  const zeilen = pos.map((p) => { const brutto = rund2(p.menge * p.einzelBrutto); return Object.assign({}, p, { brutto, netto: rund2(brutto / (1 + p.ust / 100)) }); });
+  const gruppen = {};
+  zeilen.forEach((z) => { gruppen[z.ust] = rund2((gruppen[z.ust] || 0) + z.brutto); });
+  const steuer = Object.keys(gruppen).map(Number).sort((a, b) => b - a).map((satz) => { const brutto = gruppen[satz], netto = rund2(brutto / (1 + satz / 100)); return { satz, brutto, netto, mwst: rund2(brutto - netto) }; });
+  const summe = (f) => rund2(steuer.reduce((s, g) => s + g[f], 0));
+  return { zeilen, steuer, gesamtBrutto: summe("brutto"), gesamtNetto: summe("netto"), gesamtMwst: summe("mwst") };
+}
+
+// ---------- Zustand ----------
+let daten = null;            // Antwort von "laden"
+let positionen = [];         // [{ text, menge, einzelBrutto, ust }]
+let vorherigeSprache = "de";
+
+async function laden(nachAktion){
+  const ref = (daten && daten.referenz) || $("referenz").value.trim().toUpperCase();
+  if (!ref) return setStatus("statusLaden", "Bitte eine Referenz eingeben.", "error");
+  if (!nachAktion) setStatus("statusLaden", "Wird geladen …", "");
+  try {
+    const d = await fetch(`${BASIS}/rechnungAdmin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aktion: "laden", referenz: ref, adminKey: speicherLesen("lt_admin_key") }) });
+    const j = await d.json().catch(() => ({}));
+    if (!d.ok) throw new Error(j.fehler || (d.status === 401 ? "Bitte zuerst im Portal anmelden (Admin-Passwort fehlt oder ist falsch)." : `Fehler ${d.status}`));
+    const ersterAufruf = !daten || daten.referenz !== j.referenz;
+    const entwurfWurdeFrei = !!daten && !daten.kannErstellen && j.kannErstellen;   // z. B. direkt nach einer Stornorechnung
+    daten = j;
+    $("referenz").value = j.referenz;
+    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true; }
+    aufbauen();
+    setStatus("statusLaden", "", "");
+  } catch (e) { $("inhalt").style.display = "none"; setStatus("statusLaden", e.message, "error"); }
+}
+
+function aufbauen(){
+  $("inhalt").style.display = "block";
+  const e = daten.empfaenger || {};
+  $("empfaengerBox").innerHTML = `<strong>Rechnungsempfänger:</strong> ${esc(e.name || "–")}${e.abteilung ? ", " + esc(e.abteilung) : ""}${e.zHd ? " (z. Hd. " + esc(e.zHd) + ")" : ""}` +
+    `<br>${(e.adressZeilen || []).map(esc).join(", ") || "<span class='grau'>keine Adresse hinterlegt</span>"}<br><span class="grau">E-Mail: ${esc(daten.empfaengerEmail || "–")} · Name, Adresse und „Rechnung auf Firma“ ändert man unten bei den Kontaktdaten.</span>`;
+  // Verlauf
+  const v = daten.verlauf || [];
+  $("verlaufBereich").style.display = v.length ? "block" : "none";
+  $("verlaufTabelle").innerHTML = v.map((h) => {
+    const art = h.typ === "storno" ? `Stornorechnung zu ${esc(h.bezugNummer)}` : "Rechnung";
+    const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>`;
+    return `<tr><td style="white-space:nowrap;"><strong>${esc(h.nummer)}</strong>${h.aeltere ? ' <span class="grau">(ältere Rechnung)</span>' : ""}</td><td>${art}</td><td>${h.datumISO ? new Date(h.datumISO).toLocaleDateString("de-DE") : "–"}</td>` +
+      `<td class="zahl">${h.gesamtBrutto == null ? "–" : eur(h.gesamtBrutto)}</td><td>${status}</td>` +
+      `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">PDF</button> <button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button></td></tr>`;
+  }).join("");
+  document.querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", () => pdfOeffnen(b.dataset.pdf)));
+  document.querySelectorAll("[data-senden]").forEach((b) => b.addEventListener("click", () => erneutSenden(b.dataset.senden)));
+  // Aktuelle Rechnung -> nur Storno möglich; sonst Entwurf
+  const hatAktuelle = !!daten.aktuelleNummer;
+  $("aktuelleBox").style.display = hatAktuelle ? "block" : "none";
+  if (hatAktuelle) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es die gültige Rechnung <strong>${esc(daten.aktuelleNummer)}</strong>. Eine ausgestellte Rechnung wird nicht überschrieben: Zum Ändern erstellst du zuerst eine <strong>Stornorechnung</strong> (eigene Nummer, hebt die Rechnung auf) und danach eine neue Rechnung.`;
+  $("entwurf").style.display = daten.kannErstellen ? "block" : "none";
+  const nm = $("nichtMoeglich");
+  nm.style.display = (!daten.kannErstellen && !hatAktuelle) ? "block" : "none";
+  if (!daten.kannErstellen && !hatAktuelle) nm.textContent = `Eine Rechnung ist nur bei bestätigten Aufträgen möglich (Status: ${daten.status}).`;
+  $("entwurfTitel").textContent = daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen");
+  zahlungsartGeaendert();
+  positionenRendern();
+}
+
+// ---------- Positionen ----------
+function positionenRendern(){
+  const tb = $("positionen"); tb.innerHTML = "";
+  positionen.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><input type="text" value="${esc(p.text)}" maxlength="200" data-f="text"></td>` +
+      `<td><input type="number" step="0.01" min="0" value="${Number.isFinite(p.menge) ? p.menge : ""}" data-f="menge"></td>` +
+      `<td><input type="number" step="0.01" value="${Number.isFinite(p.einzelBrutto) ? p.einzelBrutto : ""}" data-f="einzelBrutto"></td>` +
+      `<td><select data-f="ust">${[19, 7, 0].map((u) => `<option value="${u}" ${Number(p.ust) === u ? "selected" : ""}>${u} %</option>`).join("")}</select></td>` +
+      `<td class="zahl" data-summe="${i}"></td><td><button type="button" class="x" title="Position entfernen">×</button></td>`;
+    tr.querySelectorAll("[data-f]").forEach((el) => el.addEventListener("input", () => {
+      const f = el.dataset.f; p[f] = f === "text" ? el.value : (el.value === "" ? NaN : Number(el.value));
+      summenAktualisieren();
+    }));
+    tr.querySelector(".x").addEventListener("click", () => { if (positionen.length > 1) { positionen.splice(i, 1); positionenRendern(); } else setStatus("statusEntwurf", "Mindestens eine Position ist nötig.", "error"); });
+    tb.appendChild(tr);
+  });
+  summenAktualisieren();
+}
+function positionHinzufuegen(art){
+  const en = $("sprache").value === "en";
+  positionen.push(art === "trinkgeld" ? { text: en ? "Tip" : "Trinkgeld", menge: 1, einzelBrutto: 0, ust: 19 } : { text: "", menge: 1, einzelBrutto: 0, ust: 19 });
+  positionenRendern();
+  const zeilen = $("positionen").querySelectorAll("tr"); const letzte = zeilen[zeilen.length - 1];
+  const feld = letzte.querySelector(art === "trinkgeld" ? "[data-f=einzelBrutto]" : "[data-f=text]"); if (feld) feld.focus();
+}
+function summenAktualisieren(){
+  const c = berechnen(positionen.map((p) => ({ text: p.text, menge: Number(p.menge) || 0, einzelBrutto: Number(p.einzelBrutto) || 0, ust: Number(p.ust) })));
+  c.zeilen.forEach((z, i) => { const td = document.querySelector(`[data-summe="${i}"]`); if (td) td.textContent = eur(z.brutto); });
+  let html = "";
+  if (c.steuer.length === 1) html += `<div><span>Nettobetrag</span><span>${eur(c.gesamtNetto)}</span></div><div><span>zzgl. ${c.steuer[0].satz} % USt.</span><span>${eur(c.gesamtMwst)}</span></div>`;
+  else c.steuer.forEach((g) => { html += `<div><span>Netto ${g.satz} %</span><span>${eur(g.netto)}</span></div><div><span>zzgl. ${g.satz} % USt.</span><span>${eur(g.mwst)}</span></div>`; });
+  html += `<div class="gesamt"><span>Gesamtbetrag</span><span>${eur(c.gesamtBrutto)}</span></div>`;
+  $("summen").innerHTML = html;
+}
+/** Sprache gewechselt: Standardtexte der Fahrt und des Trinkgelds wandern mit, selbst geschriebene Texte bleiben. */
+function spracheGeaendert(){
+  const neu = $("sprache").value, alt = vorherigeSprache;
+  if (neu === alt) return;
+  const std = daten.standardtexte;
+  positionen.forEach((p) => {
+    if (p.text === std[alt]) p.text = std[neu];
+    else if (p.text === (alt === "en" ? "Tip" : "Trinkgeld")) p.text = neu === "en" ? "Tip" : "Trinkgeld";
+  });
+  vorherigeSprache = neu;
+  positionenRendern();
+}
+function zahlungsartGeaendert(){
+  const art = (document.querySelector("input[name=zahlungsart]:checked") || {}).value;
+  $("bankWarnung").style.display = (art === "ueberweisung" && daten && !daten.bank.konfiguriert) ? "block" : "none";
+}
+
+// ---------- Aktionen ----------
+function entwurfAuslesen(){
+  const zahlungsart = (document.querySelector("input[name=zahlungsart]:checked") || {}).value || "bezahlt";
+  return { sprache: $("sprache").value, zahlungsart, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
+    positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
+}
+function entwurfPruefen(e){
+  for (let i = 0; i < e.positionen.length; i++) {
+    const p = e.positionen[i];
+    if (!p.text) return `Position ${i + 1}: Bitte eine Beschreibung eingeben.`;
+    if (!(p.menge > 0)) return `Position ${i + 1}: Die Menge muss größer als 0 sein.`;
+    if (!Number.isFinite(p.einzelBrutto)) return `Position ${i + 1}: Bitte einen Preis eingeben.`;
+  }
+  if (!(berechnen(e.positionen).gesamtBrutto > 0)) return "Der Rechnungsbetrag muss größer als 0 sein.";
+  return null;
+}
+function pdfAnzeigen(base64, fenster){
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  if (fenster) fenster.location.href = url; else window.open(url, "_blank");
+}
+async function vorschau(){
+  const e = entwurfAuslesen(), fehler = entwurfPruefen(e);
+  if (fehler) return setStatus("statusEntwurf", fehler, "error");
+  const fenster = window.open("", "_blank");
+  $("vorschauBtn").disabled = true; setStatus("statusEntwurf", "Vorschau wird erzeugt …", "");
+  try { const d = await api("vorschau", { rechnung: e }); pdfAnzeigen(d.pdfBase64, fenster); setStatus("statusEntwurf", "Die Vorschau hat keine Rechnungsnummer und verbraucht keine.", ""); }
+  catch (err) { if (fenster) fenster.close(); setStatus("statusEntwurf", err.message, "error"); }
+  finally { $("vorschauBtn").disabled = false; }
+}
+async function erzeugen(){
+  const e = entwurfAuslesen(), fehler = entwurfPruefen(e);
+  if (fehler) return setStatus("statusEntwurf", fehler, "error");
+  const senden = $("senden").checked, c = berechnen(e.positionen);
+  const frage = `Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
+  if (!confirm(frage)) return;
+  $("erzeugenBtn").disabled = true; setStatus("statusEntwurf", "Rechnung wird erzeugt …", "");
+  try {
+    const d = await api("erstellen", { rechnung: e, senden });
+    await laden(true);
+    setStatus("statusEntwurf", `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : " (nicht verschickt)"}.`, "ok");
+  } catch (err) { setStatus("statusEntwurf", err.message, "error"); await laden(true).catch(() => {}); }
+  finally { $("erzeugenBtn").disabled = false; }
+}
+async function stornoErstellen(){
+  const senden = $("stornoSenden").checked;
+  if (!confirm(`Stornorechnung zu ${daten.aktuelleNummer} erstellen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nDie Stornorechnung bekommt eine eigene Nummer und hebt die Rechnung auf. Danach kannst du eine neue Rechnung erstellen.`)) return;
+  $("stornoBtn").disabled = true; setStatus("statusStorno", "Stornorechnung wird erzeugt …", "");
+  try {
+    const d = await api("stornieren", { senden });
+    await laden(true);
+    setStatus("statusEntwurf", `✓ Stornorechnung ${d.nummer} zu ${d.bezugNummer} erstellt${d.versendet ? " und verschickt" : ""}. Jetzt kannst du die neue Rechnung erstellen.`, "ok");
+  } catch (err) { setStatus("statusStorno", err.message, "error"); }
+  finally { $("stornoBtn").disabled = false; }
+}
+async function pdfOeffnen(nummer){
+  const fenster = window.open("", "_blank");
+  try { const d = await api("pdf", { nummer }); pdfAnzeigen(d.pdfBase64, fenster); }
+  catch (err) { if (fenster) fenster.close(); setStatus("statusVerlauf", err.message, "error"); }
+}
+async function erneutSenden(nummer){
+  if (!confirm(`${nummer} noch einmal an ${daten.empfaengerEmail || "den Kunden"} senden?\n\nDer Inhalt bleibt unverändert, es wird keine neue Nummer vergeben.`)) return;
+  setStatus("statusVerlauf", "Wird gesendet …", "");
+  try { await api("senden", { nummer }); setStatus("statusVerlauf", `✓ ${nummer} wurde erneut verschickt.`, "ok"); }
+  catch (err) { setStatus("statusVerlauf", err.message, "error"); }
+}
+
+// ---------- Start ----------
+(function start(){
+  if (speicherLesen("lt_admin_key")) $("adminKey").placeholder = "gespeichert";
+  const ref = new URLSearchParams(location.search).get("referenz");
+  if (ref) { $("referenz").value = ref.toUpperCase(); laden(); }
+})();
+</script>
+<script>
+  // Eingebettet: Höhe ans Portal melden, damit der Rahmen mitwächst (kein doppelter Scrollbalken).
+  (function () {
+    if (!document.documentElement.classList.contains("embedded") || window.parent === window) return;
+    var melden = function () { window.parent.postMessage({ type: "lt-hoehe", hoehe: document.documentElement.scrollHeight }, "*"); };
+    if (window.ResizeObserver) new ResizeObserver(melden).observe(document.body);
+    window.addEventListener("load", melden); melden();
+  })();
+</script>
+</body>
+</html>
