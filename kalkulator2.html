@@ -146,6 +146,7 @@
         <button id="typPrivat" class="active" onclick="setKundentyp('privat')">Privat</button>
         <button id="typFirma" onclick="setKundentyp('firma')">Firma</button>
         <button id="typHotel" onclick="setKundentyp('hotel')">Hotel</button>
+        <button id="typVermittlung" onclick="setKundentyp('vermittlung')">Vermittlung</button>
       </div>
 
       <!-- PRIVAT -->
@@ -217,8 +218,22 @@
         </div>
       </div>
 
+      <!-- VERMITTLUNG (z. B. Welcome Pickups): nur der Gastname ist nötig -->
+      <div id="formVermittlung" style="display:none;">
+        <div class="field"><label for="vmPlattform">Plattform</label><input type="text" id="vmPlattform" value="Welcome Pickups" maxlength="60"></div>
+        <div class="row">
+          <div class="field"><label for="vmVorname">Vorname des Gastes</label><input type="text" id="vmVorname"></div>
+          <div class="field"><label for="vmNachname">Nachname des Gastes</label><input type="text" id="vmNachname"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="vmTelefon">Telefon (optional)</label><input type="text" id="vmTelefon"></div>
+          <div class="field"><label for="vmEmail">E-Mail (optional)</label><input type="email" id="vmEmail" placeholder="meist erst nach der Fahrt bekannt"></div>
+        </div>
+        <p class="hint" style="margin-top:-6px;">Der Auftrag ist sofort bestätigt und blockt den Kalender (Anfahrt, Fahrt, Rückkehr). Der Gast bekommt <strong>keine Mail</strong>. Preis und E-Mail trägst du nach der Fahrt im Portal ein, dann erzeugst du die Rechnung.</p>
+      </div>
+
       <!-- RECHNUNGSADRESSE (gemeinsam) -->
-      <div style="margin-top:6px;">
+      <div id="raBlock" style="margin-top:6px;">
         <label id="raTitel">Rechnungsadresse</label>
         <label class="check"><input type="checkbox" id="raGleich" checked onchange="rechnungsadresseStatus()"> Rechnungsadresse = Abholadresse</label>
         <div id="raFelder" style="display:none;">
@@ -253,7 +268,7 @@
       <p class="hint" style="margin-bottom:10px;">Vorbelegt mit Abfahrt/Rückkehr an der Basis aus der Berechnung – bei Tagesaufträgen ggf. anpassen.</p>
 
       <h2 style="margin-top:22px;">Bezahlung &amp; Versand</h2>
-      <div class="field">
+      <div class="field" id="zahlungsartBlock">
         <label>Wie wird die Fahrt bezahlt?</label>
         <label class="check"><input type="radio" name="zahlungsart" value="link" checked onchange="modusTexteAktualisieren()"> Im Vorfeld per Zahlungslink (Stripe)</label>
         <label class="check"><input type="radio" name="zahlungsart" value="fahrzeug" onchange="modusTexteAktualisieren()"> Im Fahrzeug per Karte (SumUp)</label>
@@ -263,7 +278,7 @@
         <label for="agSprache">Sprache von Angebot, Bestätigung und Rechnung</label>
         <select id="agSprache"><option value="de">Deutsch</option><option value="en">English</option></select>
       </div>
-      <div class="toggle">
+      <div class="toggle" id="modusToggle">
         <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
         <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
       </div>
@@ -474,15 +489,24 @@ function aktuellerZahler(){
 function setKundentyp(t){
   kundentyp = t;
   delete el("rcCheck").dataset.gesetzt; // Standardwert des Firmen-Hakens für die neue Kundenart neu setzen
-  ["privat", "firma", "hotel"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
+  ["privat", "firma", "hotel", "vermittlung"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
+  const vm = t === "vermittlung";
   el("formPrivat").style.display = t === "privat" ? "block" : "none";
-  el("formGeschaeft").style.display = t === "privat" ? "none" : "block";
+  el("formGeschaeft").style.display = (t === "firma" || t === "hotel") ? "block" : "none";
+  el("formVermittlung").style.display = vm ? "block" : "none";
+  // Vermittlungsfahrt: keine Rechnungsadresse, keine Zahlungsart, kein Angebot/Auftrag-Schalter (immer sofort bestätigt)
+  el("raBlock").style.display = vm ? "none" : "block";
+  el("zahlungsartBlock").style.display = vm ? "none" : "block";
+  el("modusToggle").style.display = vm ? "none" : "";
+  el("modusHinweis").style.display = vm ? "none" : "";
   const hotel = t === "hotel";
   el("gNameLabel").textContent = hotel ? "Hotelname" : "Firmenname";
   el("zahlerFirmaText").textContent = hotel ? "Hotel" : "Firma";
   el("zimmerFeld").style.display = hotel ? "block" : "none";
   el("fgTitel").textContent = hotel ? "Fahrgast (Hotelgast)" : "Fahrgast";
   zahlerGeaendert();
+  if (vm) el("angebotBtn").textContent = "Fahrt anlegen (ohne Mail an den Gast)"; else setModus(modus);
+  empfaengerAktualisieren();
 }
 
 /**
@@ -492,7 +516,7 @@ function setKundentyp(t){
  *  "firma"     - Fahrgast bekommt die Rechnung, aber auf eine (andere) Firma ausgestellt
  */
 function rechnungsmodus(){
-  if (kundentyp === "privat") return "keine";
+  if (kundentyp === "privat" || kundentyp === "vermittlung") return "keine";
   if (aktuellerZahler() === "fahrgast") return el("rcCheck").checked ? "firma" : "keine";
   return kundentyp === "firma" ? "vorbelegt" : "keine";
 }
@@ -522,7 +546,7 @@ function rechnungsblockAktualisieren(){
     letzterRechnungsKontext = kontext;
   }
   const m = rechnungsmodus();
-  el("rechnungsBlock").style.display = kundentyp === "privat" ? "none" : "block";
+  el("rechnungsBlock").style.display = (kundentyp === "privat" || kundentyp === "vermittlung") ? "none" : "block";
   el("rcCheckZeile").style.display = (kundentyp !== "privat" && fg) ? "flex" : "none";
   el("rcFelder").style.display = m === "keine" ? "none" : "block";
   el("rcHinweis").textContent = m === "vorbelegt"
@@ -589,6 +613,10 @@ function modusTexteAktualisieren(){
 function empfaengerAktualisieren(){
   const v = (id) => el(id).value.trim();
   let text = "";
+  if (kundentyp === "vermittlung") {
+    el("empfaengerVorschau").textContent = "Es geht keine Mail an den Gast. Die E-Mail ergänzt du nach der Fahrt im Portal.";
+    return;
+  }
   if (kundentyp === "privat") {
     text = `${v("pVorname")} ${v("pNachname")} <${v("pEmail") || "E-Mail fehlt"}>`;
   } else if (aktuellerZahler() === "fahrgast") {
@@ -859,17 +887,25 @@ async function angebotSenden(){
   const { gesamtBrutto, hinPlan, ruckPlan, ab12, unter12 } = letztesErgebnis;
 
   const v = (id) => document.getElementById(id).value.trim();
+  const istVermittlung = kundentyp === "vermittlung";
   const rechnungsadresse = { strasse: v("raStrasse"), plz: v("raPlz"), ort: v("raOrt"), land: v("raLand") };
-  if (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land) {
+  if (!istVermittlung && (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land)) {
     return setAngebotStatus("Bitte vollständige Rechnungsadresse angeben.", "error");
   }
-  const kurzbeschreibung = v("agKurz");
+  // Vermittlungsfahrt: Ohne eigene Kurzbeschreibung wird "Ort → Ort" verwendet (z. B. "Stuttgart → Neckartenzlingen")
+  const kurzOrt = (p) => ((p.formatted_address || "").split(",").slice(-2, -1)[0] || p.formatted_address || "").replace(/^\s*\d{5}\s*/, "").trim();
+  const kurzbeschreibung = v("agKurz") || (istVermittlung ? `${kurzOrt(hinPlan.abhol)} → ${kurzOrt(hinPlan.ziel)}` : "");
   if (!kurzbeschreibung) return setAngebotStatus("Bitte eine Kurzbeschreibung angeben.", "error");
   if (!v("agBlockStart") || !v("agBlockEnde")) return setAngebotStatus("Bitte den Kalender-Block der Hinfahrt angeben.", "error");
   if (ruckPlan && (!v("agRueckBlockStart") || !v("agRueckBlockEnde"))) return setAngebotStatus("Bitte den Kalender-Block der Rückfahrt angeben.", "error");
 
   let kunde, gastname = "";
-  if (kundentyp === "privat") {
+  if (istVermittlung) {
+    if (!v("vmVorname") || !v("vmNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen des Gastes angeben.", "error");
+    if (v("vmEmail") && !gueltigeEmail(v("vmEmail"))) return setAngebotStatus("Die E-Mail-Adresse ist ungültig (oder leer lassen).", "error");
+    kunde = { typ: "vermittlung", plattform: v("vmPlattform") || "Vermittlung", vorname: v("vmVorname"), nachname: v("vmNachname"),
+      name: `${v("vmVorname")} ${v("vmNachname")}`.trim(), telefon: v("vmTelefon"), email: v("vmEmail") };
+  } else if (kundentyp === "privat") {
     if (!v("pVorname") || !v("pNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen angeben.", "error");
     if (!gueltigeEmail(v("pEmail"))) return setAngebotStatus("Bitte eine gültige E-Mail-Adresse angeben.", "error");
     kunde = {
@@ -929,8 +965,8 @@ async function angebotSenden(){
   const flugRueck = ruckPlan && el("flugRueckFeld").style.display !== "none" ? v("flugRueck") : "";
 
   const body = {
-    modus,
-    zahlungsart: aktuelleZahlungsart(),
+    modus: istVermittlung ? "auftrag" : modus,
+    zahlungsart: istVermittlung ? "vermittlung" : aktuelleZahlungsart(),
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
     kunde,
@@ -953,7 +989,7 @@ async function angebotSenden(){
         flugnummer: flugRueck
       } : null
     },
-    preis: { gesamtBrutto },
+    preis: { gesamtBrutto: istVermittlung ? 0 : gesamtBrutto },   // Vermittlung: Preis offen bis nach der Fahrt
     kalender: {
       blockStartISO: new Date(v("agBlockStart")).toISOString(),
       blockEndeISO: new Date(v("agBlockEnde")).toISOString(),
@@ -964,19 +1000,22 @@ async function angebotSenden(){
     }
   };
 
-  const istAuftrag = modus === "auftrag";
-  if (istAuftrag && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
+  const istAuftrag = istVermittlung || modus === "auftrag";
+  if (istVermittlung && !confirm("Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast.")) return;
+  if (istAuftrag && !istVermittlung && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
-  setAngebotStatus(istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
+  setAngebotStatus(istVermittlung ? "Fahrt wird angelegt …" : istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
   try {
     const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
-      istAuftrag
+      istVermittlung
+        ? `✓ Fahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Gast bekommt keine Mail. Nach der Fahrt: Auftrag im Portal öffnen, E-Mail ergänzen (falls vorhanden) und im Rechnungsentwurf den Preis eintragen.`
+      : istAuftrag
         ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");

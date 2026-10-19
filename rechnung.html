@@ -111,6 +111,7 @@
       </div>
 
       <h2>Positionen</h2>
+      <div class="warn" id="preisHinweis" style="display:none;">Der Preis ist bei dieser Vermittlungsfahrt noch offen. Trage den Betrag ein, den der Gast bezahlt hat (steht nach Fahrtende in der Plattform).</div>
       <p class="hint" style="margin-top:-6px;">Preise sind Bruttopreise. Netto und Umsatzsteuer werden je Steuersatz herausgerechnet. Ein Rabatt ist eine Position mit negativem Preis.</p>
       <div class="tabellenrahmen pos"><table>
         <thead><tr><th>Beschreibung</th><th style="width:78px;">Menge</th><th style="width:112px;">Einzelpreis (€)</th><th style="width:88px;">USt</th><th class="zahl" style="width:96px;">Summe</th><th style="width:34px;"></th></tr></thead>
@@ -121,9 +122,11 @@
         <button type="button" class="sekundaer" onclick="positionHinzufuegen('trinkgeld')">+ Trinkgeld</button>
       </div>
       <div class="summen" id="summen"></div>
+      <div class="warn" id="kleinbetragHinweis" style="display:none;">Bei Rechnungen über 250 € brutto muss die Anschrift des Empfängers auf der Rechnung stehen. Bitte unten bei „Kontaktdaten ändern“ eintragen.</div>
 
       <div class="field" style="margin-top:16px;"><label for="hinweis">Hinweis auf der Rechnung (optional)</label><textarea id="hinweis" rows="2" maxlength="500" placeholder="z. B. Zahlungsreferenz, Kostenstelle, Dank an den Kunden"></textarea></div>
       <label class="check"><input type="checkbox" id="senden" checked> Rechnung per E-Mail an den Kunden senden</label>
+      <div class="hint" id="sendenHinweis" style="display:none;margin:-4px 0 8px 25px;">Für diesen Auftrag ist keine E-Mail-Adresse hinterlegt. Die Rechnung wird nur erzeugt; die PDF lädst du danach im Verlauf herunter. E-Mail ergänzen: unten bei „Kontaktdaten ändern“.</div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
         <button type="button" class="sekundaer" id="vorschauBtn" onclick="vorschau()">Vorschau (PDF)</button>
         <button type="button" class="primary" id="erzeugenBtn" onclick="erzeugen()">Rechnung erzeugen</button>
@@ -186,11 +189,22 @@ async function laden(nachAktion){
   } catch (e) { $("inhalt").style.display = "none"; setStatus("statusLaden", e.message, "error"); }
 }
 
-function aufbauen(){
-  $("inhalt").style.display = "block";
+function empfaengerRendern(){
   const e = daten.empfaenger || {};
   $("empfaengerBox").innerHTML = `<strong>Rechnungsempfänger:</strong> ${esc(e.name || "–")}${e.abteilung ? ", " + esc(e.abteilung) : ""}${e.zHd ? " (z. Hd. " + esc(e.zHd) + ")" : ""}` +
     `<br>${(e.adressZeilen || []).map(esc).join(", ") || "<span class='grau'>keine Adresse hinterlegt</span>"}<br><span class="grau">E-Mail: ${esc(daten.empfaengerEmail || "–")} · Name, Adresse und „Rechnung auf Firma“ ändert man unten bei den Kontaktdaten.</span>`;
+  versandZustand();
+}
+/** Ohne E-Mail-Adresse im Auftrag lässt sich nichts verschicken (Vermittlungsfahrten): Haken aus und gesperrt. */
+function versandZustand(){
+  const keine = !daten.empfaengerEmail;
+  [$("senden"), $("stornoSenden")].forEach((c) => { c.disabled = keine; if (keine) c.checked = false; });
+  $("sendenHinweis").style.display = keine ? "block" : "none";
+  document.querySelectorAll("[data-senden]").forEach((b) => { b.disabled = keine; b.title = keine ? "Keine E-Mail-Adresse im Auftrag" : ""; });
+}
+function aufbauen(){
+  $("inhalt").style.display = "block";
+  empfaengerRendern();
   // Verlauf
   const v = daten.verlauf || [];
   $("verlaufBereich").style.display = v.length ? "block" : "none";
@@ -213,8 +227,25 @@ function aufbauen(){
   if (!daten.kannErstellen && !hatAktuelle) nm.textContent = `Eine Rechnung ist nur bei bestätigten Aufträgen möglich (Status: ${daten.status}).`;
   $("entwurfTitel").textContent = daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen");
   zahlungsartGeaendert();
+  $("preisHinweis").style.display = daten.preisOffen ? "block" : "none";
+  versandZustand();
   positionenRendern();
 }
+/** Kontaktdaten wurden nebenan geändert (z. B. E-Mail ergänzt): nur Empfänger und Versandzustand auffrischen, der Entwurf bleibt unberührt. */
+async function kontaktNachladen(){
+  if (!daten) return;
+  try {
+    const d = await fetch(`${BASIS}/rechnungAdmin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aktion: "laden", referenz: daten.referenz, adminKey: speicherLesen("lt_admin_key") }) });
+    if (!d.ok) return;
+    const j = await d.json();
+    const hatteKeine = !daten.empfaengerEmail;
+    daten.empfaenger = j.empfaenger; daten.empfaengerEmail = j.empfaengerEmail;
+    empfaengerRendern();
+    if (hatteKeine && j.empfaengerEmail && daten.kannErstellen) $("senden").checked = true;
+    summenAktualisieren();
+  } catch (e) { /* Auffrischen ist optional */ }
+}
+window.addEventListener("focus", kontaktNachladen);
 
 // ---------- Positionen ----------
 function positionenRendern(){
@@ -250,6 +281,8 @@ function summenAktualisieren(){
   else c.steuer.forEach((g) => { html += `<div><span>Netto ${g.satz} %</span><span>${eur(g.netto)}</span></div><div><span>zzgl. ${g.satz} % USt.</span><span>${eur(g.mwst)}</span></div>`; });
   html += `<div class="gesamt"><span>Gesamtbetrag</span><span>${eur(c.gesamtBrutto)}</span></div>`;
   $("summen").innerHTML = html;
+  // Kleinbetragsrechnung bis 250 € brutto darf ohne Empfängeranschrift sein, darüber nicht
+  $("kleinbetragHinweis").style.display = (c.gesamtBrutto > 250 && !((daten && daten.empfaenger && daten.empfaenger.adressZeilen) || []).length) ? "block" : "none";
 }
 /** Sprache gewechselt: Standardtexte der Fahrt und des Trinkgelds wandern mit, selbst geschriebene Texte bleiben. */
 function spracheGeaendert(){
@@ -308,7 +341,7 @@ async function erzeugen(){
   try {
     const d = await api("erstellen", { rechnung: e, senden });
     await laden(true);
-    setStatus("statusEntwurf", `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : " (nicht verschickt)"}.`, "ok");
+    setStatus("statusEntwurf", `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : d.keineEmail ? " (nicht verschickt: keine E-Mail-Adresse hinterlegt, die PDF findest du im Verlauf)" : " (nicht verschickt)"}.`, "ok");
   } catch (err) { setStatus("statusEntwurf", err.message, "error"); await laden(true).catch(() => {}); }
   finally { $("erzeugenBtn").disabled = false; }
 }

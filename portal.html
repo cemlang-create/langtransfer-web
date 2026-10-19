@@ -300,7 +300,7 @@ async function ansichtAuftraege(params, noch){
       $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Status</th></tr></thead><tbody>` +
         d.liste.map((r) => `<tr data-ref="${esc(r.referenz)}">
           <td>${esc(zeitText(r.zeitpunktISO))}</td>
-          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "pauschal" ? "Pauschal" : "Online"}</div></td>
+          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div></td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}</td>
           <td>${esc(r.von)} → ${esc(r.nach)}</td>
           <td>${r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
