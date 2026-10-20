@@ -87,6 +87,9 @@
   .werkzeuge{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px;}
   .rahmenkarte{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 22px 10px;margin-top:18px;}
   .rahmenkarte h3{margin:16px 0 0;font-size:1.05rem;}
+  .abrechnung label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;}
+  .abrechnung input, .abrechnung select{font:inherit;font-size:14.5px;padding:9px 10px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
+  .abrechnung .zeile{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:8px;}
   .reiter{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--line);}
   .reiter button{background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;font:inherit;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer;}
   .reiter button:hover{color:var(--ink);}
@@ -308,7 +311,7 @@ async function ansichtAuftraege(params, noch){
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}</td>
           <td>${esc(r.von)} → ${esc(r.nach)}</td>
           <td>${r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
-          <td>${statusBadge(r.status)}${r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}</td></tr>`).join("") +
+          <td>${statusBadge(r.status)}${r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : r.abgerechnet ? `<div class="klein">abgerechnet (${r.abgerechnet.art === "bar" ? "bar" : "Karte"})</div>` : ""}</td></tr>`).join("") +
         `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
       stornoLink();
       document.querySelectorAll("#listeBox tbody tr").forEach((tr) => tr.addEventListener("click", () => { location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref); }));
@@ -330,17 +333,34 @@ async function ansichtAuftrag(referenz, noch, params){
       // Route und Zeit eines Pauschal- oder Vermittlungsauftrags ändert man über "Neuer Auftrag" (bestehende Buchung überschreiben)
       const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
         ? `Route und Zeit ändern: im Menü „Neuer Auftrag“ bei „Bestehende Buchung überschreiben“ die Referenz <strong>${esc(d.referenz)}</strong> eintragen. Den Preis änderst du im Reiter „Rechnung“.` : "";
+      // Abrechnung im Fahrzeug (Karte/bar): Markierung statt Rechnung. Nur solange es keine gültige Rechnung gibt.
+      const abg = d.abgerechnet;
+      const heuteDatum = new Date().toLocaleDateString("sv-SE");   // YYYY-MM-DD in Ortszeit
+      const abgText = abg ? `${abg.art === "bar" ? "bar im Fahrzeug" : "per Karte im Fahrzeug"}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}` : "";
+      const abrechnungKarte = (d.status === "bestaetigt" && !d.rechnungsnummer) ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Abrechnung</h3>` + (abg
+        ? `<p style="margin:8px 0 4px;"><strong>✓ Abgerechnet:</strong> ${esc(abgText)}</p>
+           <div class="klein">Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).</div>
+           <div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`
+        : `<div class="klein" style="margin:6px 0 4px;">Hat der Gast im Fahrzeug bezahlt, markierst du den Auftrag als abgerechnet. Er zählt dann nicht mehr unter „Rechnung fehlt“.</div>
+           <div class="zeile">
+             <div><label for="abArt">Zahlungsart</label><select id="abArt"><option value="karte">Karte</option><option value="bar">bar</option></select></div>
+             <div><label for="abBetrag">Betrag (€)</label><input type="number" step="0.01" min="0" id="abBetrag" value="${d.preisBrutto != null ? esc(String(d.preisBrutto)) : ""}" style="width:110px;"></div>
+             <div><label for="abDatum">Datum</label><input type="date" id="abDatum" value="${heuteDatum}"></div>
+             <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" placeholder="z. B. SumUp-Beleg" style="width:100%;"></div>
+             <button type="button" class="knopf gold" id="abBtn">Als abgerechnet markieren</button>
+           </div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`) + `</div>` : "";
       const knoepfe = [];
       if (d.status === "angefragt") { knoepfe.push(["bestaetigen", "Bestätigen", "gold"]); knoepfe.push(["ablehnen", "Ablehnen", "rot"]); }
       if (d.status === "bestaetigt") { knoepfe.push(["ablehnen", "Stornieren", "rot"]); }
       if (d.status === "angebot") { knoepfe.push(["ablehnen", "Angebot stornieren", "rot"]); }
       $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a>
         <h2 class="seite">${esc(d.referenz)} – ${esc(name || "Auftrag")}</h2>
-        <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""}<br>
+        <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : d.abgerechnet ? `<span class="badge ok">abgerechnet</span>` : ""}<br>
           ${esc(f.von)} → ${esc(f.nach)}<br>
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
+        ${abrechnungKarte}
         ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">Rechnung${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
         <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
           ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
@@ -361,6 +381,20 @@ async function ansichtAuftrag(referenz, noch, params){
       document.querySelectorAll("#reiter button").forEach((b) => b.addEventListener("click", () => zeigeTab(b.dataset.tab)));
       zeigeTab(hatRechnung && hashLesen().params.get("tab") === "rechnung" ? "rechnung" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
       document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
+      const abMeldung = (t, fehler) => { const e = $("abMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
+      if ($("abBtn")) $("abBtn").addEventListener("click", async () => {
+        const betrag = Number($("abBetrag").value.replace(",", "."));
+        if (!(betrag > 0)) return abMeldung("Bitte den bezahlten Betrag eingeben.", true);
+        $("abBtn").disabled = true; abMeldung("Wird gespeichert …");
+        try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() } }); await laden(); }
+        catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
+      });
+      if ($("abAufheben")) $("abAufheben").addEventListener("click", async () => {
+        if (!confirm("Die Markierung „abgerechnet“ entfernen? Der Auftrag zählt danach wieder unter „Rechnung fehlt“.")) return;
+        $("abAufheben").disabled = true;
+        try { await api("rechnungAdmin", { aktion: "abrechnenAufheben", referenz: d.referenz }); await laden(); }
+        catch (e) { abMeldung(e.message, true); $("abAufheben").disabled = false; }
+      });
     } catch (e) { if (noch()) $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a><div class="meldung error">${esc(e.message)}</div>`; }
   }
   await laden();

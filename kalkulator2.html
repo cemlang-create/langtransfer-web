@@ -220,16 +220,29 @@
 
       <!-- VERMITTLUNG (z. B. Welcome Pickups): nur der Gastname ist nötig -->
       <div id="formVermittlung" style="display:none;">
-        <div class="field"><label for="vmPlattform">Plattform</label><input type="text" id="vmPlattform" value="Welcome Pickups" maxlength="60"></div>
+        <div class="field"><label for="vmPlattform">Auftraggeber / Plattform</label><input type="text" id="vmPlattform" value="Welcome Pickups" maxlength="60" placeholder="Welcome Pickups oder Name des Hotels"></div>
         <div class="row">
-          <div class="field"><label for="vmVorname">Vorname des Gastes</label><input type="text" id="vmVorname"></div>
-          <div class="field"><label for="vmNachname">Nachname des Gastes</label><input type="text" id="vmNachname"></div>
+          <div class="field"><label for="vmVorname">Vorname des Gastes (optional)</label><input type="text" id="vmVorname"></div>
+          <div class="field"><label for="vmNachname">Nachname des Gastes (optional)</label><input type="text" id="vmNachname"></div>
         </div>
+        <p class="hint" style="margin-top:-6px;">Ohne Namen heißt der Auftrag „Gast“. Den Namen kannst du später im Portal nachtragen.</p>
         <div class="row">
           <div class="field"><label for="vmTelefon">Telefon (optional)</label><input type="text" id="vmTelefon"></div>
           <div class="field"><label for="vmEmail">E-Mail (optional)</label><input type="email" id="vmEmail" placeholder="meist erst nach der Fahrt bekannt"></div>
         </div>
-        <p class="hint" style="margin-top:-6px;">Der Auftrag ist sofort bestätigt und blockt den Kalender (Anfahrt, Fahrt, Rückkehr). Der Gast bekommt <strong>keine Mail</strong>. Preis und E-Mail trägst du nach der Fahrt im Portal ein, dann erzeugst du die Rechnung.</p>
+        <div class="field">
+          <label>Preis</label>
+          <label class="check"><input type="radio" name="vmPreis" value="offen" checked onchange="vermittlungAktualisieren()"> Offen: du trägst den bezahlten Betrag nach der Fahrt ein (z. B. Plattform)</label>
+          <label class="check"><input type="radio" name="vmPreis" value="fest" onchange="vermittlungAktualisieren()"> Festpreis aus der Berechnung: <strong id="vmPreisFest">–</strong> (z. B. Fahrt für ein Hotel)</label>
+        </div>
+        <div class="field">
+          <label>Abrechnung</label>
+          <label class="check"><input type="radio" name="vmAbr" value="" checked onchange="vermittlungAktualisieren()"> Noch offen (später im Auftrag als abgerechnet markieren)</label>
+          <label class="check"><input type="radio" name="vmAbr" value="karte" onchange="vermittlungAktualisieren()"> Der Gast hat per Karte im Fahrzeug bezahlt</label>
+          <label class="check"><input type="radio" name="vmAbr" value="bar" onchange="vermittlungAktualisieren()"> Der Gast hat bar im Fahrzeug bezahlt</label>
+          <div id="vmBetragZeile" style="display:none;margin-top:6px;"><label for="vmBetrag">Bezahlter Betrag (€)</label><input type="number" step="0.01" min="0" id="vmBetrag"></div>
+        </div>
+        <p class="hint" style="margin-top:-6px;">Der Auftrag ist sofort bestätigt und blockt den Kalender (Anfahrt, Fahrt, Rückkehr). Der Gast bekommt <strong>keine Mail</strong>, du bekommst eine Kopie. Eine Rechnung erzeugst du nur bei Bedarf im Portal.</p>
       </div>
 
       <!-- RECHNUNGSADRESSE (gemeinsam) -->
@@ -486,6 +499,15 @@ function aktuellerZahler(){
   return r ? r.value : "firma";
 }
 
+/** Vermittlungsformular: Festpreis anzeigen, Betragsfeld bei "bezahlt" einblenden und vorbelegen. */
+function vermittlungAktualisieren(){
+  const preis = letztesErgebnis ? letztesErgebnis.gesamtBrutto : null;
+  el("vmPreisFest").textContent = preis == null ? "– (erst Preis berechnen)" : `${fmt(preis)} €`;
+  const art = (document.querySelector("input[name=vmAbr]:checked") || {}).value || "";
+  el("vmBetragZeile").style.display = art ? "block" : "none";
+  const fest = (document.querySelector("input[name=vmPreis]:checked") || {}).value === "fest";
+  if (art && fest && preis != null && !el("vmBetrag").value) el("vmBetrag").value = preis.toFixed(2);
+}
 function setKundentyp(t){
   kundentyp = t;
   delete el("rcCheck").dataset.gesetzt; // Standardwert des Firmen-Hakens für die neue Kundenart neu setzen
@@ -505,7 +527,7 @@ function setKundentyp(t){
   el("zimmerFeld").style.display = hotel ? "block" : "none";
   el("fgTitel").textContent = hotel ? "Fahrgast (Hotelgast)" : "Fahrgast";
   zahlerGeaendert();
-  if (vm) el("angebotBtn").textContent = "Fahrt anlegen (ohne Mail an den Gast)"; else setModus(modus);
+  if (vm) { el("angebotBtn").textContent = "Fahrt anlegen (ohne Mail an den Gast)"; vermittlungAktualisieren(); } else setModus(modus);
   empfaengerAktualisieren();
 }
 
@@ -855,6 +877,7 @@ async function preisBerechnen(){
 
     // ---------- Angebots-Vorbelegung ----------
     letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12 };
+    vermittlungAktualisieren();
     flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
     if (!kurz.value.trim() || kurz.dataset.auto === "1") {
@@ -899,11 +922,15 @@ async function angebotSenden(){
   if (!v("agBlockStart") || !v("agBlockEnde")) return setAngebotStatus("Bitte den Kalender-Block der Hinfahrt angeben.", "error");
   if (ruckPlan && (!v("agRueckBlockStart") || !v("agRueckBlockEnde"))) return setAngebotStatus("Bitte den Kalender-Block der Rückfahrt angeben.", "error");
 
-  let kunde, gastname = "";
+  let kunde, gastname = "", vermittlungDaten = null;
   if (istVermittlung) {
-    if (!v("vmVorname") || !v("vmNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen des Gastes angeben.", "error");
     if (v("vmEmail") && !gueltigeEmail(v("vmEmail"))) return setAngebotStatus("Die E-Mail-Adresse ist ungültig (oder leer lassen).", "error");
-    kunde = { typ: "vermittlung", plattform: v("vmPlattform") || "Vermittlung", vorname: v("vmVorname"), nachname: v("vmNachname"),
+    const preisFest = (document.querySelector("input[name=vmPreis]:checked") || {}).value === "fest";
+    const abrArt = (document.querySelector("input[name=vmAbr]:checked") || {}).value || "";
+    const abrBetrag = Number(v("vmBetrag").replace(",", "."));
+    if (abrArt && !(abrBetrag > 0)) return setAngebotStatus("Bitte den bezahlten Betrag eingeben.", "error");
+    vermittlungDaten = { preisFest, abgerechnet: abrArt ? { art: abrArt, betragBrutto: abrBetrag } : null };
+    kunde = { typ: "vermittlung", plattform: v("vmPlattform") || "Vermittlung", vorname: v("vmVorname"), nachname: v("vmNachname"), preisFest,
       name: `${v("vmVorname")} ${v("vmNachname")}`.trim(), telefon: v("vmTelefon"), email: v("vmEmail") };
   } else if (kundentyp === "privat") {
     if (!v("pVorname") || !v("pNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen angeben.", "error");
@@ -989,7 +1016,8 @@ async function angebotSenden(){
         flugnummer: flugRueck
       } : null
     },
-    preis: { gesamtBrutto: istVermittlung ? 0 : gesamtBrutto },   // Vermittlung: Preis offen bis nach der Fahrt
+    preis: { gesamtBrutto: istVermittlung && !vermittlungDaten.preisFest ? 0 : gesamtBrutto },   // Vermittlung: Preis offen bis nach der Fahrt, außer Festpreis
+    ...(istVermittlung && vermittlungDaten.abgerechnet ? { abgerechnet: vermittlungDaten.abgerechnet } : {}),
     kalender: {
       blockStartISO: new Date(v("agBlockStart")).toISOString(),
       blockEndeISO: new Date(v("agBlockEnde")).toISOString(),
@@ -1001,7 +1029,7 @@ async function angebotSenden(){
   };
 
   const istAuftrag = istVermittlung || modus === "auftrag";
-  if (istVermittlung && !confirm("Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast.")) return;
+  if (istVermittlung && !confirm("Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast." + (vermittlungDaten.abgerechnet ? `\nSie wird als abgerechnet markiert (${vermittlungDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €).` : ""))) return;
   if (istAuftrag && !istVermittlung && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
@@ -1014,7 +1042,10 @@ async function angebotSenden(){
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
       istVermittlung
-        ? `✓ Fahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Gast bekommt keine Mail. Nach der Fahrt: Auftrag im Portal öffnen, E-Mail ergänzen (falls vorhanden) und im Rechnungsentwurf den Preis eintragen.`
+        ? `✓ Fahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Gast bekommt keine Mail.` + (vermittlungDaten.abgerechnet
+            ? ` Abgerechnet: ${vermittlungDaten.abgerechnet.art === "karte" ? "per Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €. Eine Rechnung erzeugst du nur bei Bedarf im Portal (Auftrag öffnen, Reiter „Rechnung“).`
+            : vermittlungDaten.preisFest ? ` Festpreis ${fmt(gesamtBrutto)} €. Nach der Fahrt im Portal als abgerechnet markieren oder eine Rechnung erzeugen.`
+            : ` Nach der Fahrt: Auftrag im Portal öffnen, E-Mail ergänzen (falls vorhanden) und im Rechnungsentwurf den Preis eintragen.`)
       : istAuftrag
         ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
