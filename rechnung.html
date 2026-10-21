@@ -105,7 +105,9 @@
       </div>
       <div class="field">
         <label>Zahlungsart</label>
-        <label class="check"><input type="radio" name="zahlungsart" value="bezahlt" onchange="zahlungsartGeaendert()"> Bereits bezahlt (Karte im Fahrzeug, Zahlungslink)</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="bezahlt" onchange="zahlungsartGeaendert()"> Bereits bezahlt</label>
+        <div id="bezahltArtZeile" style="margin:-2px 0 8px 25px;"><label for="bezahltArt" style="font-weight:400;font-size:13px;">Wie wurde bezahlt?</label>
+          <select id="bezahltArt" style="max-width:300px;"><option value="karte">Karte im Fahrzeug</option><option value="bar">bar im Fahrzeug</option><option value="ueberweisung">Überweisung (Geld ist schon da)</option><option value="link">Zahlungslink</option><option value="plattform">Plattform</option></select></div>
         <label class="check"><input type="radio" name="zahlungsart" value="ueberweisung" onchange="zahlungsartGeaendert()"> Per Überweisung: zahlbar sofort ohne Abzug, mit IBAN auf der Rechnung</label>
         <div class="warn" id="bankWarnung" style="display:none;">Für Überweisungsrechnungen fehlt die Bankverbindung. Bitte <code>RECHNUNG_BANK</code> in <code>index.js</code> ausfüllen (gültige IBAN, BIC und Bank sind optional) und die Funktionen neu ausrollen. Die Vorschau funktioniert trotzdem.</div>
       </div>
@@ -183,7 +185,7 @@ async function laden(nachAktion){
     const entwurfWurdeFrei = !!daten && !daten.kannErstellen && j.kannErstellen;   // z. B. direkt nach einer Stornorechnung
     daten = j;
     $("referenz").value = j.referenz;
-    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true; }
+    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true; }
     aufbauen();
     setStatus("statusLaden", "", "");
   } catch (e) { $("inhalt").style.display = "none"; setStatus("statusLaden", e.message, "error"); }
@@ -210,7 +212,9 @@ function aufbauen(){
   $("verlaufBereich").style.display = v.length ? "block" : "none";
   $("verlaufTabelle").innerHTML = v.map((h) => {
     const art = h.typ === "storno" ? `Stornorechnung zu ${esc(h.bezugNummer)}` : "Rechnung";
-    const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>`;
+    const abrH = daten.abrechnung || {};
+    const zahlBadge = h.aktuell && abrH.status === "bezahlt" ? ` <span class="badge ok">bezahlt</span>` : h.aktuell && abrH.status === "rechnung_offen" ? ` <span class="badge ${abrH.ueberfaellig ? "err" : "warn"}">${abrH.ueberfaellig ? "überfällig" : "offen"}</span>` : "";
+    const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>${zahlBadge}`;
     return `<tr><td style="white-space:nowrap;"><strong>${esc(h.nummer)}</strong>${h.aeltere ? ' <span class="grau">(ältere Rechnung)</span>' : ""}</td><td>${art}</td><td>${h.datumISO ? new Date(h.datumISO).toLocaleDateString("de-DE") : "–"}</td>` +
       `<td class="zahl">${h.gesamtBrutto == null ? "–" : eur(h.gesamtBrutto)}</td><td>${status}</td>` +
       `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">PDF</button> <button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button></td></tr>`;
@@ -220,7 +224,9 @@ function aufbauen(){
   // Aktuelle Rechnung -> nur Storno möglich; sonst Entwurf
   const hatAktuelle = !!daten.aktuelleNummer;
   $("aktuelleBox").style.display = hatAktuelle ? "block" : "none";
-  if (hatAktuelle) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es die gültige Rechnung <strong>${esc(daten.aktuelleNummer)}</strong>. Eine ausgestellte Rechnung wird nicht überschrieben: Zum Ändern erstellst du zuerst eine <strong>Stornorechnung</strong> (eigene Nummer, hebt die Rechnung auf) und danach eine neue Rechnung.`;
+  const abr = daten.abrechnung || {};
+  const zahlungText = abr.status === "bezahlt" ? ` Zahlung: <strong>bezahlt</strong> (${esc(ARTEN[abr.art] || "")}).` : abr.status === "rechnung_offen" ? ` Zahlung: <strong>${abr.ueberfaellig ? "überfällig, " : ""}offen seit ${abr.tage} ${abr.tage === 1 ? "Tag" : "Tagen"}</strong> (Zahlungseingang markierst du oben im Bereich „Zahlung“).` : "";
+  if (hatAktuelle) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es die gültige Rechnung <strong>${esc(daten.aktuelleNummer)}</strong>.${zahlungText} Eine ausgestellte Rechnung wird nicht überschrieben: Zum Ändern erstellst du zuerst eine <strong>Stornorechnung</strong> (eigene Nummer, hebt die Rechnung auf) und danach eine neue Rechnung.`;
   $("entwurf").style.display = daten.kannErstellen ? "block" : "none";
   const nm = $("nichtMoeglich");
   nm.style.display = (!daten.kannErstellen && !hatAktuelle) ? "block" : "none";
@@ -298,15 +304,17 @@ function spracheGeaendert(){
   vorherigeSprache = neu;
   positionenRendern();
 }
+const ARTEN = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
 function zahlungsartGeaendert(){
   const art = (document.querySelector("input[name=zahlungsart]:checked") || {}).value;
+  $("bezahltArtZeile").style.display = art === "bezahlt" ? "block" : "none";
   $("bankWarnung").style.display = (art === "ueberweisung" && daten && !daten.bank.konfiguriert) ? "block" : "none";
 }
 
 // ---------- Aktionen ----------
 function entwurfAuslesen(){
   const zahlungsart = (document.querySelector("input[name=zahlungsart]:checked") || {}).value || "bezahlt";
-  return { sprache: $("sprache").value, zahlungsart, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
+  return { sprache: $("sprache").value, zahlungsart, bezahltArt: $("bezahltArt").value, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
     positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
 }
 function entwurfPruefen(e){

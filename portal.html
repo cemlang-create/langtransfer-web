@@ -138,6 +138,8 @@ function zeitText(iso, mitJahr){
   if (!iso) return "–";
   return new Date(iso).toLocaleString("de-DE", Object.assign({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, mitJahr ? { year: "numeric" } : {}));
 }
+const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
+const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform" };
 const STATUS = {
   angefragt: { text: "Neue Anfrage", cls: "warn" },
   angebot: { text: "Angebot offen", cls: "blau" },
@@ -255,7 +257,8 @@ async function ansichtUebersicht(noch){
       karte(z.heute, "Fahrten heute", "#/auftraege?status=heute", false) +
       karte(z.kommend, "Kommende bestätigte Fahrten", "#/auftraege?status=bestaetigt&zeit=kommend", false) +
       karte(z.angebot, "Offene Angebote", "#/auftraege?status=angebot", false) +
-      karte(z.zuFakturieren, "Gefahren, Rechnung fehlt", "#/auftraege?status=zu_fakturieren", true);
+      karte(z.zuFakturieren, "Gefahren, Abrechnung offen", "#/auftraege?status=zu_fakturieren", true) +
+      karte(z.rechnungOffen || 0, z.ueberfaellig ? `Rechnung offen (davon ${z.ueberfaellig} überfällig)` : "Rechnung offen", "#/auftraege?status=rechnung_offen", true);
     if (kf && kf.liste) {
       const offen = kf.liste.reduce((s, a) => s + (a.offen || 0), 0);
       html += karte(offen, "Krankenfahrten: offene Zuzahlungsrechnungen", "#/krankenfahrten", true);
@@ -277,7 +280,7 @@ async function ansichtAuftraege(params, noch){
   $("main").innerHTML = `<h2 class="seite">Aufträge</h2><p class="unter">Suchen, filtern und einen Auftrag öffnen.</p>
     <div class="filter">
       <input type="search" id="fSuche" placeholder="Suche: Name, Referenz, E-Mail, Ort, Rechnungsnummer" value="${esc(suche)}">
-      <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Rechnung fehlt", status)}${opt("storniert", "Storniert", status)}</select>
+      <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Abrechnung offen", status)}${opt("rechnung_offen", "Rechnung offen", status)}${opt("ueberfaellig", "Überfällig", status)}${opt("bezahlt", "Bezahlt", status)}${opt("storniert", "Storniert", status)}</select>
       <select id="fZeit">${opt("alle", "Alle Zeiten", zeit)}${opt("kommend", "Kommende", zeit)}${opt("vergangen", "Vergangene", zeit)}</select>
     </div>
     <div id="listeBox"><div class="laden">Wird geladen …</div></div>`;
@@ -304,15 +307,41 @@ async function ansichtAuftraege(params, noch){
       const stornoHinweis = d.ausgeblendet ? ` ${d.ausgeblendet} stornierte${d.ausgeblendet === 1 ? "r Auftrag" : " Aufträge"} ausgeblendet · <a href="#" data-storno>anzeigen</a>` : "";
       const stornoLink = () => { const a = $("listeBox").querySelector("[data-storno]"); if (a) a.addEventListener("click", (ev) => { ev.preventDefault(); $("fStatus").value = "storniert"; neuLaden(); }); };
       if (!d.liste.length) { $("listeBox").innerHTML = `<div class="tabellenrahmen"><div class="leer">Keine Aufträge gefunden.${stornoHinweis ? `<div class="klein" style="margin-top:6px;">${stornoHinweis}</div>` : ""}</div></div>`; stornoLink(); return; }
-      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Status</th></tr></thead><tbody>` +
-        d.liste.map((r) => `<tr data-ref="${esc(r.referenz)}">
-          <td>${esc(zeitText(r.zeitpunktISO))}</td>
+      // Jede Fahrt ist eine eigene Zeile: Bei Hin- und Rückfahrt erscheint die Rückfahrt separat (beide öffnen denselben Auftrag)
+      const heuteStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }), jetztMs = Date.now();
+      let fahrten = [];
+      d.liste.forEach((r) => {
+        fahrten.push({ r, typ: r.rueckfahrt ? "hin" : "einzel", zeit: r.zeitpunktISO, von: r.von, nach: r.nach });
+        if (r.rueckfahrt) fahrten.push({ r, typ: "rueck", zeit: r.rueckfahrt.zeitpunktISO, von: r.rueckfahrt.von, nach: r.rueckfahrt.nach });
+      });
+      // Zeit- und Tagesfilter gelten für die einzelne Fahrt (nicht für den ganzen Auftrag)
+      fahrten = fahrten.filter((f) => {
+        if (a.zeit === "kommend") return !f.zeit || new Date(f.zeit).getTime() >= jetztMs;
+        if (a.zeit === "vergangen") return !!f.zeit && new Date(f.zeit).getTime() < jetztMs;
+        if (a.status === "heute") return !!f.zeit && new Date(f.zeit).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }) === heuteStr;
+        return true;
+      });
+      fahrten.sort((x, y) => (d.aufsteigend ? (x.zeit || "").localeCompare(y.zeit || "") : (y.zeit || "").localeCompare(x.zeit || "")));
+      const ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
+      const abrechnungZelle = (r) => {
+        const ab = r.abrechnung || {};
+        if (r.status !== "bestaetigt") return `<span class="klein">–</span>`;
+        const art = esc(ART[ab.art] || "");
+        if (ab.status === "bezahlt") return `<span class="badge ok">Bezahlt</span><div class="klein">${art}${ab.rechnung ? " · Rechnung" : ""}</div>`;
+        if (ab.status === "rechnung_offen") return `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span><div class="klein">Überweisung · seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"}</div>`;
+        return ab.faellig ? `<span class="badge warn">Offen</span><div class="klein">${art}</div>` : `<div class="klein">${art}</div>`;
+      };
+      const beinText = { hin: "Hinfahrt", rueck: "Rückfahrt" };
+      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
+        fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; return `<tr data-ref="${esc(r.referenz)}"${zweite ? ' data-fahrt="rueck"' : ""}>
+          <td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
           <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div></td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}</td>
-          <td>${esc(r.von)} → ${esc(r.nach)}</td>
-          <td>${r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
-          <td>${statusBadge(r.status)}${r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : r.abgerechnet ? `<div class="klein">abgerechnet (${r.abgerechnet.art === "bar" ? "bar" : "Karte"})</div>` : ""}</td></tr>`).join("") +
-        `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
+          <td>${esc(f.von)} → ${esc(f.nach)}</td>
+          <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
+          <td>${zweite ? '<span class="klein">wie Hinfahrt</span>' : abrechnungZelle(r)}</td>
+          <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}</td></tr>`; }).join("") +
+        `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${fahrten.length !== d.gesamt ? " (" + fahrten.length + " Fahrten)" : ""}${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
       stornoLink();
       document.querySelectorAll("#listeBox tbody tr").forEach((tr) => tr.addEventListener("click", () => { location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref); }));
     } catch (e) { if (noch() && nr === abfrageNr) $("listeBox").innerHTML = `<div class="meldung error">${esc(e.message)}</div>`; }
@@ -333,31 +362,40 @@ async function ansichtAuftrag(referenz, noch, params){
       // Route und Zeit eines Pauschal- oder Vermittlungsauftrags ändert man über "Neuer Auftrag" (bestehende Buchung überschreiben)
       const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
         ? `Route und Zeit ändern: im Menü „Neuer Auftrag“ bei „Bestehende Buchung überschreiben“ die Referenz <strong>${esc(d.referenz)}</strong> eintragen. Den Preis änderst du im Reiter „Rechnung“.` : "";
-      // Abrechnung im Fahrzeug (Karte/bar): Markierung statt Rechnung. Nur solange es keine gültige Rechnung gibt.
+      // Zahlung: "bezahlt" markieren (Karte, bar, Überweisung, Zahlungslink, Plattform) – mit oder ohne Rechnung
+      const ab = d.abrechnung || { status: "offen" };
       const abg = d.abgerechnet;
       const heuteDatum = new Date().toLocaleDateString("sv-SE");   // YYYY-MM-DD in Ortszeit
-      const abgText = abg ? `${abg.art === "bar" ? "bar im Fahrzeug" : "per Karte im Fahrzeug"}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}` : "";
-      const abrechnungKarte = (d.status === "bestaetigt" && !d.rechnungsnummer) ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Abrechnung</h3>` + (abg
-        ? `<p style="margin:8px 0 4px;"><strong>✓ Abgerechnet:</strong> ${esc(abgText)}</p>
-           <div class="klein">Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).</div>
-           <div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`
-        : `<div class="klein" style="margin:6px 0 4px;">Hat der Gast im Fahrzeug bezahlt, markierst du den Auftrag als abgerechnet. Er zählt dann nicht mehr unter „Rechnung fehlt“.</div>
-           <div class="zeile">
-             <div><label for="abArt">Zahlungsart</label><select id="abArt"><option value="karte">Karte</option><option value="bar">bar</option></select></div>
-             <div><label for="abBetrag">Betrag (€)</label><input type="number" step="0.01" min="0" id="abBetrag" value="${d.preisBrutto != null ? esc(String(d.preisBrutto)) : ""}" style="width:110px;"></div>
+      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}` : "";
+      const artAuswahl = (vorgabe) => ["karte", "bar", "ueberweisung", "link", "plattform"].map((a) => `<option value="${a}" ${a === vorgabe ? "selected" : ""}>${ZAHLUNG_ART[a]}</option>`).join("");
+      const markierFormular = (vorgabeArt, vorgabeBetrag, knopfText) => `<div class="zeile">
+             <div><label for="abArt">Zahlungsart</label><select id="abArt">${artAuswahl(vorgabeArt)}</select></div>
+             <div><label for="abBetrag">Betrag (€)</label><input type="number" step="0.01" min="0" id="abBetrag" value="${vorgabeBetrag != null ? esc(String(vorgabeBetrag)) : ""}" style="width:110px;"></div>
              <div><label for="abDatum">Datum</label><input type="date" id="abDatum" value="${heuteDatum}"></div>
-             <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" placeholder="z. B. SumUp-Beleg" style="width:100%;"></div>
-             <button type="button" class="knopf gold" id="abBtn">Als abgerechnet markieren</button>
-           </div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`) + `</div>` : "";
+             <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" placeholder="z. B. SumUp-Beleg, Überweisung vom 20.10." style="width:100%;"></div>
+             <button type="button" class="knopf gold" id="abBtn">${knopfText}</button>
+           </div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`;
+      const kannEntfernen = abg && (!d.rechnungsnummer || d.rechnungZahlungsart === "ueberweisung");
+      const zahlungInhalt = ab.status === "bezahlt"
+        ? `<p style="margin:8px 0 4px;"><strong>✓ Bezahlt:</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · Rechnung ${esc(d.rechnungsnummer)}` : ""}</p>
+           <div class="klein">${d.rechnungsnummer ? "" : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen)."}</div>
+           ${kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>` : ""}`
+        : ab.status === "rechnung_offen"
+        ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
+           <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
+        : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
+      const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
+      const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       const knoepfe = [];
       if (d.status === "angefragt") { knoepfe.push(["bestaetigen", "Bestätigen", "gold"]); knoepfe.push(["ablehnen", "Ablehnen", "rot"]); }
       if (d.status === "bestaetigt") { knoepfe.push(["ablehnen", "Stornieren", "rot"]); }
       if (d.status === "angebot") { knoepfe.push(["ablehnen", "Angebot stornieren", "rot"]); }
       $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a>
         <h2 class="seite">${esc(d.referenz)} – ${esc(name || "Auftrag")}</h2>
-        <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : d.abgerechnet ? `<span class="badge ok">abgerechnet</span>` : ""}<br>
-          ${esc(f.von)} → ${esc(f.nach)}<br>
-          ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
+        <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
+          ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.von)} → ${esc(f.nach)}<br>
+          ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) + (f.rueckfahrt ? " (inkl. Rückfahrt)" : "") : ""}
+          ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.von)} → ${esc(f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
         ${abrechnungKarte}
@@ -390,7 +428,7 @@ async function ansichtAuftrag(referenz, noch, params){
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
       });
       if ($("abAufheben")) $("abAufheben").addEventListener("click", async () => {
-        if (!confirm("Die Markierung „abgerechnet“ entfernen? Der Auftrag zählt danach wieder unter „Rechnung fehlt“.")) return;
+        if (!confirm("Die Markierung „bezahlt“ entfernen? Der Auftrag gilt danach wieder als offen.")) return;
         $("abAufheben").disabled = true;
         try { await api("rechnungAdmin", { aktion: "abrechnenAufheben", referenz: d.referenz }); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abAufheben").disabled = false; }
