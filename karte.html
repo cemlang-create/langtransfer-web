@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Ihre Zehnerkarte | LANGtransfer</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:700; font-display:swap; src:url('fonts/work-sans-latin-700-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --ok:#2f6b45; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);padding:24px 16px 60px;font-size:16px;line-height:1.55;}
+  .karte{max-width:520px;margin:0 auto;}
+  .marke{font-size:1.5rem;margin:0 0 20px;} .marke strong{font-weight:700;} .marke span{font-weight:400;}
+  .sprache{float:right;font-size:14px;} .sprache button{background:none;border:none;color:var(--muted);cursor:pointer;font:inherit;padding:0 4px;} .sprache button.aktiv{color:var(--moss-dark);font-weight:600;text-decoration:underline;}
+  .box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px 20px;margin-bottom:16px;}
+  h1{font-size:1.3rem;margin:0 0 4px;} .sub{color:var(--muted);margin:0 0 18px;font-size:15px;}
+  .stempel{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:8px 0 14px;}
+  .punkt{aspect-ratio:1/1;border-radius:50%;border:2px dashed #cfc9b8;display:flex;align-items:center;justify-content:center;font-weight:700;color:#cfc9b8;font-size:15px;}
+  .punkt.voll{background:var(--moss);border:2px solid var(--moss);color:#fff;}
+  .stand{font-size:1.1rem;font-weight:600;margin:0;}
+  .frei{background:#e8f3ec;border:1px solid #b9dcc6;color:#1f5133;border-radius:8px;padding:14px 16px;margin-bottom:16px;}
+  .frei strong{font-size:1.05rem;}
+  table{width:100%;border-collapse:collapse;font-size:15px;} td{padding:7px 4px;border-bottom:1px solid var(--line);} td.datum{color:var(--muted);white-space:nowrap;width:1%;padding-right:12px;}
+  .regeln{font-size:14px;color:var(--muted);} .regeln li{margin-bottom:4px;}
+  .kontakt{font-size:14px;color:var(--muted);text-align:center;margin-top:24px;} .kontakt a{color:var(--moss-dark);}
+  .fehler{text-align:center;padding:30px 10px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="karte">
+  <div class="sprache"><button id="de" class="aktiv" type="button">DE</button>·<button id="en" type="button">EN</button></div>
+  <p class="marke"><strong>LANG</strong><span>transfer</span></p>
+  <div id="inhalt"><div class="fehler" id="laden">…</div></div>
+  <p class="kontakt" id="kontakt"></p>
+</div>
+<script>
+const FUNKTION = "https://europe-west1-lang-transfer.cloudfunctions.net/karteAnzeigen";
+const TEXTE = {
+  de: { titel: "Ihre digitale Zehnerkarte", hallo: (n) => `Hallo ${n}, hier ist Ihr Stempelstand.`, stand: (s, v) => `${s} von ${v} Fahrten`,
+    noch: (n) => n === 1 ? "Noch 1 Fahrt bis zur Freifahrt." : `Noch ${n} Fahrten bis zur Freifahrt.`,
+    freiTitel: "Sie haben eine Freifahrt!", freiText: (w) => `Wert: ${w} €. Sie wird bei Ihrer nächsten Buchung vom Fahrpreis abgezogen. Sagen Sie uns bei der Buchung einfach Bescheid.`,
+    wertHinweis: (w) => `Wert der Freifahrt: derzeit Ø ${w} € Ihrer bisherigen Fahrten.`, eingeloest: (n) => n === 1 ? "Bereits 1 Freifahrt eingelöst." : `Bereits ${n} Freifahrten eingelöst.`,
+    fahrten: "Gesammelte Fahrten dieser Karte", keine: "Noch keine Fahrten auf dieser Karte.",
+    regelnTitel: "So funktioniert es", regeln: ["Jede gefahrene Buchung ist ein Stempel (Hin- und Rückfahrt zählen als eine Fahrt).", "Nach 10 Fahrten ist Ihre nächste Fahrt kostenfrei.", "Der Wert der Freifahrt ist der Durchschnitt Ihrer 10 Fahrten und wird auf den Fahrpreis angerechnet."],
+    fehler: "Diese Zehnerkarte wurde nicht gefunden. Bitte nutzen Sie den Link aus Ihrer Buchungsbestätigung oder fragen Sie uns.", kontakt: "Fragen? Rufen Sie uns an:", fehlerLaden: "Die Zehnerkarte konnte gerade nicht geladen werden. Bitte versuchen Sie es später erneut." },
+  en: { titel: "Your digital ten-ride card", hallo: (n) => `Hello ${n}, here is your stamp card.`, stand: (s, v) => `${s} of ${v} rides`,
+    noch: (n) => n === 1 ? "1 more ride until your free ride." : `${n} more rides until your free ride.`,
+    freiTitel: "You have a free ride!", freiText: (w) => `Value: ${w} €. It will be deducted from the fare of your next booking. Just let us know when you book.`,
+    wertHinweis: (w) => `Value of your free ride: currently an average of ${w} € of your rides so far.`, eingeloest: (n) => n === 1 ? "1 free ride redeemed so far." : `${n} free rides redeemed so far.`,
+    fahrten: "Rides collected on this card", keine: "No rides on this card yet.",
+    regelnTitel: "How it works", regeln: ["Every completed booking is one stamp (a round trip counts as one ride).", "After 10 rides your next ride is free.", "The value of the free ride is the average of your 10 rides and is deducted from the fare."],
+    fehler: "This ride card could not be found. Please use the link from your booking confirmation or contact us.", kontakt: "Questions? Call us:", fehlerLaden: "The ride card could not be loaded right now. Please try again later." }
+};
+let sprache = (new URLSearchParams(location.search).get("l") || (navigator.language || "de")).toLowerCase().startsWith("en") ? "en" : "de";
+let daten = null, fehlerArt = null;
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const eur = (n) => Number(n).toLocaleString(sprache === "en" ? "en-GB" : "de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const datum = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString(sprache === "en" ? "en-GB" : "de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
+function zeichnen(){
+  const t = TEXTE[sprache];
+  document.documentElement.lang = sprache; document.title = t.titel + " | LANGtransfer";
+  document.getElementById("de").classList.toggle("aktiv", sprache === "de"); document.getElementById("en").classList.toggle("aktiv", sprache === "en");
+  document.getElementById("kontakt").innerHTML = `${t.kontakt} <a href="tel:+491774455445">+49 177 44 55 445</a>`;
+  const box = document.getElementById("inhalt");
+  if (fehlerArt) { box.innerHTML = `<div class="box fehler">${esc(fehlerArt === "nicht" ? t.fehler : t.fehlerLaden)}</div>`; return; }
+  if (!daten) return;
+  const d = daten, voll = d.verfuegbar > 0;
+  const punkte = Array.from({ length: d.von }, (_, i) => `<div class="punkt ${i < d.stempel ? "voll" : ""}">${i < d.stempel ? "✓" : i + 1}</div>`).join("");
+  let html = `<div class="box"><h1>${esc(t.titel)}</h1><p class="sub">${esc(t.hallo(d.name))}</p><div class="stempel">${punkte}</div><p class="stand">${esc(t.stand(d.stempel, d.von))}</p>` +
+    (!voll ? `<p class="sub" style="margin:4px 0 0;">${esc(t.noch(d.naechste))}</p>` : "") +
+    (d.eingeloest ? `<p class="sub" style="margin:8px 0 0;">${esc(t.eingeloest(d.eingeloest))}</p>` : "") + `</div>`;
+  if (voll) html += `<div class="frei"><strong>🎉 ${esc(t.freiTitel)}</strong><br>${esc(t.freiText(eur(d.freifahrtWert)))}</div>`;
+  else if (d.freifahrtWert > 0) html += `<p class="sub" style="text-align:center;">${esc(t.wertHinweis(eur(d.freifahrtWert)))}</p>`;
+  html += `<div class="box"><h1 style="font-size:1.05rem;">${esc(t.fahrten)}</h1>` + (d.fahrten.length ? `<table>${d.fahrten.map((f) => `<tr><td class="datum">${esc(datum(f.datum))}</td><td>${esc(f.von)} → ${esc(f.nach)}</td></tr>`).join("")}</table>` : `<p class="sub" style="margin:0;">${esc(t.keine)}</p>`) + `</div>`;
+  html += `<div class="box regeln"><strong style="color:var(--ink);">${esc(t.regelnTitel)}</strong><ul style="padding-left:18px;margin:8px 0 0;">${t.regeln.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
+  box.innerHTML = html;
+}
+document.getElementById("de").addEventListener("click", () => { sprache = "de"; zeichnen(); });
+document.getElementById("en").addEventListener("click", () => { sprache = "en"; zeichnen(); });
+(async function start(){
+  zeichnen();
+  const token = new URLSearchParams(location.search).get("t") || "";
+  try {
+    const antwort = await fetch(`${FUNKTION}?t=${encodeURIComponent(token)}`);
+    if (antwort.status === 404) { fehlerArt = "nicht"; return zeichnen(); }
+    if (!antwort.ok) throw new Error("Fehler");
+    daten = await antwort.json();
+  } catch (e) { fehlerArt = "laden"; }
+  zeichnen();
+})();
+</script>
+</body>
+</html>

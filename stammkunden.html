@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Stammkunden (intern)</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --err:#b23b2f; --ok:#2f6b45; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);padding:32px 20px 100px;font-size:15px;}
+  .card{max-width:900px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:8px;padding:26px;}
+  h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;}
+  h2{font-size:1.05rem;margin:26px 0 12px;padding-top:16px;border-top:1px solid var(--line);color:var(--moss-dark);}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px;}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:5px;}
+  input, select, textarea{width:100%;font-family:inherit;font-size:15px;padding:9px 11px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
+  input:focus, textarea:focus{outline:none;border-color:var(--moss);}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--moss);padding:0;}
+  .field{margin-bottom:14px;} .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;} @media (max-width:640px){ .row{grid-template-columns:1fr;} }
+  .check{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;}
+  .hint{font-size:12.5px;color:var(--muted);margin:3px 0 0;}
+  .box{background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 16px;line-height:1.65;}
+  .primary{background:var(--moss);color:#fff;border:none;border-radius:6px;padding:11px 18px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .primary:disabled{opacity:.5;}
+  .sekundaer{background:#fff;color:var(--ink);border:1px solid #cfc9b8;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;}
+  .sekundaer.rot{color:var(--err);border-color:#e0b4ad;}
+  .status{margin-top:10px;font-size:14px;min-height:1.2em;white-space:pre-line;} .status.error{color:var(--err);} .status.ok{color:var(--ok);}
+  table{width:100%;border-collapse:collapse;font-size:14px;} th, td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;} th{font-size:12.5px;color:var(--muted);font-weight:600;}
+  tr.zeile{cursor:pointer;} tr.zeile:hover{background:#faf6ec;}
+  .tabellenrahmen{overflow-x:auto;border:1px solid var(--line);border-radius:6px;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:600;background:#eee;color:var(--muted);white-space:nowrap;} .badge.ok{background:#dcefe3;color:var(--ok);} .badge.gold{background:#f6e7c8;color:var(--moss-dark);}
+  .stempel{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;} .punkt{width:30px;height:30px;border-radius:50%;border:2px dashed #cfc9b8;display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfc9b8;font-weight:700;} .punkt.voll{background:var(--moss);border:2px solid var(--moss);color:#fff;}
+  .x{background:none;border:none;color:var(--err);font-size:20px;cursor:pointer;padding:0 6px;}
+  .linkzeile{display:flex;gap:8px;} .linkzeile input{flex:1;font-size:13px;}
+  html.embedded body{padding:0;background:transparent;} html.embedded .card{max-width:none;border:none;padding:0;background:transparent;} html.embedded .embedded-aus{display:none !important;}
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");</script>
+<div class="card">
+  <h1 class="embedded-aus">Stammkunden</h1>
+  <p class="sub">Kunden mit festen Fahrten und digitaler Zehnerkarte. Einen Stammkunden legst du aus einem bestehenden Auftrag an; in „Neuer Auftrag“ wählst du ihn dann aus und musst nur noch Datum und Uhrzeit eingeben.</p>
+
+  <div id="listeBereich">
+    <div class="box" style="margin-bottom:16px;">
+      <strong>Neuen Stammkunden aus einem Auftrag anlegen</strong>
+      <div class="row" style="margin-top:8px;">
+        <div><label for="neuReferenz">Referenz des Auftrags</label><input type="text" id="neuReferenz" style="text-transform:uppercase;" placeholder="z. B. AVJV74"></div>
+        <div><label for="neuName">Name des Stammkunden (optional)</label><input type="text" id="neuName" maxlength="80" placeholder="wird sonst aus dem Auftrag übernommen"></div>
+      </div>
+      <button type="button" class="primary" id="anlegenBtn" onclick="ausAuftragAnlegen()">Als Stammkunde speichern</button>
+      <div class="status" id="statusNeu"></div>
+    </div>
+    <div class="tabellenrahmen"><table>
+      <thead><tr><th>Name</th><th>Art</th><th>Stammfahrten</th><th>Zehnerkarte</th></tr></thead>
+      <tbody id="liste"></tbody>
+    </table></div>
+    <div class="status" id="statusListe"></div>
+  </div>
+
+  <div id="detail" style="display:none;">
+    <button type="button" class="sekundaer" onclick="zurueck()">← Alle Stammkunden</button>
+    <h2 style="border-top:none;margin-top:14px;padding-top:0;" id="detailTitel">Stammkunde</h2>
+    <div class="field"><label for="name">Name</label><input type="text" id="name" maxlength="80"></div>
+    <div class="box" id="kundenBox" style="margin-bottom:14px;"></div>
+    <div class="field"><label for="notiz">Notiz (nur intern)</label><textarea id="notiz" rows="2" maxlength="500"></textarea></div>
+
+    <h2>Stammfahrten</h2>
+    <p class="hint" style="margin-top:-6px;">Der Preis ist ein Festpreis (brutto). Er wird in „Neuer Auftrag“ übernommen, bis du ihn dort änderst. Ohne Preis wird die Fahrt berechnet.</p>
+    <div class="tabellenrahmen"><table>
+      <thead><tr><th>Name</th><th>Route</th><th style="width:120px;">Preis (€)</th><th style="width:34px;"></th></tr></thead>
+      <tbody id="fahrten"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:12px;align-items:end;">
+      <div><label for="fahrtReferenz">Weitere Stammfahrt aus einem Auftrag hinzufügen</label><input type="text" id="fahrtReferenz" style="text-transform:uppercase;" placeholder="Referenz, z. B. AVJV74"></div>
+      <div><button type="button" class="sekundaer" onclick="fahrtAusAuftrag()">Hinzufügen</button></div>
+    </div>
+    <p class="hint">Dabei werden auch die Kundendaten aus diesem Auftrag in den Stammkunden übernommen.</p>
+    <div class="status" id="statusFahrt"></div>
+
+    <h2>Digitale Zehnerkarte</h2>
+    <label class="check"><input type="checkbox" id="karteAktiv"> Zehnerkarte aktiv (Link, Hinweis in Bestätigung und Rechnung)</label>
+    <div id="karteBereich" style="margin-top:12px;"></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;">
+      <button type="button" class="primary" id="speichernBtn" onclick="speichern()">Speichern</button>
+      <button type="button" class="sekundaer rot" onclick="archivieren()">Stammkunde archivieren</button>
+    </div>
+    <div class="status" id="statusDetail"></div>
+  </div>
+</div>
+<script>
+const BASIS = "https://europe-west1-lang-transfer.cloudfunctions.net";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const eur = (n) => Number(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const ortKurz = (a) => { const t = String(a || "").split(",").map((x) => x.trim()).filter(Boolean); return (t[t.length - 1] || a || "").replace(/^\d{4,5}\s*/, "") || a; };
+function setStatus(id, msg, cls){ const e = $(id); e.textContent = msg || ""; e.className = "status" + (cls ? " " + cls : ""); }
+function speicherLesen(k){ try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+async function api(body){
+  const key = speicherLesen("lt_admin_key");
+  if (!key) throw new Error("Bitte zuerst im Portal anmelden (Admin-Passwort fehlt).");
+  const antwort = await fetch(`${BASIS}/stammkundeAdmin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({}, body, { adminKey: key })) });
+  let d = {}; try { d = await antwort.json(); } catch (e) {}
+  if (!antwort.ok) throw new Error(d.fehler || `Fehler ${antwort.status}`);
+  return d;
+}
+
+let aktuell = null;      // geladener Stammkunde (Daten + Stand)
+let fahrten = [];        // bearbeitbare Stammfahrten
+
+async function listeLaden(){
+  setStatus("statusListe", "Wird geladen …", "");
+  try {
+    const d = await api({ aktion: "liste" });
+    $("liste").innerHTML = d.liste.length ? d.liste.map((k) => `<tr class="zeile" data-id="${esc(k.id)}"><td><strong>${esc(k.name)}</strong></td><td>${esc(k.typ)}</td><td>${k.fahrten}</td>` +
+      `<td>${k.karteAktiv ? `${k.verfuegbar > 0 ? `<span class="badge ok">Freifahrt verfügbar · ${esc(eur(k.freifahrtWert))}</span>` : `<span class="badge gold">${k.stempel} von ${k.von}</span>`}` : '<span class="badge">aus</span>'}</td></tr>`).join("")
+      : `<tr><td colspan="4" style="color:var(--muted);">Noch keine Stammkunden. Lege oben den ersten aus einem Auftrag an.</td></tr>`;
+    document.querySelectorAll("tr.zeile").forEach((z) => z.addEventListener("click", () => oeffnen(z.dataset.id)));
+    setStatus("statusListe", "");
+  } catch (e) { setStatus("statusListe", e.message, "error"); }
+}
+async function ausAuftragAnlegen(){
+  const referenz = $("neuReferenz").value.trim().toUpperCase();
+  if (!referenz) return setStatus("statusNeu", "Bitte eine Referenz eingeben.", "error");
+  $("anlegenBtn").disabled = true; setStatus("statusNeu", "Wird angelegt …", "");
+  try { const d = await api({ aktion: "ausAuftrag", referenz, name: $("neuName").value.trim() }); $("neuReferenz").value = ""; $("neuName").value = ""; setStatus("statusNeu", "✓ Stammkunde angelegt.", "ok"); await listeLaden(); await oeffnen(d.stammkundeId); }
+  catch (e) { setStatus("statusNeu", e.message, "error"); }
+  finally { $("anlegenBtn").disabled = false; }
+}
+
+function kundenText(k){
+  if (!k) return "–";
+  const ra = k.rechnungsadresse || {};
+  const adr = [ra.strasse, [ra.plz, ra.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  if (k.typ === "firma") { const b = k.buchendePerson || {}; return `<strong>${esc(k.firmenname)}</strong> (${k.kategorie === "hotel" ? "Hotel" : "Firma"})<br>Ansprechpartner: ${esc(b.name || "–")} · ${esc(b.email || "–")} · ${esc(b.telefon || "–")}<br>${esc(adr || "keine Adresse")}`; }
+  return `<strong>${esc(k.name || "–")}</strong> (Privat)<br>${esc(k.email || "–")} · ${esc(k.mobil || "–")}<br>${esc(adr || "keine Adresse")}`;
+}
+function fahrtenRendern(){
+  $("fahrten").innerHTML = fahrten.length ? "" : `<tr><td colspan="4" style="color:var(--muted);">Keine Stammfahrten.</td></tr>`;
+  fahrten.forEach((f, i) => {
+    const tr = document.createElement("tr");
+    const ruck = f.fahrt.rueckfahrt ? " (mit Rückfahrt)" : "";
+    tr.innerHTML = `<td><input type="text" data-f="name" maxlength="80" value="${esc(f.name)}"></td><td>${esc(ortKurz(f.fahrt.abholadresse))} → ${esc(ortKurz(f.fahrt.zieladresse))}${ruck}<div class="hint">${esc(f.fahrt.abholadresse)} → ${esc(f.fahrt.zieladresse)}</div></td>` +
+      `<td><input type="number" step="0.01" min="0" data-f="preis" placeholder="berechnen" value="${f.preisBrutto == null ? "" : esc(String(f.preisBrutto))}"></td><td><button type="button" class="x" title="Stammfahrt entfernen">×</button></td>`;
+    tr.querySelector("[data-f=name]").addEventListener("input", (e) => { f.name = e.target.value; });
+    tr.querySelector("[data-f=preis]").addEventListener("input", (e) => { f.preisBrutto = e.target.value === "" ? null : Number(e.target.value); });
+    tr.querySelector(".x").addEventListener("click", () => { fahrten.splice(i, 1); fahrtenRendern(); });
+    $("fahrten").appendChild(tr);
+  });
+}
+function karteRendern(){
+  const s = aktuell.stand;
+  const punkte = Array.from({ length: s.von }, (_, i) => `<div class="punkt ${i < s.stempel ? "voll" : ""}">${i < s.stempel ? "✓" : i + 1}</div>`).join("");
+  $("karteBereich").innerHTML = `<div class="stempel">${punkte}</div>` +
+    `<div><strong>${s.stempel} von ${s.von}</strong> Fahrten${s.verfuegbar > 0 ? ` · <span class="badge ok">Freifahrt verfügbar</span>` : ` · noch ${s.naechste}`} · ${s.gefahren} Fahrten insgesamt · ${s.eingeloest} Freifahrt${s.eingeloest === 1 ? "" : "en"} eingelöst</div>` +
+    (s.freifahrtWert > 0 ? `<div class="hint">Wert der ${s.verfuegbar > 0 ? "Freifahrt" : "nächsten Freifahrt (bisher)"}: Ø ${esc(eur(s.freifahrtWert))} der Fahrten dieser Karte.</div>` : "") +
+    (s.fahrten.length ? `<div class="hint" style="margin-top:6px;">Fahrten dieser Karte: ${s.fahrten.map((f) => `${esc(f.datum.split("-").reverse().join("."))} ${esc(f.von)}→${esc(f.nach)} (${esc(f.referenz)})`).join(" · ")}</div>` : "") +
+    (aktuell.karteLink ? `<div class="field" style="margin-top:12px;"><label>Persönlicher Link des Kunden</label><div class="linkzeile"><input type="text" id="karteLink" readonly value="${esc(aktuell.karteLink)}"><button type="button" class="sekundaer" onclick="linkKopieren()">Kopieren</button><button type="button" class="sekundaer" onclick="linkNeu()">Neuer Link</button></div><div class="hint">Der Link steht automatisch in der Bestätigung und in der Rechnung. „Neuer Link“ macht den alten ungültig.</div><div class="status" id="statusLink"></div></div>` : "");
+}
+async function oeffnen(id){
+  setStatus("statusDetail", "", "");
+  try {
+    const d = await api({ aktion: "laden", id });
+    aktuell = { id: d.id, stammkunde: d.stammkunde, stand: d.stand, karteLink: d.karteLink };
+    fahrten = JSON.parse(JSON.stringify(d.stammkunde.fahrten || []));
+    $("listeBereich").style.display = "none"; $("detail").style.display = "block";
+    $("detailTitel").textContent = d.stammkunde.name;
+    $("name").value = d.stammkunde.name; $("notiz").value = d.stammkunde.notiz || ""; $("karteAktiv").checked = !!d.stammkunde.karteAktiv;
+    $("kundenBox").innerHTML = kundenText(d.stammkunde.kunde);
+    fahrtenRendern(); karteRendern(); window.scrollTo(0, 0);
+  } catch (e) { setStatus("statusListe", e.message, "error"); }
+}
+function zurueck(){ $("detail").style.display = "none"; $("listeBereich").style.display = "block"; aktuell = null; listeLaden(); }
+async function speichern(){
+  if (!$("name").value.trim()) return setStatus("statusDetail", "Bitte einen Namen angeben.", "error");
+  $("speichernBtn").disabled = true; setStatus("statusDetail", "Wird gespeichert …", "");
+  try {
+    await api({ aktion: "speichern", id: aktuell.id, name: $("name").value.trim(), notiz: $("notiz").value.trim(), karteAktiv: $("karteAktiv").checked, fahrten });
+    await oeffnen(aktuell.id); setStatus("statusDetail", "✓ Gespeichert.", "ok");
+  } catch (e) { setStatus("statusDetail", e.message, "error"); }
+  finally { $("speichernBtn").disabled = false; }
+}
+async function fahrtAusAuftrag(){
+  const referenz = $("fahrtReferenz").value.trim().toUpperCase();
+  if (!referenz) return setStatus("statusFahrt", "Bitte eine Referenz eingeben.", "error");
+  try { await api({ aktion: "ausAuftrag", referenz, stammkundeId: aktuell.id }); $("fahrtReferenz").value = ""; await oeffnen(aktuell.id); setStatus("statusFahrt", "✓ Stammfahrt hinzugefügt, Kundendaten übernommen.", "ok"); }
+  catch (e) { setStatus("statusFahrt", e.message, "error"); }
+}
+async function archivieren(){
+  if (!confirm(`„${aktuell.stammkunde.name}“ archivieren? Die Zehnerkarte und ihr Link werden deaktiviert. Bestehende Aufträge bleiben unverändert.`)) return;
+  try { await api({ aktion: "archivieren", id: aktuell.id }); zurueck(); } catch (e) { setStatus("statusDetail", e.message, "error"); }
+}
+function linkKopieren(){
+  const f = $("karteLink"); f.select();
+  try { navigator.clipboard.writeText(f.value); setStatus("statusLink", "✓ Link kopiert.", "ok"); } catch (e) { document.execCommand && document.execCommand("copy"); setStatus("statusLink", "✓ Link kopiert.", "ok"); }
+}
+async function linkNeu(){
+  if (!confirm("Einen neuen Link erzeugen? Der bisherige Link des Kunden funktioniert danach nicht mehr.")) return;
+  try { const d = await api({ aktion: "tokenNeu", id: aktuell.id }); aktuell.karteLink = d.karteLink; karteRendern(); setStatus("statusLink", "✓ Neuer Link erzeugt.", "ok"); }
+  catch (e) { setStatus("statusLink", e.message, "error"); }
+}
+(function start(){
+  const id = new URLSearchParams(location.search).get("id");
+  listeLaden().then(() => { if (id) oeffnen(id); });
+})();
+</script>
+<script>
+  (function () {
+    if (!document.documentElement.classList.contains("embedded") || window.parent === window) return;
+    var melden = function () { window.parent.postMessage({ type: "lt-hoehe", hoehe: document.documentElement.scrollHeight }, "*"); };
+    if (window.ResizeObserver) new ResizeObserver(melden).observe(document.body);
+    window.addEventListener("load", melden); melden();
+  })();
+</script>
+</body>
+</html>

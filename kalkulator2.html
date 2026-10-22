@@ -77,6 +77,18 @@
     <div class="status" id="ladenStatus"></div>
   </div>
 
+  <div class="field" id="stammBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:18px;">
+    <label for="stammWahl">Stammkunde wählen</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <select id="stammWahl" style="flex:1;min-width:170px;"><option value="">– kein Stammkunde –</option></select>
+      <select id="stammFahrt" style="flex:1;min-width:170px;display:none;"></select>
+      <button type="button" class="link-btn" id="stammBtn" style="flex:none;white-space:nowrap;display:none;" onclick="stammfahrtUebernehmen()">Übernehmen</button>
+    </div>
+    <div class="hint" id="stammInfo" style="margin-top:6px;">Übernimmt Kundendaten, Route und Festpreis einer Stammfahrt. Danach nur noch Datum und Uhrzeit eingeben.</div>
+    <label class="check" id="freifahrtZeile" style="display:none;margin-top:8px;"><input type="checkbox" id="freifahrtCheck" onchange="stammAktualisieren()"> <span id="freifahrtText"></span></label>
+    <div class="status" id="stammStatus"></div>
+  </div>
+
   <div class="toggle">
     <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
     <button id="fahrtartHinRueck" onclick="setFahrtart('hinrueck')">Hin- und Rückfahrt</button>
@@ -301,6 +313,7 @@
         <label for="agSprache">Sprache von Angebot, Bestätigung und Rechnung</label>
         <select id="agSprache"><option value="de">Deutsch</option><option value="en">English</option></select>
       </div>
+      <label class="check" id="alsStammkundeZeile" style="margin-bottom:12px;"><input type="checkbox" id="alsStammkunde"> Kunde und Route als Stammkunde speichern (mit digitaler Zehnerkarte)</label>
       <div class="toggle" id="modusToggle">
         <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
         <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
@@ -512,6 +525,7 @@ function aktuellerZahler(){
 /** Vermittlungsformular: Festpreis anzeigen, Betragsfeld bei "bezahlt" einblenden und vorbelegen. */
 function vermittlungAktualisieren(){
   const preis = letztesErgebnis ? letztesErgebnis.gesamtBrutto : null;
+  if (typeof stammAktualisieren === "function") stammAktualisieren();
   el("vmPreisFest").textContent = preis == null ? "– (erst Preis berechnen)" : `${fmt(preis)} €`;
   const art = (document.querySelector("input[name=vmAbr]:checked") || {}).value || "";
   el("vmBetragZeile").style.display = art ? "block" : "none";
@@ -922,8 +936,72 @@ async function adresseAlsPlace(text){
   if (!treffer) throw new Error(`Die Adresse „${text}“ wurde nicht gefunden.`);
   return Object.assign({}, treffer, { formatted_address: text });
 }
+// ===================== Stammkunden und Zehnerkarte =====================
+const STAMM_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/stammkundeAdmin";
+let stammkundeAktuell = null;   // { id, name, stand, sk, freifahrtBestehend }
+async function stammApi(body){
+  const antwort = await fetch(STAMM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({}, body, { adminKey: adminKeyLesen() })) });
+  const d = await antwort.json();
+  if (!antwort.ok) throw new Error(d.fehler || "Stammkunden konnten nicht geladen werden.");
+  return d;
+}
+async function stammListeLaden(){
+  if (!adminKeyLesen()) return;
+  try {
+    const d = await stammApi({ aktion: "liste" });
+    el("stammWahl").innerHTML = `<option value="">– kein Stammkunde –</option>` + d.liste.map((k) => `<option value="${k.id}">${k.name.replace(/[<>&"]/g, "")}${k.karteAktiv ? ` · ${k.stempel}/${k.von}${k.verfuegbar > 0 ? " · Freifahrt" : ""}` : ""}</option>`).join("");
+  } catch (e) { setStatus("stammStatus", e.message, "error"); }
+}
+/** Stammkunde laden (Daten + Zehnerkarte) und die Auswahl der Stammfahrten füllen. */
+async function stammkundeLaden(id, optionen = {}){
+  const d = await stammApi({ aktion: "laden", id });
+  stammkundeAktuell = { id: d.id, name: d.stammkunde.name, stand: d.stand, sk: d.stammkunde, freifahrtBestehend: optionen.freifahrtBestehend || null };
+  if (![...el("stammWahl").options].some((o) => o.value === id)) el("stammWahl").insertAdjacentHTML("beforeend", `<option value="${id}">${d.stammkunde.name.replace(/[<>&"]/g, "")}</option>`);
+  el("stammWahl").value = id;
+  const fahrten = d.stammkunde.fahrten || [];
+  el("stammFahrt").innerHTML = fahrten.map((f, i) => `<option value="${i}">${f.name.replace(/[<>&"]/g, "")}${f.preisBrutto != null ? ` · ${fmt(f.preisBrutto)} €` : ""}</option>`).join("");
+  const sichtbar = !optionen.nurVerknuepfen && fahrten.length > 0;
+  el("stammFahrt").style.display = sichtbar ? "" : "none"; el("stammBtn").style.display = sichtbar ? "" : "none";
+  el("alsStammkundeZeile").style.display = "none";
+  stammAktualisieren();
+}
+function stammAktualisieren(){
+  const info = el("stammInfo"), zeile = el("freifahrtZeile");
+  if (!stammkundeAktuell) { info.textContent = "Übernimmt Kundendaten, Route und Festpreis einer Stammfahrt. Danach nur noch Datum und Uhrzeit eingeben."; zeile.style.display = "none"; el("alsStammkundeZeile").style.display = ""; return; }
+  const s = stammkundeAktuell.stand, aktiv = !!stammkundeAktuell.sk.karteAktiv;
+  const frei = stammkundeAktuell.freifahrtBestehend, wert = frei ? frei.wert : s.freifahrtWert;
+  info.textContent = `★ ${stammkundeAktuell.name}` + (aktiv ? ` · Zehnerkarte: ${s.stempel} von ${s.von} Fahrten${s.verfuegbar > 0 ? " · Freifahrt verfügbar" : ` · noch ${s.naechste}`}` : " · Zehnerkarte aus");
+  const anzeigen = aktiv && (s.verfuegbar > 0 || !!frei) && kundentyp !== "vermittlung";
+  zeile.style.display = anzeigen ? "flex" : "none";
+  if (anzeigen) {
+    const preis = letztesErgebnis ? letztesErgebnis.gesamtBrutto : null;
+    const vorschau = el("freifahrtCheck").checked && preis != null ? ` → Preis nach Gutschrift: ${fmt(Math.max(0, preis - wert))} €` : "";
+    el("freifahrtText").textContent = `Freifahrt einlösen (Gutschrift Ø ${fmt(wert)} € auf den Fahrpreis)${vorschau}`;
+  } else el("freifahrtCheck").checked = false;
+}
+/** Gewählte Stammfahrt in die Maske übernehmen: nur Datum und Uhrzeit fehlen noch. */
+async function stammfahrtUebernehmen(){
+  if (!stammkundeAktuell) return;
+  const sk = stammkundeAktuell.sk, f = sk.fahrten[Number(el("stammFahrt").value)];
+  if (!f) return;
+  setStatus("stammStatus", "Wird übernommen …", "");
+  try {
+    el("freifahrtCheck").checked = false;
+    await auftragInFormular({ referenz: "", status: "bestaetigt", sprache: sk.sprache, zahlungsart: sk.zahlungsart, kunde: sk.kunde, vermittlung: null, preisOffen: f.preisBrutto == null, preis: { gesamtBrutto: f.preisBrutto },
+      fahrt: { abholadresse: f.fahrt.abholadresse, zieladresse: f.fahrt.zieladresse, zwischenziel: f.fahrt.zwischenziel, beschreibung: f.fahrt.beschreibung, fahrgaesteAb12: f.fahrt.personen, fahrgaesteUnter12: 0, sonstigesGepaeck: f.fahrt.gepaeck, rueckfahrt: f.fahrt.rueckfahrt } }, { ohneBerechnung: true });
+    setStatus("stammStatus", `✓ „${f.name}“ übernommen. Bitte Datum und Uhrzeit eingeben und „Preis berechnen“ klicken.`, "ok");
+    el("datum").focus();
+  } catch (e) { setStatus("stammStatus", e.message || "Die Stammfahrt konnte nicht übernommen werden.", "error"); }
+}
+el("stammWahl").addEventListener("change", async () => {
+  const id = el("stammWahl").value;
+  setStatus("stammStatus", "", "");
+  if (!id) { stammkundeAktuell = null; el("stammFahrt").style.display = "none"; el("stammBtn").style.display = "none"; stammAktualisieren(); return; }
+  try { await stammkundeLaden(id); } catch (e) { setStatus("stammStatus", e.message, "error"); }
+});
+
 /** Füllt die ganze Maske mit den Daten eines gespeicherten Auftrags und berechnet die Route neu (Preis und Terminblocker bleiben wie gespeichert). */
-async function auftragInFormular(d){
+async function auftragInFormular(d, optionen = {}){
   const f = d.fahrt || {}, k = d.kunde || {}, ruck = f.rueckfahrt || null;
   // --- Fahrtart, Adressen ---
   setFahrtart(ruck ? "hinrueck" : "einfach");
@@ -942,11 +1020,16 @@ async function auftragInFormular(d){
   for (const id of Object.keys(adressen)) { setzeWert(id, adressen[id]); places[id] = await adresseAlsPlace(adressen[id]); }
   rechnungsadresseStatus();
   // --- Zeiten, Fahrgäste, Preis ---
-  const hin = lokalDatumZeit(f.zeitpunktISO); setzeWert("datum", hin.datum); setzeWert("uhrzeit", hin.zeit);
-  if (ruck) { const r = lokalDatumZeit(ruck.zeitpunktISO); setzeWert("ruckDatum", r.datum); setzeWert("ruckUhrzeit", r.zeit); }
+  if (f.zeitpunktISO) { const hin = lokalDatumZeit(f.zeitpunktISO); setzeWert("datum", hin.datum); setzeWert("uhrzeit", hin.zeit); }
+  else setzeWert("uhrzeit", "");   // Stammfahrt: Datum und Uhrzeit werden pro Fahrt eingegeben
+  if (ruck) {
+    if (ruck.zeitpunktISO) { const r = lokalDatumZeit(ruck.zeitpunktISO); setzeWert("ruckDatum", r.datum); setzeWert("ruckUhrzeit", r.zeit); }
+    else { setzeWert("ruckDatum", ""); setzeWert("ruckUhrzeit", ""); }
+  }
   setzeWert("ab12", f.fahrgaesteAb12 || 1); setzeWert("unter12", f.fahrgaesteUnter12 || 0);
   setzeWert("gutschein", ""); setzeWert("manuellRabatt", ""); setzeWert("sonderzuschlag", "");
-  setzeWert("eigenerPreis", d.preisOffen ? "" : ((d.preis && d.preis.gesamtBrutto) || ""));   // der bisherige Preis bleibt, bis du ihn änderst
+  // der bisherige Preis bleibt, bis du ihn änderst (bei einer Freifahrt der Preis VOR der Gutschrift, sie wird beim Senden wieder abgezogen)
+  setzeWert("eigenerPreis", d.freifahrt ? d.freifahrt.bruttoVorher : (d.preisOffen ? "" : ((d.preis && d.preis.gesamtBrutto) || "")));
   // --- Kunde ---
   const ra = k.rechnungsadresse || {};
   let bemerkungen = k.bemerkungen || "";
@@ -996,9 +1079,13 @@ async function auftragInFormular(d){
     const zRadio = document.querySelector(`input[name="zahlungsart"][value="${["link", "fahrzeug", "rechnung"].includes(d.zahlungsart) ? d.zahlungsart : "link"}"]`); if (zRadio) zRadio.checked = true;
     setModus(d.status === "bestaetigt" ? "auftrag" : "angebot");   // ein bereits bestätigter Auftrag bleibt ein Auftrag
   }
+  // --- Stammkunde: Verknüpfung und Freifahrt des geladenen Auftrags beibehalten ---
+  if (d.stammkundeId) { try { await stammkundeLaden(d.stammkundeId, { nurVerknuepfen: true, freifahrtBestehend: d.freifahrt || null }); el("freifahrtCheck").checked = !!d.freifahrt; } catch (e) { /* Verknüpfung ist optional */ } }
+  if (optionen.ohneBerechnung) { letztesErgebnis = null; return; }
   // --- Route neu berechnen, dann die gespeicherten Terminblocker und Flugnummern wiederherstellen ---
   letztesErgebnis = null;
   await preisBerechnen();
+  stammAktualisieren();
   if (!letztesErgebnis) throw new Error(el("status").textContent || "Die Strecke konnte nicht berechnet werden.");
   if (d.kalenderBlockStartISO) setzeWert("agBlockStart", isoZuDatetimeLocal(new Date(d.kalenderBlockStartISO)));
   if (d.kalenderBlockEndeISO) setzeWert("agBlockEnde", isoZuDatetimeLocal(new Date(d.kalenderBlockEndeISO)));
@@ -1122,6 +1209,8 @@ async function angebotSenden(){
     zahlungsart: istVermittlung ? "vermittlung" : aktuelleZahlungsart(),
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
+    ...(stammkundeAktuell ? { stammkundeId: stammkundeAktuell.id } : {}),
+    ...(stammkundeAktuell && !istVermittlung && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
     kunde,
     fahrt: {
       beschreibung: kurzbeschreibung,
@@ -1178,6 +1267,15 @@ async function angebotSenden(){
         ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
+    // Kunde und Route gleich als Stammkunde speichern (der Auftrag ist dann verknüpft, die Zehnerkarte läuft)
+    if (el("alsStammkunde").checked && !stammkundeAktuell && !istVermittlung) {
+      try {
+        const sk = await stammApi({ aktion: "ausAuftrag", referenz: daten.referenz });
+        el("alsStammkunde").checked = false;
+        stammListeLaden();
+        setAngebotStatus(el("angebotStatus").textContent + " ★ Als Stammkunde gespeichert (Verwaltung im Menü „Stammkunden“).", "ok");
+      } catch (e) { setAngebotStatus(el("angebotStatus").textContent + ` (Der Stammkunde konnte nicht gespeichert werden: ${e.message})`, "ok"); }
+    }
   } catch (err) {
     setAngebotStatus(err.message || "Versand fehlgeschlagen.", "error");
   } finally {
@@ -1188,6 +1286,7 @@ async function angebotSenden(){
 // Startzustand der Auswahl-Elemente
 setKundentyp("privat");
 setModus("angebot");
+stammListeLaden();
 </script>
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCP9TfFmRUsTB1MkyNZVxkZKf0uTMyYKTE&libraries=places&callback=initAutocomplete&language=de&region=DE">

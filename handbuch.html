@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Handbuch | LANGtransfer Portal</title>
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+<style>
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/work-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:600; font-display:swap; src:url('fonts/work-sans-latin-600-normal.woff2') format('woff2'); }
+  @font-face{ font-family:'Work Sans'; font-style:normal; font-weight:700; font-display:swap; src:url('fonts/work-sans-latin-700-normal.woff2') format('woff2'); }
+  :root{ --ink:#232320; --paper:#faf9f5; --line:#e1dccf; --moss:#b9862f; --moss-dark:#8c6423; --muted:#6b6a63; --ok:#2f6b45; --warn:#8a5a00; }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:'Work Sans',sans-serif;background:var(--paper);color:var(--ink);font-size:15.5px;line-height:1.65;padding:28px 20px 80px;}
+  .seite{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:34px;}
+  @media (max-width:820px){ .seite{grid-template-columns:1fr;} nav#inhalt{position:static !important;} table{display:block;overflow-x:auto;} }
+  h1{font-size:1.6rem;margin:0 0 4px;} .sub{color:var(--muted);margin:0 0 18px;}
+  nav#inhalt{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;font-size:14px;}
+  nav#inhalt a{display:block;padding:5px 10px;border-left:3px solid transparent;color:var(--ink);text-decoration:none;border-radius:0 6px 6px 0;} nav#inhalt a:hover{background:#f1ecde;} nav#inhalt a.aktiv{border-left-color:var(--moss);background:#f6f2e8;font-weight:600;}
+  nav#inhalt .gruppe{margin:14px 10px 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  #suche{width:100%;padding:10px 12px;font:inherit;border:1px solid #cfc9b8;border-radius:8px;background:#fff;margin-bottom:6px;} #suche:focus{outline:none;border-color:var(--moss);}
+  #trefferInfo{font-size:13px;color:var(--muted);margin:0 0 14px;min-height:1.2em;}
+  main{min-width:0;}
+  section.thema{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px 24px;margin-bottom:18px;scroll-margin-top:16px;}
+  section.thema h2{font-size:1.25rem;margin:0 0 10px;color:var(--moss-dark);}
+  section.thema h3{font-size:1.02rem;margin:20px 0 6px;}
+  p{margin:0 0 10px;} ul, ol{margin:0 0 12px;padding-left:22px;} li{margin-bottom:5px;}
+  .tipp, .wichtig{border-radius:8px;padding:11px 14px;margin:12px 0;font-size:14.5px;}
+  .tipp{background:#e8f3ec;border:1px solid #b9dcc6;color:#1f5133;} .wichtig{background:#fbf1de;border:1px solid #ecd29b;color:#6b4a00;}
+  .tipp strong, .wichtig strong{display:block;margin-bottom:2px;}
+  code{background:#f1ecde;border-radius:4px;padding:1px 6px;font-size:13.5px;overflow-wrap:anywhere;} kbd{background:#fff;border:1px solid #cfc9b8;border-radius:4px;padding:0 6px;font-size:13px;}
+  table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:14.5px;} th, td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top;} th{font-size:13px;color:var(--muted);}
+  .badge{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12.5px;font-weight:600;background:#eee;color:var(--muted);} .badge.ok{background:#dcefe3;color:var(--ok);} .badge.warn{background:#f6e7c8;color:var(--warn);} .badge.err{background:#f3d9d4;color:#b23b2f;}
+  .leer{display:none;text-align:center;color:var(--muted);padding:30px;}
+  html.embedded body{padding:0;background:transparent;} html.embedded h1, html.embedded .sub{display:none;}
+  @media print{ nav#inhalt, #suche, #trefferInfo{display:none;} .seite{display:block;} section.thema{break-inside:avoid;border:none;padding:8px 0;} body{padding:0;} }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");</script>
+<h1>Handbuch</h1>
+<p class="sub">Anleitungen zu allen Funktionen des LANGtransfer-Portals. Mit <strong>Suche</strong> findest du schnell, was du brauchst.</p>
+<div class="seite">
+<nav id="inhalt" aria-label="Inhalt"></nav>
+<main>
+  <input type="search" id="suche" placeholder="Suchen, z. B. Stornorechnung, Freifahrt, Überweisung …" autocomplete="off">
+  <p id="trefferInfo"></p>
+  <p class="leer" id="leer">Nichts gefunden. Probiere einen anderen Begriff.</p>
+
+<section class="thema" id="start" data-gruppe="Erste Schritte" data-titel="Überblick und Anmeldung">
+  <h2>Überblick und Anmeldung</h2>
+  <p>Das Portal ist deine Zentrale für Aufträge, Rechnungen, Zahlungen, Stammkunden und Krankenfahrten. Alles läuft im Browser, auch auf dem Handy.</p>
+  <h3>Anmelden</h3>
+  <p>Gib im Portal das gemeinsame Passwort ein. Es wird im Browser gespeichert, bis du dich abmeldest. Die anderen Seiten (Neuer Auftrag, Rechnung usw.) öffnen sich im Portal und nutzen diese Anmeldung automatisch.</p>
+  <h3>Das Menü</h3>
+  <table>
+    <tr><th>Menüpunkt</th><th>Wofür</th></tr>
+    <tr><td>Übersicht</td><td>Was heute zu tun ist: neue Anfragen, Fahrten heute und kommende, offene Angebote, Abrechnung offen, offene und überfällige Rechnungen.</td></tr>
+    <tr><td>Aufträge</td><td>Alle Aufträge mit Suche und Filtern. Ein Klick öffnet den Auftrag.</td></tr>
+    <tr><td>Neuer Auftrag</td><td>Preis berechnen, Angebot oder Auftrag anlegen, bestehenden Auftrag laden und ändern, Stammkunden nutzen.</td></tr>
+    <tr><td>Krankenfahrten</td><td>Terminserien (z. B. Dialyse) für gesetzliche Krankenkassen.</td></tr>
+    <tr><td>Stammkunden</td><td>Kunden mit festen Fahrten und digitaler Zehnerkarte.</td></tr>
+    <tr><td>Handbuch</td><td>Diese Seite.</td></tr>
+  </table>
+  <h3>Wichtige Begriffe</h3>
+  <ul>
+    <li><strong>Referenz:</strong> der sechsstellige Code eines Auftrags (z. B. AVJV74). Damit findest du ihn überall.</li>
+    <li><strong>Angebot:</strong> der Kunde entscheidet noch (annehmen, Änderungen, nicht mehr benötigt). <strong>Auftrag / bestätigt:</strong> die Fahrt steht fest, der Kalender ist geblockt.</li>
+    <li><strong>Terminblocker:</strong> der Kalendereintrag mit Anfahrt, Fahrt und Rückkehr.</li>
+    <li><strong>Abrechnungsstatus:</strong> ob und wie ein Auftrag bezahlt ist (siehe „Zahlung und Abrechnungsstatus“).</li>
+  </ul>
+</section>
+
+<section class="thema" id="auftraege" data-gruppe="Aufträge" data-titel="Aufträge: Liste, Suche, Filter">
+  <h2>Aufträge: Liste, Suche, Filter</h2>
+  <p>Die Liste zeigt jede <strong>Fahrt</strong> in einer eigenen Zeile. Bei Hin- und Rückfahrt stehen „Hinfahrt“ und „Rückfahrt“ untereinander, beide öffnen denselben Auftrag. Der Preis steht bei der Hinfahrt, die Rückfahrt zeigt „inkl.“.</p>
+  <h3>Spalten</h3>
+  <ul>
+    <li><strong>Fahrt, Referenz, Kunde, Strecke, Preis:</strong> unter der Referenz steht die Herkunft (Online, Pauschal oder die Plattform bei Vermittlungsfahrten). „★ Stammkunde“ kennzeichnet Stammkunden, „Freifahrt“ eine eingelöste Zehnerkarte.</li>
+    <li><strong>Abrechnung:</strong> <span class="badge warn">Offen</span> (gefahren, noch nichts abgerechnet), <span class="badge warn">Rechnung offen</span> (Überweisungsrechnung wartet auf Zahlung, mit Tagen), <span class="badge err">Überfällig</span> (ab 7 Tagen), <span class="badge ok">Bezahlt</span> (mit Zahlungsart). Bei Fahrten, die noch bevorstehen, steht nur die vereinbarte Zahlungsart.</li>
+    <li><strong>Status:</strong> Neue Anfrage, Angebot offen, Bestätigt, Storniert, plus die Rechnungsnummer.</li>
+  </ul>
+  <h3>Filter</h3>
+  <p>Die Auswahl links filtert nach Status: <em>Alle</em> (ohne stornierte), <em>Heute</em>, <em>Abrechnung offen</em>, <em>Rechnung offen</em>, <em>Überfällig</em>, <em>Bezahlt</em>, <em>Storniert</em> und weitere. Rechts filterst du nach Zeit (Kommende / Vergangene). Der Zeitfilter gilt je Fahrt: Bei „Kommende“ bleibt von einem Auftrag nur die Rückfahrt, wenn die Hinfahrt schon vorbei ist.</p>
+  <p>Die Suche findet Name, Referenz, E-Mail, Ort und Rechnungsnummer.</p>
+  <div class="tipp"><strong>Stornierte Aufträge</strong>Sie sind in „Alle“ ausgeblendet. Unter der Liste steht „n stornierte ausgeblendet · anzeigen“, ein Klick zeigt sie.</div>
+  <h3>Auftrag öffnen</h3>
+  <p>Oben stehen Status, Strecke und Zeit. Darunter: <strong>Aktionen</strong> (je nach Status Bestätigen, Ablehnen, Stornieren), der Bereich <strong>Zahlung</strong>, der Bereich <strong>Stammkunde</strong> und zwei Reiter: <strong>Auftrag ändern</strong> und <strong>Rechnung</strong>.</p>
+</section>
+
+<section class="thema" id="neuer-auftrag" data-gruppe="Aufträge" data-titel="Neuer Auftrag anlegen">
+  <h2>Neuer Auftrag anlegen</h2>
+  <ol>
+    <li><strong>Route:</strong> Abhol- und Zieladresse aus der Vorschlagsliste wählen (nicht nur tippen). Optional ein Zwischenziel. Für Hin- und Rückfahrt oben umschalten und die Rückfahrt eintragen.</li>
+    <li><strong>Datum und Uhrzeit</strong> der Abholung, <strong>Fahrgäste</strong>, bei Bedarf Gutschein, eigener Rabatt, Sonderzuschlag oder ein <strong>eigener Gesamtpreis</strong>.</li>
+    <li><strong>Preis berechnen:</strong> Die Maske rechnet Route, Preis (inkl. aktueller Aktionen) und den Terminblocker aus und zeigt alles aufgeschlüsselt.</li>
+    <li><strong>Flugdaten</strong> erscheinen automatisch bei Flughafenadressen (optional, landen in Kalender und Mails).</li>
+    <li><strong>Kunde:</strong> Kundentyp wählen (Privat, Firma, Hotel, Vermittlung) und die Daten eintragen. Rechnungsadresse nicht vergessen.</li>
+    <li><strong>Bezahlung und Versand:</strong> Zahlungsart und Sprache wählen, dann <strong>Angebot</strong> oder <strong>Auftrag</strong> senden.</li>
+  </ol>
+  <h3>Angebot oder Auftrag?</h3>
+  <ul>
+    <li><strong>Angebot senden:</strong> Der Kunde bekommt eine Mail mit den Knöpfen „Angebot annehmen“, „Änderungen anfragen“ und „Wird nicht mehr benötigt“. Der Kalender wird erst bei Annahme geblockt.</li>
+    <li><strong>Auftrag senden:</strong> gilt sofort. Der Kalender wird geblockt, der Kunde bekommt die Bestätigung (mit Zahlungslink, falls gewählt) und einen Kalendereintrag.</li>
+  </ul>
+  <h3>Zahlungsarten</h3>
+  <ul>
+    <li><strong>Zahlungslink:</strong> der Kunde zahlt online im Voraus (Stripe).</li>
+    <li><strong>Im Fahrzeug per Karte:</strong> kein Link, bezahlt wird bei der Fahrt.</li>
+    <li><strong>Auf Rechnung:</strong> kein Link, nach der Fahrt kommt eine Rechnung, zahlbar sofort per Überweisung.</li>
+  </ul>
+  <h3>Kundentypen</h3>
+  <ul>
+    <li><strong>Privat:</strong> eine Person, die bucht und fährt.</li>
+    <li><strong>Firma / Hotel:</strong> buchende Person plus optional ein anderer Fahrgast. Du legst fest, wer zahlt (Firma/Hotel oder der Fahrgast) und ob die Rechnung auf eine Firma ausgestellt wird. Bei Hotels steht das Zimmer in den Bemerkungen.</li>
+    <li><strong>Vermittlung:</strong> siehe „Vermittlungs- und Hotelfahrten“.</li>
+  </ul>
+  <div class="wichtig"><strong>Überschneidung im Kalender</strong>Ist im Zeitraum schon ein Termin eingetragen, fragt die Maske nach, bevor sie trotzdem anlegt. Der bestehende Termin wird dabei nicht verändert.</div>
+  <div class="tipp"><strong>Titel und Sprache</strong>Optional kannst du einen Titel (Dr., Prof. …) eintragen, er erscheint in Anrede, Rechnung und Kalender. Die Sprache (Deutsch/English) gilt für Angebot, Bestätigung, Kundenseiten und die Rechnung.</div>
+</section>
+
+<section class="thema" id="laden" data-gruppe="Aufträge" data-titel="Bestehenden Auftrag laden und ändern">
+  <h2>Bestehenden Auftrag laden und ändern</h2>
+  <p>Ganz oben in „Neuer Auftrag“ gibst du die <strong>Referenz</strong> ein und klickst <strong>Laden</strong>. Die Maske füllt sich mit Route, Zeiten, Gästen, Kundendaten, Preis und Zahlungsart. Ändere, was sich geändert hat, und sende neu: Der bisherige Auftrag wird <strong>ersetzt</strong>, die Kalendereinträge werden neu angelegt. Der Preis und der Terminblocker bleiben, bis du sie änderst.</p>
+  <ul>
+    <li>Ein bestätigter Auftrag bleibt ein Auftrag, ein Angebot bleibt ein Angebot. Der Kunde bekommt nach dem Ersetzen eine neue Mail (bei Vermittlungsfahrten nicht).</li>
+    <li>Rechnungsverlauf, Zahlungsmarkierung, Erstelldatum und Stammkunden-Verknüpfung bleiben erhalten.</li>
+  </ul>
+  <div class="wichtig"><strong>Das lässt sich nicht laden</strong>
+    <ul style="margin:4px 0 0;">
+      <li>Stornierte Aufträge.</li>
+      <li>Aufträge mit gültiger Rechnung: zuerst im Reiter „Rechnung“ eine Stornorechnung erstellen.</li>
+      <li>Aufträge aus dem Online-Buchungsformular: Kontaktdaten und Rechnung änderst du im Portal (Reiter „Auftrag ändern“).</li>
+    </ul>
+  </div>
+</section>
+
+<section class="thema" id="vermittlung" data-gruppe="Aufträge" data-titel="Vermittlungs- und Hotelfahrten">
+  <h2>Vermittlungs- und Hotelfahrten</h2>
+  <p>Für Fahrten, bei denen du den Gast nicht kennst oder nicht mailen kannst: Plattformfahrten (z. B. Welcome Pickups) und spontane Anrufe von Hotels.</p>
+  <h3>Anlegen</h3>
+  <ol>
+    <li>In „Neuer Auftrag“ Route und Zeit eintragen, <strong>Preis berechnen</strong> (er dient für Terminblocker und Festpreis).</li>
+    <li>Kundentyp <strong>Vermittlung</strong> wählen. Bei „Auftraggeber / Plattform“ steht z. B. „Welcome Pickups“ oder der Hotelname. Name, Telefon und E-Mail des Gastes sind <strong>optional</strong> (ohne Namen heißt der Auftrag „Gast“).</li>
+    <li><strong>Preis:</strong> „Offen“ (du trägst ihn nach der Fahrt ein) oder „Festpreis aus der Berechnung“ (Hotelfahrt).</li>
+    <li><strong>Abrechnung:</strong> noch offen, per Karte oder bar bezahlt (mit Betrag). Dann gilt der Auftrag sofort als bezahlt.</li>
+    <li><strong>Fahrt anlegen</strong> klicken.</li>
+  </ol>
+  <p>Der Auftrag ist sofort bestätigt und blockt den Kalender. Der Gast bekommt <strong>keine Mail</strong>. Du bekommst eine <strong>Kopie</strong> an info@langtransfer.de für deinen Mailverlauf.</p>
+  <h3>Nach der Fahrt</h3>
+  <ul>
+    <li>Im Auftrag unter <strong>Auftrag ändern</strong> die E-Mail des Gastes nachtragen (falls bekannt).</li>
+    <li>Entweder im Bereich <strong>Zahlung</strong> als bezahlt markieren (Karte/bar) oder im Reiter <strong>Rechnung</strong> eine Rechnung erzeugen. Dort ist „bereits bezahlt“ vorbelegt, bei Plattformfahrten mit dem Hinweis „Bezahlt über …“.</li>
+    <li>Hat der Gast keine E-Mail, erzeugst du die Rechnung trotzdem und lädst die PDF im Verlauf herunter.</li>
+  </ul>
+  <div class="wichtig"><strong>Steuern und Plattformen</strong>Stellt die Plattform selbst Rechnungen oder Gutschriften aus, würde dieselbe Fahrt doppelt als Umsatz erscheinen. Bei Barzahlungen gelten besondere Aufzeichnungspflichten. Beides klärst du bitte mit deinem Steuerberater.</div>
+</section>
+
+<section class="thema" id="zahlung" data-gruppe="Abrechnung" data-titel="Zahlung und Abrechnungsstatus">
+  <h2>Zahlung und Abrechnungsstatus</h2>
+  <p>Jeder bestätigte Auftrag hat einen Abrechnungsstatus. Du siehst ihn in der Liste und im Auftrag.</p>
+  <table>
+    <tr><th>Status</th><th>Bedeutung</th></tr>
+    <tr><td><span class="badge warn">Offen</span></td><td>Gefahren, aber noch keine Zahlung und keine Rechnung. Zählt unter „Abrechnung offen“.</td></tr>
+    <tr><td><span class="badge warn">Rechnung offen</span></td><td>Eine Überweisungsrechnung ist raus, die Zahlung steht aus. Die Liste zeigt die Tage seit der Rechnung.</td></tr>
+    <tr><td><span class="badge err">Überfällig</span></td><td>Die Überweisungsrechnung ist seit 7 Tagen oder länger offen.</td></tr>
+    <tr><td><span class="badge ok">Bezahlt</span></td><td>Zahlung markiert oder Rechnung „bereits bezahlt“. Mit Zahlungsart: Karte, bar, Überweisung, Zahlungslink, Plattform oder Freifahrt.</td></tr>
+  </table>
+  <h3>Zahlung markieren</h3>
+  <p>Im Auftrag gibt es den Bereich <strong>Zahlung</strong>. Wähle Zahlungsart, Betrag, Datum und optional eine Notiz (z. B. SumUp-Beleg).</p>
+  <ul>
+    <li><strong>Ohne Rechnung:</strong> „Als bezahlt markieren“. Eine Rechnung ist dann nicht nötig, du kannst sie aber jederzeit im Reiter „Rechnung“ erzeugen (Betrag und Zahlungsart sind übernommen).</li>
+    <li><strong>Überweisungsrechnung offen:</strong> Ist das Geld da, klicke „Zahlung eingegangen“. Die Rechnung gilt dann als bezahlt.</li>
+    <li><strong>Zahlungslink:</strong> Das System erkennt Zahlungen per Link nicht automatisch. Prüfe sie in Stripe und markiere sie hier selbst.</li>
+    <li>„Markierung entfernen“ macht die Zahlung rückgängig (bei Rechnungen „bereits bezahlt“ nicht möglich, dort gilt die Rechnung).</li>
+  </ul>
+  <div class="tipp"><strong>Übersicht und Filter</strong>Die Karten „Abrechnung offen“ und „Rechnung offen (davon n überfällig)“ in der Übersicht führen direkt zur gefilterten Liste.</div>
+</section>
+
+<section class="thema" id="rechnung" data-gruppe="Abrechnung" data-titel="Rechnung erstellen, Storno und Korrektur">
+  <h2>Rechnung erstellen, Storno und Korrektur</h2>
+  <p>Öffne den Auftrag und wähle den Reiter <strong>Rechnung</strong>. Rechnungen gibt es nur für <strong>bestätigte</strong> Aufträge.</p>
+  <h3>Rechnungsentwurf</h3>
+  <ul>
+    <li><strong>Sprache</strong> (Deutsch/English) und <strong>Leistungsdatum</strong>.</li>
+    <li><strong>Zahlungsart:</strong> <em>Bereits bezahlt</em> (dann wählst du, wie bezahlt wurde) oder <em>Per Überweisung</em> (zahlbar sofort ohne Abzug, mit Bankverbindung und Girocode auf der Rechnung).</li>
+    <li><strong>Positionen:</strong> Beschreibung, Menge, Einzelpreis (brutto) und USt-Satz (19 %, 7 % oder 0 %) je Position. Der Fahrpreis ist vorgegeben. Du kannst ihn ändern und weitere Positionen hinzufügen („+ Position“, „+ Trinkgeld“): Wartezeit, Trinkgeld, Auslagen oder einen Rabatt als Position mit negativem Preis. Netto und USt werden je Steuersatz ausgerechnet, die Summen laufen live mit.</li>
+    <li><strong>Hinweis</strong> (optional) erscheint auf der Rechnung.</li>
+  </ul>
+  <h3>Vorschau, Erzeugen, Versand</h3>
+  <ol>
+    <li><strong>Vorschau (PDF)</strong> zeigt die Rechnung ohne Nummer. Sie verbraucht keine Rechnungsnummer.</li>
+    <li><strong>Rechnung erzeugen</strong> vergibt die fortlaufende Nummer (LT-Jahr-Nr.) und verschickt die PDF per Mail an den Kunden (mit Kopie an dich), solange der Haken „Rechnung per E-Mail an den Kunden senden“ gesetzt ist.</li>
+    <li>Im <strong>Verlauf</strong> siehst du alle Rechnungen und Stornorechnungen des Auftrags. „PDF“ öffnet sie, „Erneut senden“ schickt dieselbe Rechnung noch einmal (gleicher Inhalt, keine neue Nummer).</li>
+  </ol>
+  <h3>Eine Rechnung korrigieren</h3>
+  <p>Ausgestellte Rechnungen werden <strong>nie überschrieben</strong>. So korrigierst du:</p>
+  <ol>
+    <li>Im Reiter „Rechnung“ <strong>Stornorechnung erstellen</strong>. Sie bekommt eine eigene Nummer, hebt die Rechnung auf und geht (auf Wunsch) per Mail an den Kunden.</li>
+    <li>Der Entwurf ist danach mit der stornierten Rechnung vorbelegt. Ändere, was nötig ist, und erzeuge die neue Rechnung.</li>
+  </ol>
+  <h3>Gut zu wissen</h3>
+  <ul>
+    <li><strong>Ohne E-Mail im Auftrag</strong> lässt sich die Rechnung erzeugen, aber nicht verschicken. Lade die PDF im Verlauf herunter.</li>
+    <li>Bei Rechnungen über <strong>250 € brutto</strong> muss die Anschrift des Empfängers auf der Rechnung stehen. Der Entwurf weist darauf hin, falls sie fehlt (nachtragen unter „Auftrag ändern“).</li>
+    <li>Der <strong>Girocode</strong> (QR-Code für die Banking-App) steht nur auf Überweisungsrechnungen mit hinterlegter Bankverbindung.</li>
+    <li>Eine Rechnung über 0 € gibt es nicht. Eine komplett kostenlose Freifahrt braucht keine Rechnung.</li>
+  </ul>
+</section>
+
+<section class="thema" id="auftrag-aendern" data-gruppe="Abrechnung" data-titel="Auftrag ändern (Kontaktdaten, Adresse, Sprache)">
+  <h2>Auftrag ändern: Kontaktdaten, Adresse, Sprache</h2>
+  <p>Im Reiter <strong>Auftrag ändern</strong> korrigierst du Anrede, Titel, Name, E-Mail, Telefon, Rechnungsadresse, „Rechnung auf Firma“ (Firma, Ansprechpartner, Abteilung, Kostenstelle) und die Sprache. Der Kalendereintrag wird automatisch angepasst.</p>
+  <ul>
+    <li>Aus einer Privatbuchung machst du eine Firmenrechnung, indem du „Rechnung auf Firma“ aktivierst und die Firma einträgst.</li>
+    <li><strong>Nach einer Rechnung</strong> ist alles gesperrt, was auf der Rechnung steht (Name, Adresse, Titel, Rechnungsfirma, Sprache). Nur E-Mail und Telefon bleiben änderbar. Für alles andere erstellst du zuerst eine Stornorechnung.</li>
+    <li>Route und Zeit änderst du über „Neuer Auftrag“ mit „Laden“ (siehe dort).</li>
+  </ul>
+</section>
+
+<section class="thema" id="stornieren" data-gruppe="Abrechnung" data-titel="Aufträge und Angebote stornieren">
+  <h2>Aufträge und Angebote stornieren</h2>
+  <table>
+    <tr><th>Was</th><th>Was passiert</th></tr>
+    <tr><td>Angebot stornieren (du)</td><td>Der Auftrag wird storniert, der Kunde bekommt <strong>keine Mail</strong>.</td></tr>
+    <tr><td>Bestätigten Auftrag stornieren</td><td>Der Kunde bekommt eine Stornomail, der Kalendertermin wird gelöscht.</td></tr>
+    <tr><td>Neue Online-Anfrage ablehnen („Ablehnen“ in deiner Mail oder im Portal)</td><td>Der Auftrag wird wie eine Stornierung behandelt: Der Kunde bekommt die Stornomail, ein vorhandener Kalendertermin wird gelöscht.</td></tr>
+    <tr><td>Kunde klickt „Wird nicht mehr benötigt“</td><td>Das Angebot ist erledigt, du siehst es in der Liste als „Storniert“.</td></tr>
+  </table>
+  <div class="wichtig"><strong>Auftrag mit Rechnung</strong>Eine gültige Rechnung bleibt bei einer Stornierung bestehen. Erstelle im Reiter „Rechnung“ zusätzlich die Stornorechnung, wenn nicht gefahren wird.</div>
+</section>
+
+<section class="thema" id="stammkunden" data-gruppe="Stammkunden" data-titel="Stammkunden und Stammfahrten">
+  <h2>Stammkunden und Stammfahrten</h2>
+  <p>Ein Stammkunde speichert Kundendaten und <strong>Stammfahrten</strong> (Route plus Festpreis). So gibst du bei wiederkehrenden Fahrten nur noch Datum und Uhrzeit ein.</p>
+  <h3>Stammkunde anlegen</h3>
+  <ul>
+    <li><strong>Aus einem Auftrag:</strong> Im Auftrag im Bereich „Stammkunde“ auf <strong>Als Stammkunde speichern</strong> klicken und den Namen bestätigen. Kunde, Rechnungsdaten, Sprache, Zahlungsart und die Route mit ihrem Preis werden übernommen.</li>
+    <li><strong>Direkt beim Anlegen:</strong> In „Neuer Auftrag“ vor dem Senden „Kunde und Route als Stammkunde speichern“ anhaken.</li>
+    <li><strong>Menü Stammkunden:</strong> Referenz eingeben und „Als Stammkunde speichern“.</li>
+  </ul>
+  <h3>Verwalten (Menü „Stammkunden“)</h3>
+  <ul>
+    <li>Name und interne Notiz ändern, Stammfahrten umbenennen, Preise anpassen (leer = wird berechnet), Stammfahrten entfernen.</li>
+    <li>Weitere Route hinzufügen: Referenz eines passenden Auftrags eingeben. Dabei werden auch die Kundendaten aus diesem Auftrag übernommen.</li>
+    <li>Im Auftrag aktualisiert „Daten und Route in den Stammkunden übernehmen“ den Stammkunden.</li>
+    <li>Archivieren deaktiviert die Zehnerkarte und ihren Link. Aufträge bleiben unverändert.</li>
+  </ul>
+  <h3>Fahrt für einen Stammkunden anlegen</h3>
+  <ol>
+    <li>In „Neuer Auftrag“ bei <strong>Stammkunde wählen</strong> den Kunden auswählen, dann die Stammfahrt.</li>
+    <li><strong>Übernehmen</strong> füllt die Maske mit Kunde, Route, Festpreis, Zahlungsart und Sprache.</li>
+    <li>Datum und Uhrzeit (bei Hin-/Rückfahrt auch die Rückfahrt) eingeben, <strong>Preis berechnen</strong>, senden. Der Festpreis bleibt, bis du ihn änderst.</li>
+  </ol>
+  <div class="tipp"><strong>Hotels</strong>Bei Hotel-Stammkunden bleibt der Name des Hotelgasts leer, weil er bei jeder Fahrt ein anderer ist. Du trägst ihn beim Anlegen ein.</div>
+</section>
+
+<section class="thema" id="zehnerkarte" data-gruppe="Stammkunden" data-titel="Digitale Zehnerkarte und Freifahrt">
+  <h2>Digitale Zehnerkarte und Freifahrt</h2>
+  <p>Stammkunden sammeln Stempel. <strong>Nach 10 Fahrten ist die nächste Fahrt kostenfrei.</strong></p>
+  <h3>Die Regeln</h3>
+  <ul>
+    <li><strong>Ein Stempel</strong> ist ein gefahrener, nicht stornierter Auftrag des Stammkunden. Eine Hin- und Rückfahrt ist <strong>eine</strong> Fahrt. Ein Auftrag zählt, sobald auch seine letzte Fahrt vorbei ist.</li>
+    <li><strong>Der Wert der Freifahrt</strong> ist der Mittelwert der 10 Fahrten, die sie verdient haben (Rechnungsbetrag, sonst bezahlter Betrag, sonst Auftragspreis). Er wird als Gutschrift vom Fahrpreis abgezogen. Kostet die Fahrt weniger, ist sie komplett kostenlos (Gutschrift nur in Höhe des Fahrpreises).</li>
+    <li>Der Stempelstand wird aus den Aufträgen berechnet, du pflegst nichts doppelt. Zählen nur Aufträge, die einem Stammkunden zugeordnet sind (siehe „Stammkunden“).</li>
+  </ul>
+  <h3>Freifahrt einlösen</h3>
+  <p>Wählst du in „Neuer Auftrag“ einen Stammkunden mit voller Karte, erscheint <strong>Freifahrt einlösen (Gutschrift Ø … €)</strong>. Nach „Preis berechnen“ zeigt die Maske den Preis nach der Gutschrift. Beim Senden zieht das System die Gutschrift ab.</p>
+  <ul>
+    <li>Im Auftrag steht „Freifahrt (Zehnerkarte): Gutschrift … auf …“. Die Rechnung enthält Fahrpreis und die Position „Zehnerkarte: Freifahrt-Gutschrift“.</li>
+    <li>Ist die Fahrt komplett kostenlos, gibt es keinen Zahlungslink, und der Auftrag gilt als „Bezahlt · Freifahrt“. Eine Rechnung ist nicht nötig.</li>
+    <li>Wird der Freifahrt-Auftrag storniert, ist die Freifahrt wieder verfügbar. Danach beginnt die Karte von vorn.</li>
+  </ul>
+  <h3>Was der Kunde sieht</h3>
+  <ul>
+    <li>Einen <strong>persönlichen Link</strong> (Seite „karte.html“) mit Stempelstand, verfügbarer Freifahrt, den gesammelten Fahrten (Datum und Strecke, keine Preise) und den Regeln, auf Deutsch und Englisch.</li>
+    <li>Der Link und der Stempelstand stehen in der <strong>Bestätigung</strong> und in der <strong>Rechnung</strong> (Mail und PDF).</li>
+    <li>Den Link findest du im Menü „Stammkunden“ beim Kunden. Dort kannst du ihn kopieren oder mit „Neuer Link“ ersetzen (der alte funktioniert dann nicht mehr). Mit dem Haken „Zehnerkarte aktiv“ schaltest du die Karte je Kunde ein oder aus.</li>
+  </ul>
+  <div class="wichtig"><strong>Steuern</strong>Eine Freifahrt gilt steuerlich meist als Rabatt auf die zehn vorherigen Fahrten. Wie du sie buchst (z. B. Beleg über 0 €), klärst du mit deinem Steuerberater.</div>
+</section>
+
+<section class="thema" id="krankenfahrten" data-gruppe="Weitere Funktionen" data-titel="Krankenfahrten">
+  <h2>Krankenfahrten</h2>
+  <p>Für nicht liegende Krankenfahrten mit Abrechnung über die gesetzlichen Krankenkassen (z. B. Dialyse, Chemotherapie).</p>
+  <ul>
+    <li><strong>Terminserie anlegen:</strong> Patient, Krankenkasse (mit Suchvorschlägen), Anlass, Route und die Termine. Die Maske prüft den Kalender vorab und zeigt Überschneidungen.</li>
+    <li><strong>Preis:</strong> Grundpreis plus Preis je Besetzt-Kilometer nach der vereinbarten Preisliste (mit Mindestpreis). Abgerechnet werden nur die Kilometer mit Patient. Anfahrt und Rückkehr werden für den Kalender eingerechnet, aber nicht berechnet.</li>
+    <li><strong>Zuzahlung:</strong> 10 % des Fahrpreises, mindestens 5 €, höchstens 10 € je Fahrt (ohne Befreiung). Hin- und Rückfahrt zählen einzeln.</li>
+    <li>Der Patient bekommt eine Terminbestätigung. Pro Fahrt gibt es eine Zuzahlungsrechnung. Die Übersicht zeigt offene Zuzahlungen.</li>
+  </ul>
+  <div class="wichtig"><strong>Datenschutz</strong>Gesundheitsdaten brauchen die Einwilligung des Patienten. Die Maske verlangt sie, das Datum wird im Auftrag gespeichert.</div>
+</section>
+
+<section class="thema" id="mails" data-gruppe="Weitere Funktionen" data-titel="Welche Mails verschickt das System?">
+  <h2>Welche Mails verschickt das System?</h2>
+  <table>
+    <tr><th>Anlass</th><th>An wen</th></tr>
+    <tr><td>Neue Online-Buchung</td><td>Kunde (Zusammenfassung), du (mit Knöpfen Bestätigen, Ablehnen, Rechnung)</td></tr>
+    <tr><td>Angebot senden</td><td>Kunde (mit 3 Knöpfen), Kopie an dich</td></tr>
+    <tr><td>Auftrag senden / Angebot angenommen</td><td>Kunde (Bestätigung, Kalenderdatei, ggf. Zahlungslink, Zehnerkarte), du</td></tr>
+    <tr><td>Vermittlungsfahrt angelegt</td><td>nur du (Kopie), <strong>nie</strong> der Gast</td></tr>
+    <tr><td>Rechnung / Stornorechnung</td><td>Kunde (PDF), Kopie an dich</td></tr>
+    <tr><td>Anfrage ablehnen oder bestätigten Auftrag stornieren</td><td>Kunde (Stornomail)</td></tr>
+    <tr><td>Angebot von dir storniert</td><td>niemand</td></tr>
+  </table>
+  <ul>
+    <li>Vermittlungsfahrten ohne E-Mail-Adresse lösen keine Kundenmail aus. Eine Rechnung lässt sich dann trotzdem erzeugen, aber nicht per Mail verschicken (PDF im Verlauf herunterladen).</li>
+    <li>Die Sprache der Kundenmails richtet sich nach der Sprache des Auftrags. Deine Mails an dich sind deutsch. Die Kalenderdatei im Anhang ist bisher immer deutsch.</li>
+    <li>Die „Rechnung erzeugen“-Knöpfe in deinen Mails öffnen den Reiter „Rechnung“ im Portal (Anmeldung nötig).</li>
+  </ul>
+</section>
+
+<section class="thema" id="kalender" data-gruppe="Weitere Funktionen" data-titel="Kalender und Terminblocker">
+  <h2>Kalender und Terminblocker</h2>
+  <ul>
+    <li>Jeder bestätigte Auftrag blockt im Kalender den Zeitraum <strong>Anfahrt + Fahrt mit Gast + Rückkehr</strong>. Bei Hin- und Rückfahrt gibt es zwei Blöcke.</li>
+    <li>Die Maske berechnet die Blöcke aus der Route. Du kannst Start und Ende vor dem Senden anpassen.</li>
+    <li>Vor dem Senden wird der Kalender geprüft. Bei einer Überschneidung nennt die Maske die kollidierenden Termine und fragt, ob du trotzdem anlegen willst.</li>
+    <li>Beim Stornieren oder Ersetzen eines Auftrags werden die alten Kalendereinträge entfernt.</li>
+    <li>Vermittlungsfahrten erscheinen mit der Plattform im Titel (z. B. „Hotel Adler: Gast – Stuttgart → …“).</li>
+  </ul>
+</section>
+
+<section class="thema" id="ablaeufe" data-gruppe="Hilfe" data-titel="Typische Abläufe">
+  <h2>Typische Abläufe</h2>
+  <h3>Online-Anfrage kommt rein</h3>
+  <p>Mail prüfen, im Portal unter „Aufträge“ öffnen (Filter „Neue Anfragen“), <strong>Bestätigen</strong> oder <strong>Ablehnen</strong>. Nach der Fahrt: Zahlung markieren oder Rechnung erzeugen.</p>
+  <h3>Kunde ruft an (Privat oder Firma)</h3>
+  <p>„Neuer Auftrag“, Route und Zeit, Preis berechnen, Kunde eintragen, <strong>Auftrag senden</strong>. Ist es ein Stammkunde, wählst du ihn vorher aus.</p>
+  <h3>Hotel ruft an, Gast unbekannt</h3>
+  <p>Kundentyp „Vermittlung“ mit dem Hotel als Auftraggeber, Festpreis, bei Bezahlung im Fahrzeug gleich „Karte“ oder „bar“ markieren. Keine Mail an den Gast.</p>
+  <h3>Plattformfahrt (Welcome Pickups)</h3>
+  <p>Fahrt als Vermittlung mit offenem Preis anlegen. Nach der Fahrt Preis und E-Mail eintragen, Rechnung „bereits bezahlt“ mit Hinweis „Bezahlt über Welcome Pickups“.</p>
+  <h3>Kunde will etwas ändern (Zeit, Route)</h3>
+  <p>„Neuer Auftrag“, Referenz eingeben, <strong>Laden</strong>, ändern, neu senden. Hat der Auftrag schon eine Rechnung, erst die Stornorechnung erstellen.</p>
+  <h3>Kunde hat zu viel oder zu wenig berechnet bekommen</h3>
+  <p>Reiter „Rechnung“: Stornorechnung erstellen, Entwurf mit den richtigen Positionen füllen, neue Rechnung erzeugen.</p>
+  <h3>Geld ist auf dem Konto</h3>
+  <p>Im Auftrag unter „Zahlung“ <strong>Zahlung eingegangen</strong> klicken (Betrag und Datum prüfen).</p>
+  <h3>Stammkunde fährt wieder</h3>
+  <p>„Neuer Auftrag“, Stammkunde und Stammfahrt wählen, Übernehmen, Datum und Uhrzeit eingeben, senden. Bei voller Zehnerkarte „Freifahrt einlösen“ anhaken.</p>
+</section>
+
+<section class="thema" id="faq" data-gruppe="Hilfe" data-titel="Häufige Fragen und Meldungen">
+  <h2>Häufige Fragen und Meldungen</h2>
+  <h3>„Bitte zuerst im Portal anmelden“</h3>
+  <p>Die Seite hat kein Passwort. Melde dich im Portal an und öffne die Seite von dort. Die Anmeldung gilt nur im selben Browser.</p>
+  <h3>„Eine Rechnung ist nur bei bestätigten Aufträgen möglich“</h3>
+  <p>Bestätige den Auftrag zuerst (Angebot annehmen lassen oder als Auftrag neu senden).</p>
+  <h3>„Zu diesem Auftrag gibt es bereits die Rechnung …“</h3>
+  <p>Pro Auftrag gibt es eine gültige Rechnung. Zum Ändern zuerst eine Stornorechnung erstellen.</p>
+  <h3>Die Zahlung per Zahlungslink steht nicht auf „Bezahlt“</h3>
+  <p>Zahlungen per Link erkennt das System nicht von selbst. Prüfe sie in Stripe und markiere sie im Bereich „Zahlung“.</p>
+  <h3>Warum fehlt ein Auftrag in der Liste?</h3>
+  <p>Prüfe den Filter (stornierte sind ausgeblendet) und den Zeitfilter. Die Suche findet auch Referenz und Rechnungsnummer.</p>
+  <h3>Die Seite zeigt noch den alten Stand</h3>
+  <p>Seite hart neu laden (Mac: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>, Windows: <kbd>Strg</kbd>+<kbd>F5</kbd>).</p>
+  <h3>Die Rechnung lässt sich nicht erzeugen („Bankverbindung fehlt“)</h3>
+  <p>Für Überweisungsrechnungen muss die IBAN in <code>index.js</code> hinterlegt sein (siehe „Technik und Betrieb“).</p>
+  <h3>Der Stammkunde taucht in „Neuer Auftrag“ nicht auf</h3>
+  <p>Die Liste lädt beim Öffnen der Seite. Lade die Seite neu. Archivierte Stammkunden erscheinen nicht.</p>
+</section>
+
+<section class="thema" id="technik" data-gruppe="Hilfe" data-titel="Technik und Betrieb">
+  <h2>Technik und Betrieb</h2>
+  <h3>Dateien</h3>
+  <table>
+    <tr><th>Datei</th><th>Zweck</th></tr>
+    <tr><td><code>portal.html</code></td><td>Das Portal (Menü, Liste, Auftragsansicht)</td></tr>
+    <tr><td><code>kalkulator2.html</code></td><td>„Neuer Auftrag“ (im Portal eingebettet)</td></tr>
+    <tr><td><code>rechnung.html</code>, <code>auftrag.html</code>, <code>krankenfahrt.html</code>, <code>stammkunden.html</code>, <code>handbuch.html</code></td><td>Eingebettete Masken des Portals</td></tr>
+    <tr><td><code>karte.html</code></td><td>Öffentliche Zehnerkarte der Kunden (per persönlichem Link)</td></tr>
+    <tr><td><code>buchen.html</code>, <code>booking-en.html</code></td><td>Öffentliches Buchungsformular (Deutsch/Englisch)</td></tr>
+    <tr><td><code>index.js</code></td><td>Das Backend (Firebase Functions)</td></tr>
+  </table>
+  <p>Der frühere Kalkulator (<code>kalkulator.html</code>) wird nicht mehr gebraucht und kann gelöscht werden.</p>
+  <h3>Einspielen von Änderungen</h3>
+  <ol>
+    <li>Seiten (HTML-Dateien) ins GitHub-Repo legen. Netlify veröffentlicht sie automatisch. Danach die Seite hart neu laden.</li>
+    <li>Backend: im Terminal in den <strong>Projektordner</strong> wechseln (dort liegen <code>firebase.json</code> und der Ordner <code>functions</code>) und ausführen: <code>firebase deploy --only functions</code>.</li>
+    <li>Welche Reihenfolge sinnvoll ist, steht bei der jeweiligen Änderung. Oft zuerst das Backend, wenn die neue Seite es braucht.</li>
+  </ol>
+  <h3>Einmalige Einrichtung</h3>
+  <ul>
+    <li><strong>Pakete:</strong> im Ordner <code>functions</code> einmal <code>npm install</code> (u. a. <code>pdfkit</code> für Rechnungen, <code>qrcode</code> für den Girocode). Fehlt <code>qrcode</code>, werden Rechnungen ohne Girocode erzeugt.</li>
+    <li><strong>Secrets:</strong> <code>ADMIN_PASSWORT</code> (Portalpasswort), <code>IONOS_MAIL_PASSWORT</code>, <code>STRIPE_SECRET_KEY</code>, <code>BUCHUNG_AKTION_SECRET</code>, <code>CALENDAR_SERVICE_ACCOUNT_KEY</code>. Setzen mit <code>firebase functions:secrets:set NAME</code>.</li>
+    <li><strong>Bankverbindung:</strong> in <code>index.js</code> unter <code>RECHNUNG_BANK</code> (Kontoinhaber, IBAN, BIC, Bank). Die IBAN wird auf Tippfehler geprüft.</li>
+    <li><strong>Rechnungsnummern:</strong> Firestore, Sammlung <code>rechnungszaehler</code>, Dokument je Jahr (z. B. <code>2026</code>) mit dem Zahlenfeld <code>naechsteNummer</code> (Startwert). Zum Jahreswechsel legst du das neue Jahr an, sonst meldet das System „Kein Rechnungsnummern-Zähler … angelegt“.</li>
+    <li><strong>Überfällig-Grenze:</strong> <code>UEBERFAELLIG_NACH_TAGEN</code> in <code>index.js</code> (derzeit 7 Tage).</li>
+    <li><strong>Zehnerkarte:</strong> Anzahl der Fahrten in <code>ZEHNERKARTE_FAHRTEN</code> (derzeit 10), Adresse der Kundenseite in <code>KARTE_URL</code>.</li>
+  </ul>
+  <div class="tipp"><strong>Sicherheit</strong>Die internen Seiten sind per Passwort geschützt, die Funktionen prüfen es bei jedem Aufruf. Die Zehnerkarte der Kunden ist nur über den langen, zufälligen Link erreichbar und enthält keine Kontaktdaten.</div>
+</section>
+</main>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const sektionen = [...document.querySelectorAll("section.thema")];
+// Inhaltsverzeichnis aus den Abschnitten bauen (nach Gruppen)
+(function inhalt(){
+  const nav = $("inhalt"); let gruppe = "";
+  nav.innerHTML = sektionen.map((s) => { const g = s.dataset.gruppe; const kopf = g !== gruppe ? `<div class="gruppe">${g}</div>` : ""; gruppe = g; return `${kopf}<a href="#${s.id}" data-id="${s.id}">${s.dataset.titel}</a>`; }).join("");
+})();
+// Suche ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute: "überfällig", "ueberfaellig" und "uberfallig" finden dasselbe
+const norm = (t) => String(t).toLowerCase().replace(/ß/g, "ss").normalize("NFD").replace(/[\u0300-\u036f]/g, "");   // ü -> u
+const ohneE = (t) => t.replace(/ae/g, "a").replace(/oe/g, "o").replace(/ue/g, "u");                                    // ue -> u
+const texte = new Map(sektionen.map((s) => [s.id, norm(s.textContent)]));
+function suchen(){
+  const q = norm($("suche").value.trim());
+  const worte = q.split(/\s+/).filter(Boolean);
+  let treffer = 0;
+  sektionen.forEach((s) => {
+    const passt = !worte.length || worte.every((w) => texte.get(s.id).includes(w) || texte.get(s.id).includes(ohneE(w)));
+    s.style.display = passt ? "" : "none";
+    document.querySelector(`#inhalt a[data-id="${s.id}"]`).style.display = passt ? "" : "none";
+    if (passt) treffer++;
+  });
+  $("leer").style.display = treffer ? "none" : "block";
+  $("trefferInfo").textContent = worte.length ? `${treffer} von ${sektionen.length} Abschnitten enthalten „${$("suche").value.trim()}“.` : "";
+}
+$("suche").addEventListener("input", suchen);
+// Aktuellen Abschnitt im Inhaltsverzeichnis markieren
+const beobachter = new IntersectionObserver((eintraege) => { eintraege.forEach((e) => { if (e.isIntersecting) { document.querySelectorAll("#inhalt a").forEach((a) => a.classList.toggle("aktiv", a.dataset.id === e.target.id)); } }); }, { rootMargin: "-10% 0px -70% 0px" });
+sektionen.forEach((s) => beobachter.observe(s));
+// Sprung zu einem Abschnitt (aus dem Portal: handbuch.html#rechnung)
+if (location.hash) { const ziel = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (ziel) setTimeout(() => ziel.scrollIntoView(), 50); }
+</script>
+<script>
+  (function () {
+    if (!document.documentElement.classList.contains("embedded") || window.parent === window) return;
+    var melden = function () { window.parent.postMessage({ type: "lt-hoehe", hoehe: document.documentElement.scrollHeight }, "*"); };
+    if (window.ResizeObserver) new ResizeObserver(melden).observe(document.body);
+    window.addEventListener("load", melden); melden();
+  })();
+</script>
+</body>
+</html>

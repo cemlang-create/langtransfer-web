@@ -138,8 +138,8 @@ function zeitText(iso, mitJahr){
   if (!iso) return "–";
   return new Date(iso).toLocaleString("de-DE", Object.assign({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, mitJahr ? { year: "numeric" } : {}));
 }
-const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
-const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform" };
+const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", freifahrt: "Freifahrt", unbekannt: "Zahlungsart unbekannt" };
+const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform", freifahrt: "als Freifahrt (Zehnerkarte)" };
 const STATUS = {
   angefragt: { text: "Neue Anfrage", cls: "warn" },
   angebot: { text: "Angebot offen", cls: "blau" },
@@ -202,6 +202,8 @@ const MENUE = [
   { pfad: "auftraege", text: "Aufträge", modul: "auftraege" },
   { pfad: "neu", text: "Neuer Auftrag", modul: "neuerAuftrag" },
   { pfad: "krankenfahrten", text: "Krankenfahrten", modul: "krankenfahrten" },
+  { pfad: "stammkunden", text: "Stammkunden", modul: "stammkunden" },
+  { pfad: "handbuch", text: "Handbuch", modul: "handbuch" },
   { pfad: "einstellungen", text: "Einstellungen", modul: "einstellungen" }
 ];
 function navAufbauen(){
@@ -231,6 +233,8 @@ function route(){
   if (abschnitt === "auftrag" && teile[1] && sichtbar("auftraege")) return ansichtAuftrag(teile[1], noch, params);
   if (abschnitt === "neu" && sichtbar("neuerAuftrag")) return ansichtRahmen("Neuer Auftrag", "Preis berechnen und Angebot oder Auftrag an den Kunden senden.", "kalkulator2.html?embedded=1", true);
   if (abschnitt === "krankenfahrten" && sichtbar("krankenfahrten")) return ansichtRahmen("Krankenfahrten", "Terminserien anlegen, Bestätigung senden, Zuzahlungsrechnungen je Fahrt.", "krankenfahrt.html?embedded=1", true);
+  if (abschnitt === "stammkunden" && sichtbar("stammkunden")) return ansichtRahmen("Stammkunden", "Kunden mit festen Fahrten und digitaler Zehnerkarte.", "stammkunden.html?embedded=1" + (params.get("id") ? "&id=" + encodeURIComponent(params.get("id")) : ""), true);
+  if (abschnitt === "handbuch" && sichtbar("handbuch")) return ansichtRahmen("Handbuch", "Anleitungen zu allen Funktionen des Portals.", "handbuch.html?embedded=1" + (params.get("thema") ? "#" + encodeURIComponent(params.get("thema")) : ""), true);
   return ansichtUebersicht(noch);
 }
 window.addEventListener("hashchange", route);
@@ -322,7 +326,7 @@ async function ansichtAuftraege(params, noch){
         return true;
       });
       fahrten.sort((x, y) => (d.aufsteigend ? (x.zeit || "").localeCompare(y.zeit || "") : (y.zeit || "").localeCompare(x.zeit || "")));
-      const ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
+      const ART = ZAHLUNG_ART;
       const abrechnungZelle = (r) => {
         const ab = r.abrechnung || {};
         if (r.status !== "bestaetigt") return `<span class="klein">–</span>`;
@@ -335,8 +339,8 @@ async function ansichtAuftraege(params, noch){
       $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
         fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; return `<tr data-ref="${esc(r.referenz)}"${zweite ? ' data-fahrt="rueck"' : ""}>
           <td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
-          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div></td>
-          <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}</td>
+          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
+          <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
           <td>${esc(f.von)} → ${esc(f.nach)}</td>
           <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
           <td>${zweite ? '<span class="klein">wie Hinfahrt</span>' : abrechnungZelle(r)}</td>
@@ -386,6 +390,13 @@ async function ansichtAuftrag(referenz, noch, params){
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
+      // Stammkunde: aus diesem Auftrag anlegen bzw. Daten und Route in den bestehenden Stammkunden übernehmen
+      const stammkundeKarte = d.status !== "storniert" ? `<div class="rahmenkarte" id="stammkundeKarte" style="padding-bottom:16px;"><h3>Stammkunde</h3>` + (d.stammkundeId
+        ? `<p style="margin:8px 0 4px;">★ Stammkunde: <a href="#/stammkunden?id=${encodeURIComponent(d.stammkundeId)}"><strong>${esc(d.stammkundeName || "")}</strong></a></p>
+           <div class="klein">Die Fahrten dieses Auftrags zählen für die Zehnerkarte. Hat sich etwas geändert, übernimmst du Kundendaten und Route in den Stammkunden.</div>
+           <div class="zeile"><button type="button" class="knopf" id="skAktualisieren">Daten und Route in den Stammkunden übernehmen</button></div>`
+        : `<div class="klein" style="margin:6px 0 4px;">Bleibt bei diesem Kunden vieles gleich (Name, Adresse, Route, Preis)? Dann speichere ihn als Stammkunden: Er bekommt eine digitale Zehnerkarte, und du wählst ihn in „Neuer Auftrag“ aus.</div>
+           <div class="zeile"><button type="button" class="knopf gold" id="skAnlegen">Als Stammkunde speichern</button></div>`) + `<div class="klein" id="skMeldung" style="margin-top:6px;"></div></div>` : "";
       const knoepfe = [];
       if (d.status === "angefragt") { knoepfe.push(["bestaetigen", "Bestätigen", "gold"]); knoepfe.push(["ablehnen", "Ablehnen", "rot"]); }
       if (d.status === "bestaetigt") { knoepfe.push(["ablehnen", "Stornieren", "rot"]); }
@@ -395,10 +406,11 @@ async function ansichtAuftrag(referenz, noch, params){
         <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
           ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.von)} → ${esc(f.nach)}<br>
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) + (f.rueckfahrt ? " (inkl. Rückfahrt)" : "") : ""}
-          ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.von)} → ${esc(f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
+          ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.von)} → ${esc(f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
         ${abrechnungKarte}
+        ${stammkundeKarte}
         ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">Rechnung${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
         <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
           ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
@@ -426,6 +438,21 @@ async function ansichtAuftrag(referenz, noch, params){
         $("abBtn").disabled = true; abMeldung("Wird gespeichert …");
         try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() } }); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
+      });
+      const skMeldung = (t, fehler) => { const e = $("skMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
+      if ($("skAnlegen")) $("skAnlegen").addEventListener("click", async () => {
+        const vorschlag = d.vermittlung ? "" : ((d.kunde && (d.kunde.firmenname || d.kunde.name)) || "");
+        const name = prompt("Name des Stammkunden:", vorschlag);
+        if (name === null) return;
+        $("skAnlegen").disabled = true; skMeldung("Wird gespeichert …");
+        try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, name: name.trim() }); await laden(); }
+        catch (e) { skMeldung(e.message, true); $("skAnlegen").disabled = false; }
+      });
+      if ($("skAktualisieren")) $("skAktualisieren").addEventListener("click", async () => {
+        $("skAktualisieren").disabled = true; skMeldung("Wird übernommen …");
+        try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, stammkundeId: d.stammkundeId }); skMeldung("✓ Kundendaten und Route sind im Stammkunden gespeichert."); }
+        catch (e) { skMeldung(e.message, true); }
+        finally { $("skAktualisieren").disabled = false; }
       });
       if ($("abAufheben")) $("abAufheben").addEventListener("click", async () => {
         if (!confirm("Die Markierung „bezahlt“ entfernen? Der Auftrag gilt danach wieder als offen.")) return;
