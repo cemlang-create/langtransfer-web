@@ -287,10 +287,29 @@ async function ansichtAuftraege(params, noch){
       <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Abrechnung offen", status)}${opt("rechnung_offen", "Rechnung offen", status)}${opt("ueberfaellig", "Überfällig", status)}${opt("bezahlt", "Bezahlt", status)}${opt("storniert", "Storniert", status)}</select>
       <select id="fZeit">${opt("alle", "Alle Zeiten", zeit)}${opt("kommend", "Kommende", zeit)}${opt("vergangen", "Vergangene", zeit)}</select>
     </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">
+      <button type="button" class="knopf" id="aufraeumenBtn">Aufträge aufräumen</button>
+      <span id="aufraeumenLeiste" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span id="auswahlZahl" class="klein">0 ausgewählt</span>
+        <button type="button" class="knopf" id="stornoAuswahlBtn" disabled>Still stornieren</button>
+        <button type="button" class="knopf" id="loeschenAuswahlBtn" disabled style="color:var(--err);">Endgültig löschen</button>
+      </span>
+    </div>
+    <div class="klein" id="aufraeumenMeldung" style="margin:0 0 8px;min-height:1.2em;"></div>
     <div id="listeBox"><div class="laden">Wird geladen …</div></div>`;
   let abfrageNr = 0;
+  let aufraeumen = false, letzteListe = [];
+  const auswahl = new Set();   // ausgewählte Aufträge (Dokument-ID, geht auch bei alten Aufträgen ohne Referenz)
+  const meldung = (t, fehler) => { const e = $("aufraeumenMeldung"); e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; };
+  function auswahlAnzeigen(){
+    $("auswahlZahl").textContent = `${auswahl.size} ausgewählt`;
+    $("stornoAuswahlBtn").disabled = $("loeschenAuswahlBtn").disabled = auswahl.size === 0;
+    const alle = [...document.querySelectorAll("#listeBox .auswahl")];
+    const kopf = $("alleWaehlen"); if (kopf) kopf.checked = alle.length > 0 && alle.every((c) => c.checked);
+  }
   const aktuell = () => ({ status: $("fStatus").value, zeit: $("fZeit").value, suche: $("fSuche").value.trim() });
   const neuLaden = () => {
+    auswahl.clear(); auswahlAnzeigen();
     const a = aktuell(), p = new URLSearchParams();
     if (a.status !== "alle") p.set("status", a.status);
     if (a.zeit !== "alle") p.set("zeit", a.zeit);
@@ -336,9 +355,9 @@ async function ansichtAuftraege(params, noch){
         return ab.faellig ? `<span class="badge warn">Offen</span><div class="klein">${art}</div>` : `<div class="klein">${art}</div>`;
       };
       const beinText = { hin: "Hinfahrt", rueck: "Rückfahrt" };
-      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
-        fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; return `<tr data-ref="${esc(r.referenz)}"${zweite ? ' data-fahrt="rueck"' : ""}>
-          <td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
+      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr>${aufraeumen ? '<th style="width:30px;"><input type="checkbox" id="alleWaehlen" title="Alle sichtbaren auswählen"></th>' : ""}<th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
+        fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; return `<tr data-ref="${esc(r.referenz)}" data-id="${esc(r.id)}"${zweite ? ' data-fahrt="rueck"' : ""}>
+          ${aufraeumen ? `<td>${zweite ? "" : `<input type="checkbox" class="auswahl" data-id="${esc(r.id)}" ${auswahl.has(r.id) ? "checked" : ""}>`}</td>` : ""}<td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
           <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
           <td>${esc(f.von)} → ${esc(f.nach)}</td>
@@ -347,9 +366,49 @@ async function ansichtAuftraege(params, noch){
           <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}</td></tr>`; }).join("") +
         `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${fahrten.length !== d.gesamt ? " (" + fahrten.length + " Fahrten)" : ""}${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
       stornoLink();
-      document.querySelectorAll("#listeBox tbody tr").forEach((tr) => tr.addEventListener("click", () => { location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref); }));
+      letzteListe = d.liste;
+      const checkbox = (tr) => [...document.querySelectorAll("#listeBox .auswahl")].find((c) => c.dataset.id === tr.dataset.id);
+      document.querySelectorAll("#listeBox .auswahl").forEach((cb) => cb.addEventListener("change", () => { if (cb.checked) auswahl.add(cb.dataset.id); else auswahl.delete(cb.dataset.id); auswahlAnzeigen(); }));
+      if ($("alleWaehlen")) $("alleWaehlen").addEventListener("change", (ev) => { document.querySelectorAll("#listeBox .auswahl").forEach((cb) => { cb.checked = ev.target.checked; if (cb.checked) auswahl.add(cb.dataset.id); else auswahl.delete(cb.dataset.id); }); auswahlAnzeigen(); });
+      document.querySelectorAll("#listeBox tbody tr").forEach((tr) => tr.addEventListener("click", (ev) => {
+        if (aufraeumen) {   // im Aufräum-Modus wählt ein Klick auf die Zeile aus, statt den Auftrag zu öffnen
+          const cb = checkbox(tr);
+          if (!cb || ev.target === cb) return;
+          cb.checked = !cb.checked; cb.dispatchEvent(new Event("change"));
+          return;
+        }
+        if (!tr.dataset.ref) { meldung("Dieser alte Auftrag hat keine Referenz und lässt sich nicht öffnen. Mit „Aufträge aufräumen“ kannst du ihn stornieren oder löschen.", true); return; }
+        location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref);
+      }));
+      auswahlAnzeigen();
     } catch (e) { if (noch() && nr === abfrageNr) $("listeBox").innerHTML = `<div class="meldung error">${esc(e.message)}</div>`; }
   }
+  $("aufraeumenBtn").addEventListener("click", () => {
+    aufraeumen = !aufraeumen; auswahl.clear(); meldung("");
+    $("aufraeumenBtn").textContent = aufraeumen ? "Aufräumen beenden" : "Aufträge aufräumen";
+    $("aufraeumenLeiste").style.display = aufraeumen ? "inline-flex" : "none";
+    auswahlAnzeigen(); listeLaden();
+  });
+  async function aufraeumenAusfuehren(aktion){
+    const ids = [...auswahl];
+    if (!ids.length) return;
+    const mitRechnung = letzteListe.filter((r) => auswahl.has(r.id) && r.hatRechnung).length;
+    const text = (aktion === "loeschen"
+      ? `${ids.length} ${ids.length === 1 ? "Auftrag" : "Aufträge"} ENDGÜLTIG löschen?\n\nDas lässt sich nicht rückgängig machen. Kalendertermine werden entfernt, die Kunden werden nicht benachrichtigt.`
+      : `${ids.length} ${ids.length === 1 ? "Auftrag" : "Aufträge"} still stornieren?\n\nDie Kunden bekommen keine Mail, Kalendertermine werden gelöscht. Stornierte Aufträge sind in der Liste ausgeblendet (Filter „Storniert“).`)
+      + (mitRechnung ? `\n\n${mitRechnung} davon ${mitRechnung === 1 ? "hat" : "haben"} eine Rechnung und ${mitRechnung === 1 ? "wird" : "werden"} übersprungen.` : "");
+    if (!confirm(text)) return;
+    $("stornoAuswahlBtn").disabled = $("loeschenAuswahlBtn").disabled = true; meldung("Wird ausgeführt …");
+    try {
+      const d = await api("buchungenAufraeumen", { aktion, ids });
+      auswahl.clear();
+      const uebersprungen = d.uebersprungen || [];
+      meldung(`✓ ${d.erledigt} ${aktion === "loeschen" ? "gelöscht" : "storniert"}.` + (uebersprungen.length ? ` Übersprungen (${uebersprungen.length}): ${uebersprungen.map((u) => `${u.bezeichnung}: ${u.grund}`).join(" · ")}` : ""), uebersprungen.length > 0);
+      await listeLaden();
+    } catch (e) { meldung(e.message, true); auswahlAnzeigen(); }
+  }
+  $("stornoAuswahlBtn").addEventListener("click", () => aufraeumenAusfuehren("stornieren"));
+  $("loeschenAuswahlBtn").addEventListener("click", () => aufraeumenAusfuehren("loeschen"));
   listeLaden();
 }
 

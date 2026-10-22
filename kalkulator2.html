@@ -929,13 +929,30 @@ async function preisBerechnen(){
 const BUCHUNG_LADEN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/buchungNachReferenzLaden";
 function setzeWert(id, wert){ const e = el(id); if (e) e.value = wert == null ? "" : wert; }
 function lokalDatumZeit(iso){ const d = new Date(iso); return { datum: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, zeit: `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }; }
-/** Gespeicherte Adresse wieder in ein Google-Ortsobjekt verwandeln; die gespeicherte Schreibweise bleibt erhalten (Mails, Kalender, Flughafen-Erkennung). */
-async function adresseAlsPlace(text){
-  const antwort = await new google.maps.Geocoder().geocode({ address: text, region: "de" });
-  const treffer = antwort && antwort.results && antwort.results[0];
-  if (!treffer) throw new Error(`Die Adresse „${text}“ wurde nicht gefunden.`);
-  return Object.assign({}, treffer, { formatted_address: text });
+/**
+ * Gespeicherte Adresse ("Straße Nr, PLZ Ort[, Land]") wieder in ein Ortsobjekt für die Berechnung verwandeln.
+ * Bewusst OHNE Google-Geocoding (braucht eine eigene API): Die Strecke rechnet Google über den Adresstext, und PLZ, Straße
+ * und Ort (Preiszone, Flughafen-Erkennung, Rechnungsadresse) stehen im Text. Die gespeicherte Schreibweise bleibt erhalten.
+ */
+function placeAusAdresse(text){
+  const teile = String(text || "").split(",").map((t) => t.trim()).filter(Boolean);
+  const plzIdx = teile.findIndex((t) => /^\d{5}\s+\S/.test(t));
+  let plzNr = "", ort = "", strasse = "", land = "";
+  if (plzIdx >= 0) {
+    const m = teile[plzIdx].match(/^(\d{5})\s+(.+)$/);
+    plzNr = m[1]; ort = m[2];
+    if (plzIdx > 0) strasse = teile[plzIdx - 1];            // "Hotel Adler, Hauptstr. 5, 70173 Stuttgart": die Zeile direkt vor der PLZ
+    land = teile.slice(plzIdx + 1).join(", ");
+  } else { const m = String(text || "").match(/\b(\d{5})\b/); if (m) plzNr = m[1]; }
+  let route = strasse, hausnummer = "";
+  const sm = strasse.match(/^(.*?)\s+(\d+\s*[a-zA-Z]?(?:\s*[-–\/]\s*\d+\s*[a-zA-Z]?)?)$/);   // "Raidwanger Str. 10", "Weg 3a", "Hauptstr. 5-7"
+  if (sm) { route = sm[1]; hausnummer = sm[2].replace(/\s+/g, ""); }
+  const komp = [];
+  const add = (typ, wert) => { if (wert) komp.push({ types: [typ], long_name: wert, short_name: wert }); };
+  add("route", route); add("street_number", hausnummer); add("postal_code", plzNr); add("locality", ort); add("country", land);
+  return { formatted_address: text, address_components: komp, types: [] };
 }
+async function adresseAlsPlace(text){ return placeAusAdresse(text); }
 // ===================== Stammkunden und Zehnerkarte =====================
 const STAMM_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/stammkundeAdmin";
 let stammkundeAktuell = null;   // { id, name, stand, sk, freifahrtBestehend }

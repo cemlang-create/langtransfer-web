@@ -87,6 +87,14 @@
   <p>Die Auswahl links filtert nach Status: <em>Alle</em> (ohne stornierte), <em>Heute</em>, <em>Abrechnung offen</em>, <em>Rechnung offen</em>, <em>Überfällig</em>, <em>Bezahlt</em>, <em>Storniert</em> und weitere. Rechts filterst du nach Zeit (Kommende / Vergangene). Der Zeitfilter gilt je Fahrt: Bei „Kommende“ bleibt von einem Auftrag nur die Rückfahrt, wenn die Hinfahrt schon vorbei ist.</p>
   <p>Die Suche findet Name, Referenz, E-Mail, Ort und Rechnungsnummer.</p>
   <div class="tipp"><strong>Stornierte Aufträge</strong>Sie sind in „Alle“ ausgeblendet. Unter der Liste steht „n stornierte ausgeblendet · anzeigen“, ein Klick zeigt sie.</div>
+  <h3>Alte Aufträge und Testaufträge aufräumen</h3>
+  <p>Über der Liste steht <strong>Aufträge aufräumen</strong>. Dann hat jeder Auftrag ein Auswahlfeld (ein Klick auf die Zeile wählt aus). Mit „Alle“ im Tabellenkopf wählst du alle sichtbaren Aufträge aus, die Filter helfen beim Eingrenzen.</p>
+  <ul>
+    <li><strong>Still stornieren:</strong> Die Aufträge werden storniert, <strong>ohne Mail an die Kunden</strong>. Kalendertermine werden gelöscht, die Aufträge verschwinden aus der normalen Liste (Filter „Storniert“ zeigt sie).</li>
+    <li><strong>Endgültig löschen:</strong> Die Aufträge werden vollständig entfernt. Das lässt sich nicht rückgängig machen.</li>
+    <li>Aufträge mit gültiger Rechnung werden übersprungen (erst die Stornorechnung erstellen). Aufträge, die einmal eine Rechnung hatten, lassen sich nur stornieren, nicht löschen: Belege müssen erhalten bleiben.</li>
+    <li>Das geht auch bei alten Aufträgen ohne Referenz, die sich nicht öffnen lassen.</li>
+  </ul>
   <h3>Auftrag öffnen</h3>
   <p>Oben stehen Status, Strecke und Zeit. Darunter: <strong>Aktionen</strong> (je nach Status Bestätigen, Ablehnen, Stornieren), der Bereich <strong>Zahlung</strong>, der Bereich <strong>Stammkunde</strong> und zwei Reiter: <strong>Auftrag ändern</strong> und <strong>Rechnung</strong>.</p>
 </section>
@@ -355,6 +363,8 @@
   <p>Pro Auftrag gibt es eine gültige Rechnung. Zum Ändern zuerst eine Stornorechnung erstellen.</p>
   <h3>Die Zahlung per Zahlungslink steht nicht auf „Bezahlt“</h3>
   <p>Zahlungen per Link erkennt das System nicht von selbst. Prüfe sie in Stripe und markiere sie im Bereich „Zahlung“.</p>
+  <h3>Ein alter Auftrag lässt sich nicht öffnen</h3>
+  <p>Sehr alte Aufträge haben keine Referenz. Sie lassen sich nicht öffnen, aber über „Aufträge aufräumen“ stornieren oder löschen.</p>
   <h3>Warum fehlt ein Auftrag in der Liste?</h3>
   <p>Prüfe den Filter (stornierte sind ausgeblendet) und den Zeitfilter. Die Suche findet auch Referenz und Rechnungsnummer.</p>
   <h3>Die Seite zeigt noch den alten Stand</h3>
