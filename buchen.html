@@ -1213,20 +1213,22 @@ async function preisBerechnen(){
     }
   }
 
+  // Auf Cent runden: 10 % Rabatt (× 0,9) liefert sonst Werte wie 182.70000000000002
+  const aufCent = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
   // ---------- Rabatt anwenden: Gutschein ODER allgemeiner Einführungsrabatt, nie beides ----------
   const beideVorAktionBis = plan.abholung <= AKTION_BIS && (!ruck || planRueck.abholung <= AKTION_BIS);
   let allgemeinerRabattAktiv = false;
   let endpreisNachRabatt;
   if (rabattProzent > 0) {
-    endpreisNachRabatt = endpreisVorRabatt * (1 - rabattProzent / 100);
+    endpreisNachRabatt = aufCent(endpreisVorRabatt * (1 - rabattProzent / 100));
   } else if (!anyAktionGilt && beideVorAktionBis) {
     allgemeinerRabattAktiv = true;
-    endpreisNachRabatt = endpreisVorRabatt * 0.9;
+    endpreisNachRabatt = aufCent(endpreisVorRabatt * 0.9);
   } else {
     endpreisNachRabatt = endpreisVorRabatt;
   }
-  const netto = endpreisNachRabatt / 1.19;
-  const mwst = endpreisNachRabatt - netto;
+  const netto = aufCent(endpreisNachRabatt / 1.19);
+  const mwst = aufCent(endpreisNachRabatt - netto);
 
   // ---------- Ausgabe ----------
   document.getElementById("priceOut").innerHTML = (anyAktionGilt || allgemeinerRabattAktiv || rabattProzent > 0)

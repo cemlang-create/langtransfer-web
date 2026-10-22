@@ -65,7 +65,17 @@
 </script>
 <div class="card">
   <h1 class="embedded-aus">Preis-Kalkulator 2</h1>
-  <p class="sub embedded-aus">Intern. Wie das Buchungsformular (inkl. aktueller Aktionen &amp; Rabatte), aber ohne Verfügbarkeitsprüfung und ohne Regeln wie 3-Stunden-Grenze oder Nachtzeiten. Der <a href="kalkulator.html" style="color:var(--moss-dark);">alte Kalkulator</a> bleibt bestehen.</p>
+  <p class="sub embedded-aus">Intern. Wie das Buchungsformular (inkl. aktueller Aktionen &amp; Rabatte), aber ohne Verfügbarkeitsprüfung und ohne Regeln wie 3-Stunden-Grenze oder Nachtzeiten.</p>
+
+  <div class="field" id="ladenBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:18px;">
+    <label for="ladeReferenz">Bestehenden Auftrag laden und ändern</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="ladeReferenz" style="text-transform:uppercase;flex:1;" placeholder="Referenz, z. B. AVJV74" onkeydown="if(event.key==='Enter'){bestehendeBuchungLaden();}">
+      <button type="button" class="link-btn" style="flex:none;white-space:nowrap;" id="ladenBtn" onclick="bestehendeBuchungLaden()">Laden</button>
+    </div>
+    <div class="hint" style="margin-top:6px;">Lädt Route, Zeiten, Gäste und Kundendaten in die Maske. Beim erneuten Senden wird der bisherige Auftrag ersetzt.</div>
+    <div class="status" id="ladenStatus"></div>
+  </div>
 
   <div class="toggle">
     <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
@@ -901,6 +911,122 @@ async function preisBerechnen(){
 }
 
 // ===================== ANGEBOT SENDEN =====================
+// ===================== Bestehenden Auftrag laden =====================
+const BUCHUNG_LADEN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/buchungNachReferenzLaden";
+function setzeWert(id, wert){ const e = el(id); if (e) e.value = wert == null ? "" : wert; }
+function lokalDatumZeit(iso){ const d = new Date(iso); return { datum: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, zeit: `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }; }
+/** Gespeicherte Adresse wieder in ein Google-Ortsobjekt verwandeln; die gespeicherte Schreibweise bleibt erhalten (Mails, Kalender, Flughafen-Erkennung). */
+async function adresseAlsPlace(text){
+  const antwort = await new google.maps.Geocoder().geocode({ address: text, region: "de" });
+  const treffer = antwort && antwort.results && antwort.results[0];
+  if (!treffer) throw new Error(`Die Adresse „${text}“ wurde nicht gefunden.`);
+  return Object.assign({}, treffer, { formatted_address: text });
+}
+/** Füllt die ganze Maske mit den Daten eines gespeicherten Auftrags und berechnet die Route neu (Preis und Terminblocker bleiben wie gespeichert). */
+async function auftragInFormular(d){
+  const f = d.fahrt || {}, k = d.kunde || {}, ruck = f.rueckfahrt || null;
+  // --- Fahrtart, Adressen ---
+  setFahrtart(ruck ? "hinrueck" : "einfach");
+  const zwischenOffen = el("zwischenFeld").style.display !== "none";
+  if (f.zwischenziel && !zwischenOffen) zwischenUmschalten();
+  if (!f.zwischenziel && zwischenOffen) zwischenUmschalten();
+  const adressen = { abhol: f.abholadresse, ziel: f.zieladresse };
+  if (f.zwischenziel) adressen.zwischen = f.zwischenziel;
+  if (ruck) {
+    const abholGleich = ruck.abholadresse === f.zieladresse, zielGleich = ruck.zieladresse === f.abholadresse;
+    el("ruckAbholGleich").checked = abholGleich; ruckAbholUmschalten();
+    el("ruckZielGleich").checked = zielGleich; ruckZielUmschalten();
+    if (!abholGleich) adressen.ruckAbhol = ruck.abholadresse;
+    if (!zielGleich) adressen.ruckZiel = ruck.zieladresse;
+  }
+  for (const id of Object.keys(adressen)) { setzeWert(id, adressen[id]); places[id] = await adresseAlsPlace(adressen[id]); }
+  rechnungsadresseStatus();
+  // --- Zeiten, Fahrgäste, Preis ---
+  const hin = lokalDatumZeit(f.zeitpunktISO); setzeWert("datum", hin.datum); setzeWert("uhrzeit", hin.zeit);
+  if (ruck) { const r = lokalDatumZeit(ruck.zeitpunktISO); setzeWert("ruckDatum", r.datum); setzeWert("ruckUhrzeit", r.zeit); }
+  setzeWert("ab12", f.fahrgaesteAb12 || 1); setzeWert("unter12", f.fahrgaesteUnter12 || 0);
+  setzeWert("gutschein", ""); setzeWert("manuellRabatt", ""); setzeWert("sonderzuschlag", "");
+  setzeWert("eigenerPreis", d.preisOffen ? "" : ((d.preis && d.preis.gesamtBrutto) || ""));   // der bisherige Preis bleibt, bis du ihn änderst
+  // --- Kunde ---
+  const ra = k.rechnungsadresse || {};
+  let bemerkungen = k.bemerkungen || "";
+  if (d.vermittlung) {
+    setKundentyp("vermittlung");
+    setzeWert("vmPlattform", d.vermittlung.plattform);
+    setzeWert("vmVorname", k.name === "Gast" ? "" : k.vorname); setzeWert("vmNachname", k.name === "Gast" ? "" : k.nachname);
+    setzeWert("vmTelefon", k.mobil); setzeWert("vmEmail", k.email);
+    document.querySelector(`input[name="vmPreis"][value="${d.preisOffen ? "offen" : "fest"}"]`).checked = true;
+    const abg = d.abgerechnet && (d.abgerechnet.art === "karte" || d.abgerechnet.art === "bar") ? d.abgerechnet : null;
+    document.querySelector(`input[name="vmAbr"][value="${abg ? abg.art : ""}"]`).checked = true;
+    setzeWert("vmBetrag", abg ? abg.betragBrutto : "");
+  } else if (k.typ === "firma") {
+    setKundentyp(k.kategorie === "hotel" ? "hotel" : "firma");
+    setzeWert("gName", k.firmenname);
+    const bp = k.buchendePerson || {};
+    setzeWert("gAnrede", bp.anrede); setzeWert("gTitel", bp.titel); setzeWert("gVorname", bp.vorname); setzeWert("gNachname", bp.nachname); setzeWert("gTelefon", bp.telefon); setzeWert("gEmail", bp.email);
+    const zahlerRadio = document.querySelector(`input[name="zahler"][value="${k.zahler === "fahrgast" ? "fahrgast" : "firma"}"]`); if (zahlerRadio) zahlerRadio.checked = true;
+    zahlerGeaendert();
+    const fg = k.fahrgast || {};
+    setzeWert("fgAnrede", fg.anrede); setzeWert("fgAkadTitel", fg.titel); setzeWert("fgVorname", fg.vorname); setzeWert("fgNachname", fg.nachname); setzeWert("fgTelefon", fg.telefon); setzeWert("fgEmail", fg.email);
+    setzeWert("gZimmer", k.zimmer);
+    if (k.zimmer) bemerkungen = bemerkungen.replace(new RegExp(`\\s*·?\\s*Zimmer ${k.zimmer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`), "");   // "Zimmer 12" steht in den Bemerkungen, hier aber im eigenen Feld
+    if (k.zahler === "fahrgast") { el("rcCheck").checked = !!k.rechnungFirma; el("rcCheck").dataset.gesetzt = "1"; }
+    rechnungsblockAktualisieren();
+    if (k.rechnungFirma) {
+      setzeWert("rcFirma", k.rechnungFirma.name); setzeWert("rcAnsprech", k.rechnungFirma.ansprechpartner); setzeWert("rcAbteilung", k.rechnungFirma.abteilung); setzeWert("rcKostenstelle", k.rechnungFirma.kostenstelle);
+      ["rcFirma", "rcAnsprech"].forEach((id) => { el(id).dataset.touched = "1"; delete el(id).dataset.auto; });   // gespeicherte Rechnungsdaten nicht automatisch überschreiben
+    }
+  } else {
+    setKundentyp("privat");
+    setzeWert("pAnrede", k.anrede); setzeWert("pTitel", k.titel); setzeWert("pVorname", k.vorname); setzeWert("pNachname", k.nachname); setzeWert("pTelefon", k.mobil); setzeWert("pEmail", k.email);
+  }
+  if (!d.vermittlung) {
+    // Ist die gespeicherte Rechnungsadresse die Abholadresse, bleibt der Haken "= Abholadresse" gesetzt; sonst bleibt die gespeicherte Adresse stehen (z. B. Firmenadresse)
+    const ausAbholung = adresseAusPlace(places.abhol);
+    const gleich = (ausAbholung.strasse || "") === (ra.strasse || "") && (ausAbholung.plz || "") === (ra.plz || "") && (ausAbholung.ort || "") === (ra.ort || "");
+    el("raGleich").checked = gleich;
+    rechnungsadresseStatus();
+    if (!gleich) { setzeWert("raStrasse", ra.strasse); setzeWert("raPlz", ra.plz); setzeWert("raOrt", ra.ort); setzeWert("raLand", ra.land || "Deutschland"); }
+  }
+  // --- Beschreibung, Versand ---
+  setzeWert("agKurz", f.beschreibung); el("agKurz").dataset.auto = "0";
+  setzeWert("agGepaeck", f.sonstigesGepaeck); setzeWert("agBemerkungen", bemerkungen);
+  setzeWert("agReferenz", d.referenz); setzeWert("agSprache", d.sprache || "de");
+  if (!d.vermittlung) {
+    const zRadio = document.querySelector(`input[name="zahlungsart"][value="${["link", "fahrzeug", "rechnung"].includes(d.zahlungsart) ? d.zahlungsart : "link"}"]`); if (zRadio) zRadio.checked = true;
+    setModus(d.status === "bestaetigt" ? "auftrag" : "angebot");   // ein bereits bestätigter Auftrag bleibt ein Auftrag
+  }
+  // --- Route neu berechnen, dann die gespeicherten Terminblocker und Flugnummern wiederherstellen ---
+  letztesErgebnis = null;
+  await preisBerechnen();
+  if (!letztesErgebnis) throw new Error(el("status").textContent || "Die Strecke konnte nicht berechnet werden.");
+  if (d.kalenderBlockStartISO) setzeWert("agBlockStart", isoZuDatetimeLocal(new Date(d.kalenderBlockStartISO)));
+  if (d.kalenderBlockEndeISO) setzeWert("agBlockEnde", isoZuDatetimeLocal(new Date(d.kalenderBlockEndeISO)));
+  if (ruck && d.kalenderRueckBlockStartISO) { setzeWert("agRueckBlockStart", isoZuDatetimeLocal(new Date(d.kalenderRueckBlockStartISO))); setzeWert("agRueckBlockEnde", isoZuDatetimeLocal(new Date(d.kalenderRueckBlockEndeISO))); }
+  if (f.flugnummer && el("flugHinFeld").style.display !== "none") setzeWert("flugHin", f.flugnummer);
+  if (ruck && ruck.flugnummer && el("flugRueckFeld").style.display !== "none") setzeWert("flugRueck", ruck.flugnummer);
+}
+async function bestehendeBuchungLaden(){
+  const meldung = (t, cls) => setStatus("ladenStatus", t, cls);
+  const referenz = el("ladeReferenz").value.trim().toUpperCase();
+  if (!referenz) return meldung("Bitte zuerst eine Referenz eingeben.", "error");
+  if (!adminKeyLesen()) return meldung("Bitte zuerst im Portal anmelden (portal.html).", "error");
+  el("ladenBtn").disabled = true; meldung("Wird geladen …", "");
+  try {
+    const antwort = await fetch(BUCHUNG_LADEN_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenz, adminKey: adminKeyLesen() }) });
+    const d = await antwort.json();
+    if (!antwort.ok) throw new Error(d.fehler || "Der Auftrag konnte nicht geladen werden.");
+    if (d.status === "storniert") throw new Error(`${referenz} ist storniert und lässt sich nicht mehr ändern.`);
+    if (d.rechnungsnummer) throw new Error(`Zu ${referenz} gibt es bereits die Rechnung ${d.rechnungsnummer}. Zum Ändern im Portal (Reiter „Rechnung“) zuerst eine Stornorechnung erstellen.`);
+    if (d.quelle !== "kalkulator" && d.quelle !== "vermittlung") throw new Error(`${referenz} stammt aus dem Online-Formular. Solche Aufträge ändert man im Portal (Kontaktdaten, Rechnung). Hier lassen sich nur Aufträge laden, die mit „Neuer Auftrag“ angelegt wurden.`);
+    await auftragInFormular(d);
+    const preisText = d.preisOffen ? "Preis offen" : `Preis bisher ${fmt((d.preis || {}).gesamtBrutto)} €`;
+    meldung(`✓ ${referenz} geladen (${d.status === "bestaetigt" ? "bestätigter Auftrag" : "Angebot"}, ${preisText}). Passe an, was sich ändert, und sende neu: Der bisherige Auftrag wird ersetzt.`, "ok");
+    el("ergebnis").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { meldung(e.message || "Der Auftrag konnte nicht geladen werden.", "error"); }
+  finally { el("ladenBtn").disabled = false; }
+}
+
 function setAngebotStatus(msg, cls){ setStatus("angebotStatus", msg, cls); }
 function gueltigeEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 
@@ -1029,8 +1155,10 @@ async function angebotSenden(){
   };
 
   const istAuftrag = istVermittlung || modus === "auftrag";
-  if (istVermittlung && !confirm("Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast." + (vermittlungDaten.abgerechnet ? `\nSie wird als abgerechnet markiert (${vermittlungDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €).` : ""))) return;
-  if (istAuftrag && !istVermittlung && !confirm("Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
+  const ueberschreiben = body.referenz ? `Der bestehende Auftrag ${body.referenz} wird ersetzt: Die Kalendereinträge werden neu angelegt.\n\n` : "";
+  if (!istAuftrag && body.referenz && !confirm(ueberschreiben + "Angebot jetzt neu an den Kunden senden?")) return;
+  if (istVermittlung && !confirm(ueberschreiben + "Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast." + (vermittlungDaten.abgerechnet ? `\nSie wird als abgerechnet markiert (${vermittlungDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €).` : ""))) return;
+  if (istAuftrag && !istVermittlung && !confirm(ueberschreiben + "Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
