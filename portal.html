@@ -262,7 +262,8 @@ async function ansichtUebersicht(noch){
       karte(z.kommend, "Kommende bestätigte Fahrten", "#/auftraege?status=bestaetigt&zeit=kommend", false) +
       karte(z.angebot, "Offene Angebote", "#/auftraege?status=angebot", false) +
       karte(z.zuFakturieren, "Gefahren, Abrechnung offen", "#/auftraege?status=zu_fakturieren", true) +
-      karte(z.rechnungOffen || 0, z.ueberfaellig ? `Rechnung offen (davon ${z.ueberfaellig} überfällig)` : "Rechnung offen", "#/auftraege?status=rechnung_offen", true);
+      karte(z.rechnungOffen || 0, z.ueberfaellig ? `Rechnung offen (davon ${z.ueberfaellig} überfällig)` : "Rechnung offen", "#/auftraege?status=rechnung_offen", true) +
+      (z.mailProbleme ? karte(z.mailProbleme, "⚠ Neue Anfragen, bei denen eine Mail nicht ankam", "#/auftraege?status=angefragt", true) : "");
     if (kf && kf.liste) {
       const offen = kf.liste.reduce((s, a) => s + (a.offen || 0), 0);
       html += karte(offen, "Krankenfahrten: offene Zuzahlungsrechnungen", "#/krankenfahrten", true);
@@ -363,7 +364,7 @@ async function ansichtAuftraege(params, noch){
           <td>${esc(f.von)} → ${esc(f.nach)}</td>
           <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
           <td>${zweite ? '<span class="klein">wie Hinfahrt</span>' : abrechnungZelle(r)}</td>
-          <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}</td></tr>`; }).join("") +
+          <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}${!zweite && r.mailProblem && r.status === "angefragt" ? `<div class="klein" style="color:var(--err);">⚠ Mail nicht angekommen</div>` : ""}</td></tr>`; }).join("") +
         `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${fahrten.length !== d.gesamt ? " (" + fahrten.length + " Fahrten)" : ""}${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
       stornoLink();
       letzteListe = d.liste;
@@ -449,6 +450,12 @@ async function ansichtAuftrag(referenz, noch, params){
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
+      // Benachrichtigung zu einer neuen Anfrage: Fehler beim Eingang sichtbar machen, Mails erneut senden
+      const nbFehler = (d.benachrichtigung && d.benachrichtigung.fehler) || [];
+      const benachrichtigungKarte = d.status === "angefragt" ? `<div class="rahmenkarte" id="benachrichtigungKarte" style="padding-bottom:16px;${nbFehler.length ? "border-color:#e0b4ad;background:#fdf3f1;" : ""}"><h3>Benachrichtigung</h3>` +
+        (nbFehler.length ? `<p style="margin:8px 0 4px;color:var(--err);"><strong>⚠ Beim Eingang dieser Anfrage hat etwas nicht geklappt:</strong></p><ul style="margin:0 0 8px 18px;">${nbFehler.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>`
+          : `<div class="klein" style="margin:6px 0 4px;">Ist die Mail zu dieser Anfrage nicht bei dir oder dem Kunden angekommen? Dann sende sie hier erneut.</div>`) +
+        `<div class="zeile"><button type="button" class="knopf" id="mailInternBtn">Mail an mich erneut senden</button><button type="button" class="knopf" id="mailKundeBtn">Eingangsbestätigung an den Kunden erneut senden</button></div><div class="klein" id="mailMeldung" style="margin-top:6px;"></div></div>` : "";
       // Stammkunde: aus diesem Auftrag anlegen bzw. Daten und Route in den bestehenden Stammkunden übernehmen
       const stammkundeKarte = d.status !== "storniert" ? `<div class="rahmenkarte" id="stammkundeKarte" style="padding-bottom:16px;"><h3>Stammkunde</h3>` + (d.stammkundeId
         ? `<p style="margin:8px 0 4px;">★ Stammkunde: <a href="#/stammkunden?id=${encodeURIComponent(d.stammkundeId)}"><strong>${esc(d.stammkundeName || "")}</strong></a></p>
@@ -468,6 +475,7 @@ async function ansichtAuftrag(referenz, noch, params){
           ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.von)} → ${esc(f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
+        ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
         ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">Rechnung${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
@@ -498,6 +506,13 @@ async function ansichtAuftrag(referenz, noch, params){
         try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() } }); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
       });
+      async function mailErneut(art, knopf){
+        const meldung = $("mailMeldung"); knopf.disabled = true; meldung.style.color = ""; meldung.textContent = "Wird gesendet …";
+        try { await api("buchungMailsErneut", { referenz: d.referenz, art }); await laden(); const m = $("mailMeldung"); if (m) m.textContent = art === "intern" ? "✓ Die Mail an dich wurde gesendet." : "✓ Die Eingangsbestätigung wurde an den Kunden gesendet."; }
+        catch (e) { meldung.style.color = "var(--err)"; meldung.textContent = e.message; knopf.disabled = false; }
+      }
+      if ($("mailInternBtn")) $("mailInternBtn").addEventListener("click", () => mailErneut("intern", $("mailInternBtn")));
+      if ($("mailKundeBtn")) $("mailKundeBtn").addEventListener("click", () => mailErneut("kunde", $("mailKundeBtn")));
       const skMeldung = (t, fehler) => { const e = $("skMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
       if ($("skAnlegen")) $("skAnlegen").addEventListener("click", async () => {
         const vorschlag = d.vermittlung ? "" : ((d.kunde && (d.kunde.firmenname || d.kunde.name)) || "");

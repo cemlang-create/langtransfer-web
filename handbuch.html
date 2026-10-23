@@ -316,6 +316,7 @@
     <tr><td>Angebot von dir storniert</td><td>niemand</td></tr>
   </table>
   <ul>
+    <li>Bei einer neuen Online-Anfrage geht <strong>zuerst die Mail an dich</strong> raus, dann der Kalendereintrag, dann die Eingangsbestätigung an den Kunden. Jeder Mailversand wird bis zu dreimal versucht. Klappt es trotzdem nicht, bleibt die Anfrage erhalten und das Portal warnt dich (siehe „Häufige Fragen“).</li>
     <li>Vermittlungsfahrten ohne E-Mail-Adresse lösen keine Kundenmail aus. Eine Rechnung lässt sich dann trotzdem erzeugen, aber nicht per Mail verschicken (PDF im Verlauf herunterladen).</li>
     <li>Die Sprache der Kundenmails richtet sich nach der Sprache des Auftrags. Deine Mails an dich sind deutsch. Die Kalenderdatei im Anhang ist bisher immer deutsch.</li>
     <li>Die „Rechnung erzeugen“-Knöpfe in deinen Mails öffnen den Reiter „Rechnung“ im Portal (Anmeldung nötig).</li>
@@ -365,6 +366,8 @@
   <p>Zahlungen per Link erkennt das System nicht von selbst. Prüfe sie in Stripe und markiere sie im Bereich „Zahlung“.</p>
   <h3>Ein alter Auftrag lässt sich nicht öffnen</h3>
   <p>Sehr alte Aufträge haben keine Referenz. Sie lassen sich nicht öffnen, aber über „Aufträge aufräumen“ stornieren oder löschen.</p>
+  <h3>Zu einer neuen Anfrage ist keine Mail gekommen</h3>
+  <p>Öffne die Anfrage im Portal (Aufträge, Filter „Neue Anfragen“). Im Bereich <strong>Benachrichtigung</strong> siehst du, ob beim Eingang etwas schiefging (mit Fehlertext), und kannst die <strong>Mail an dich</strong> oder die <strong>Eingangsbestätigung an den Kunden</strong> erneut senden. In der Liste steht „⚠ Mail nicht angekommen“, die Übersicht zeigt eine Warnkarte. Bestätigen oder Ablehnen kannst du die Anfrage auch direkt im Portal, ohne die Mail.</p>
   <h3>Warum fehlt ein Auftrag in der Liste?</h3>
   <p>Prüfe den Filter (stornierte sind ausgeblendet) und den Zeitfilter. Die Suche findet auch Referenz und Rechnungsnummer.</p>
   <h3>Die Seite zeigt noch den alten Stand</h3>
@@ -400,6 +403,7 @@
     <li><strong>Secrets:</strong> <code>ADMIN_PASSWORT</code> (Portalpasswort), <code>IONOS_MAIL_PASSWORT</code>, <code>STRIPE_SECRET_KEY</code>, <code>BUCHUNG_AKTION_SECRET</code>, <code>CALENDAR_SERVICE_ACCOUNT_KEY</code>. Setzen mit <code>firebase functions:secrets:set NAME</code>.</li>
     <li><strong>Bankverbindung:</strong> in <code>index.js</code> unter <code>RECHNUNG_BANK</code> (Kontoinhaber, IBAN, BIC, Bank). Die IBAN wird auf Tippfehler geprüft.</li>
     <li><strong>Rechnungsnummern:</strong> Firestore, Sammlung <code>rechnungszaehler</code>, Dokument je Jahr (z. B. <code>2026</code>) mit dem Zahlenfeld <code>naechsteNummer</code> (Startwert). Zum Jahreswechsel legst du das neue Jahr an, sonst meldet das System „Kein Rechnungsnummern-Zähler … angelegt“.</li>
+    <li><strong>Fehlersuche:</strong> Firebase-Konsole, Functions, Logs. Filter auf die Funktion <code>buchungErstellen</code> und nach dem Zeitpunkt der Anfrage. Typische Meldungen: „Interne Aktionsmail fehlgeschlagen“, „Zusammenfassungsmail fehlgeschlagen“, „Kalendertermin konnte nicht angelegt werden“ (mit dem Fehlertext von IONOS bzw. Google).</li>
     <li><strong>Überfällig-Grenze:</strong> <code>UEBERFAELLIG_NACH_TAGEN</code> in <code>index.js</code> (derzeit 7 Tage).</li>
     <li><strong>Zehnerkarte:</strong> Anzahl der Fahrten in <code>ZEHNERKARTE_FAHRTEN</code> (derzeit 10), Adresse der Kundenseite in <code>KARTE_URL</code>.</li>
   </ul>
