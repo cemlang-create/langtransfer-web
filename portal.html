@@ -83,6 +83,8 @@
   /* ---------- Auftrag ---------- */
   .zurueck{display:inline-block;margin-bottom:12px;color:var(--muted);text-decoration:none;font-size:14px;}
   .zurueck:hover{color:var(--ink);}
+  .angaben{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;} .angaben th{text-align:left;font-weight:600;color:var(--muted);width:230px;vertical-align:top;padding:4px 14px 4px 0;} .angaben td{padding:4px 0;word-break:break-word;}
+  .angaben-titel{margin:16px 0 4px;font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--moss-dark);font-weight:700;} details.alleangaben > summary{cursor:pointer;font-weight:700;font-size:16px;}
   .kopfkarte{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin-bottom:14px;line-height:1.7;}
   .werkzeuge{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px;}
   .rahmenkarte{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 22px 10px;margin-top:18px;}
@@ -140,6 +142,103 @@ function zeitText(iso, mitJahr){
 }
 const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", freifahrt: "Freifahrt", unbekannt: "Zahlungsart unbekannt" };
 const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform", freifahrt: "als Freifahrt (Zehnerkarte)" };
+/** Zeigt ALLE gespeicherten Angaben eines Auftrags (beschriftet), danach alles Übrige unter "Weitere Angaben". */
+function alleAngabenHtml(a){
+  const benutzt = new Set();
+  const markiere = (...pfade) => pfade.forEach((p) => benutzt.add(p));
+  const holen = (pfad) => pfad.split(".").reduce((o, k) => (o == null ? undefined : o[k]), a);
+  const leer = (v) => v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length);
+  const zeit = (iso) => new Date(iso).toLocaleString("de-DE", { timeZone: "Europe/Berlin", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+  const wert = (v, pfad) => {
+    if (typeof v === "boolean") return v ? "ja" : "nein";
+    if (typeof v === "number") return /brutto|netto|mwst|betrag|wert|abgezogen/i.test(pfad) ? eur(v) : String(v);
+    if (typeof v === "string" && ISO.test(v)) return esc(zeit(v));
+    if (typeof v === "string" && /^https?:\/\//.test(v)) return `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`;
+    if (Array.isArray(v)) return esc(v.map((x) => (x && typeof x === "object" ? JSON.stringify(x) : String(x))).join(", "));
+    if (v && typeof v === "object") return esc(JSON.stringify(v));
+    return esc(String(v));
+  };
+  const person = (pfad, mitKontakt) => {   // "Frau Dr. Anna Muster", Vor-/Nachname gelten als verwendet
+    const o = holen(pfad); if (!o || typeof o !== "object") return null;
+    markiere(`${pfad}.anrede`, `${pfad}.titel`, `${pfad}.name`, `${pfad}.vorname`, `${pfad}.nachname`);
+    const t = [o.anrede, o.titel, o.name || [o.vorname, o.nachname].filter(Boolean).join(" ")].filter(Boolean).join(" ");
+    return t || null;
+  };
+  const ZEILEN = [];   // { titel, zeilen: [[label, htmlWert]] }
+  const abschnitt = (titel, bauen) => { const z = []; bauen((label, v) => { if (!leer(v)) z.push([label, v]); }); ZEILEN.push({ titel, zeilen: z }); };
+  const f = (label, pfad, opt = {}) => ({ label, pfad, opt });
+  const feld = (add, label, pfad, umwandeln) => { const v = holen(pfad); markiere(pfad); if (!leer(v)) add(label, umwandeln ? umwandeln(v) : wert(v, pfad)); };
+  const adr = (o) => o && typeof o === "object" ? esc([o.strasse, [o.plz, o.ort].filter(Boolean).join(" "), o.land].filter(Boolean).join(", ")) : null;
+  const k = a.kunde || {}, fa = a.fahrt || {}, ru = fa.rueckfahrt || null;
+
+  abschnitt("Kunde und Kontakt", (add) => {
+    add("Art", k.typ ? esc(k.typ === "firma" ? (k.kategorie === "hotel" ? "Hotel" : "Firma") : "Privat") : null); markiere("kunde.typ", "kunde.kategorie");
+    feld(add, "Firma / Hotel", "kunde.firmenname");
+    const pn = person("kunde"); if (pn) add(k.typ === "firma" ? "Name" : "Name", esc(pn));
+    const bp = person("kunde.buchendePerson"); if (bp) add("Buchende Person", esc(bp));
+    feld(add, "E-Mail der buchenden Person", "kunde.buchendePerson.email"); feld(add, "Telefon der buchenden Person", "kunde.buchendePerson.telefon");
+    const fg = person("kunde.fahrgast"); if (fg) add("Fahrgast", esc(fg));
+    feld(add, "E-Mail des Fahrgasts", "kunde.fahrgast.email"); feld(add, "Telefon des Fahrgasts", "kunde.fahrgast.telefon");
+    const hf = person("kunde.hauptfahrgast"); if (hf) add("Hauptfahrgast", esc(hf));
+    feld(add, "Telefon des Hauptfahrgasts", "kunde.hauptfahrgast.mobil");
+    feld(add, "E-Mail", "kunde.email"); feld(add, "Telefon", "kunde.mobil"); feld(add, "Telefon (weitere)", "kunde.telefon");
+    feld(add, "Wer zahlt", "kunde.zahler", (v) => esc(v === "fahrgast" ? "Der Fahrgast" : v === "firma" ? "Die Firma / das Hotel" : v));
+    feld(add, "Zimmer", "kunde.zimmer");
+    feld(add, "Rechnungsadresse", "kunde.rechnungsadresse", adr); markiere("kunde.rechnungsadresse.strasse", "kunde.rechnungsadresse.plz", "kunde.rechnungsadresse.ort", "kunde.rechnungsadresse.land");
+    if (k.rechnungFirma) { markiere("kunde.rechnungFirma"); const r = k.rechnungFirma; add("Rechnung auf", esc([r.name, r.ansprechpartner && `z. H. ${r.ansprechpartner}`, r.abteilung, r.kostenstelle && `Kostenstelle ${r.kostenstelle}`].filter(Boolean).join(" · "))); }
+    feld(add, "Bemerkungen des Kunden", "kunde.bemerkungen");
+  });
+  abschnitt(ru ? "Hinfahrt" : "Fahrt", (add) => {
+    feld(add, "Abholadresse", "fahrt.abholadresse"); feld(add, "Zwischenziel", "fahrt.zwischenziel"); feld(add, "Zieladresse", "fahrt.zieladresse");
+    feld(add, "Abholung", "fahrt.zeitpunktISO"); feld(add, "Ankunft", "fahrt.ankunftISO"); feld(add, "Flugnummer", "fahrt.flugnummer");
+    feld(add, "Beschreibung", "fahrt.beschreibung"); feld(add, "Name des Fahrgasts", "fahrt.gastname");
+  });
+  if (ru) abschnitt("Rückfahrt", (add) => {
+    feld(add, "Abholadresse", "fahrt.rueckfahrt.abholadresse"); feld(add, "Zieladresse", "fahrt.rueckfahrt.zieladresse");
+    feld(add, "Abholung", "fahrt.rueckfahrt.zeitpunktISO"); feld(add, "Ankunft", "fahrt.rueckfahrt.ankunftISO"); feld(add, "Flugnummer", "fahrt.rueckfahrt.flugnummer");
+  });
+  abschnitt("Fahrgäste und Gepäck", (add) => {
+    const zahl = (label, pfad) => { const v = holen(pfad); markiere(pfad); if (v !== undefined && v !== null) add(label, esc(String(v))); };
+    zahl("Fahrgäste ab 12 Jahren", "fahrt.fahrgaesteAb12"); zahl("Fahrgäste unter 12 Jahren", "fahrt.fahrgaesteUnter12");
+    zahl("Große Koffer", "fahrt.grossKoffer"); zahl("Große Taschen", "fahrt.grossTasche"); zahl("Kleine Koffer", "fahrt.kleinKoffer"); zahl("Kleine Taschen / Rucksäcke", "fahrt.kleinTasche");
+    feld(add, "Sonstiges Gepäck", "fahrt.sonstigesGepaeck");
+  });
+  abschnitt("Preis und Zahlung", (add) => {
+    feld(add, "Preis (brutto)", "preis.gesamtBrutto"); feld(add, "davon netto", "preis.nettobetrag"); feld(add, "davon USt", "preis.mwst");
+    feld(add, "Preis offen", "preisOffen"); feld(add, "Trinkgeld (brutto)", "trinkgeldBrutto");
+    feld(add, "Zahlungsart", "zahlungsart", (v) => esc({ link: "Zahlungslink (online im Voraus)", fahrzeug: "Im Fahrzeug per Karte", rechnung: "Auf Rechnung (Überweisung)", vermittlung: "Vermittlung" }[v] || v));
+    feld(add, "Zahlung laut Formular", "kunde.zahlung"); feld(add, "Zahlungslink", "zahlungslink");
+    if (a.freifahrt) { markiere("freifahrt"); add("Freifahrt (Zehnerkarte)", esc(`Gutschrift ${eur(a.freifahrt.abgezogen)} auf ${eur(a.freifahrt.bruttoVorher)} (Wert der Freifahrt ${eur(a.freifahrt.wert)})`)); }
+    if (a.abgerechnet) { markiere("abgerechnet"); add("Bezahlt", esc(`${ZAHLUNG_ART[a.abgerechnet.art] || a.abgerechnet.art}, ${eur(a.abgerechnet.betragBrutto)}${a.abgerechnet.datum ? ", " + a.abgerechnet.datum.split("-").reverse().join(".") : ""}${a.abgerechnet.notiz ? " · " + a.abgerechnet.notiz : ""}`)); }
+    feld(add, "Stammkunde", "stammkundeName"); markiere("stammkundeId");
+    feld(add, "Rechnungsnummer", "rechnungsnummer"); feld(add, "Rechnungsdatum", "rechnungsdatumISO");
+  });
+  abschnitt("Verlauf und Technik", (add) => {
+    feld(add, "Status", "status", (v) => esc({ angefragt: "Neue Anfrage", angebot: "Angebot", bestaetigt: "Bestätigt", storniert: "Storniert" }[v] || v));
+    feld(add, "Herkunft", "quelle", (v) => esc({ online: "Online-Buchungsformular", kalkulator: "Neuer Auftrag (Portal)", vermittlung: "Vermittlungsfahrt" }[v] || v));
+    feld(add, "Sprache", "sprache", (v) => esc(v === "en" ? "English" : "Deutsch"));
+    feld(add, "Plattform / Auftraggeber", "vermittlung.plattform"); markiere("vermittlung");
+    feld(add, "Angelegt am", "erstelltAm"); feld(add, "Bestätigt am", "bestaetigtAm"); feld(add, "Storniert am", "storniertAm");
+    const blk = (label, s, e) => { const x = holen(s), y = holen(e); markiere(s, e); if (x || y) add(label, esc([x && zeit(x), y && zeit(y)].filter(Boolean).join(" bis "))); };
+    blk("Terminblocker Hinfahrt", "kalenderBlockStartISO", "kalenderBlockEndeISO"); blk("Terminblocker Rückfahrt", "kalenderRueckBlockStartISO", "kalenderRueckBlockEndeISO");
+    feld(add, "Kalendertermin (ID)", "kalenderEventId"); feld(add, "Kalendertermin Rückfahrt (ID)", "kalenderEventIdRueck");
+    feld(add, "Referenz", "referenz"); feld(add, "Interne ID", "id");
+  });
+  // Alles, was oben nicht beschriftet wurde: nichts bleibt versteckt
+  const uebrig = [];
+  const istBenutzt = (p) => { for (const b of benutzt) if (p === b || p.startsWith(b + ".")) return true; return false; };
+  const gehen = (o, pfad) => {
+    if (o === null || o === undefined) return;
+    if (Array.isArray(o) ? o.length === 0 : (typeof o !== "object")) { if (!istBenutzt(pfad) && !leer(o)) uebrig.push([pfad.split(".").join(" › "), wert(o, pfad)]); return; }
+    if (Array.isArray(o)) { if (!istBenutzt(pfad)) uebrig.push([pfad.split(".").join(" › "), wert(o, pfad)]); return; }
+    for (const [key, w] of Object.entries(o)) gehen(w, pfad ? `${pfad}.${key}` : key);
+  };
+  gehen(a, "");
+  if (uebrig.length) ZEILEN.push({ titel: "Weitere Angaben", zeilen: uebrig });
+  return ZEILEN.filter((z) => z.zeilen.length).map((z) => `<div class="angaben-titel">${esc(z.titel)}</div><table class="angaben">${z.zeilen.map(([l, v]) => `<tr><th>${esc(l)}</th><td>${v}</td></tr>`).join("")}</table>`).join("");
+}
+
 const STATUS = {
   angefragt: { text: "Neue Anfrage", cls: "warn" },
   angebot: { text: "Angebot offen", cls: "blau" },
@@ -284,7 +383,7 @@ async function ansichtAuftraege(params, noch){
   const opt = (wert, text, aktiv) => `<option value="${wert}" ${wert === aktiv ? "selected" : ""}>${esc(text)}</option>`;
   $("main").innerHTML = `<h2 class="seite">Aufträge</h2><p class="unter">Suchen, filtern und einen Auftrag öffnen.</p>
     <div class="filter">
-      <input type="search" id="fSuche" placeholder="Suche: Name, Referenz, E-Mail, Ort, Rechnungsnummer" value="${esc(suche)}">
+      <input type="search" id="fSuche" placeholder="Suche: Name, Referenz, E-Mail, Adresse, Rechnungsnummer" value="${esc(suche)}">
       <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Abrechnung offen", status)}${opt("rechnung_offen", "Rechnung offen", status)}${opt("ueberfaellig", "Überfällig", status)}${opt("bezahlt", "Bezahlt", status)}${opt("storniert", "Storniert", status)}</select>
       <select id="fZeit">${opt("alle", "Alle Zeiten", zeit)}${opt("kommend", "Kommende", zeit)}${opt("vergangen", "Vergangene", zeit)}</select>
     </div>
@@ -335,8 +434,8 @@ async function ansichtAuftraege(params, noch){
       const heuteStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }), jetztMs = Date.now();
       let fahrten = [];
       d.liste.forEach((r) => {
-        fahrten.push({ r, typ: r.rueckfahrt ? "hin" : "einzel", zeit: r.zeitpunktISO, von: r.von, nach: r.nach });
-        if (r.rueckfahrt) fahrten.push({ r, typ: "rueck", zeit: r.rueckfahrt.zeitpunktISO, von: r.rueckfahrt.von, nach: r.rueckfahrt.nach });
+        fahrten.push({ r, typ: r.rueckfahrt ? "hin" : "einzel", zeit: r.zeitpunktISO, von: r.vonVoll || r.von, nach: r.nachVoll || r.nach, ueber: r.ueber || "" });
+        if (r.rueckfahrt) fahrten.push({ r, typ: "rueck", zeit: r.rueckfahrt.zeitpunktISO, von: r.rueckfahrt.vonVoll || r.rueckfahrt.von, nach: r.rueckfahrt.nachVoll || r.rueckfahrt.nach, ueber: "" });
       });
       // Zeit- und Tagesfilter gelten für die einzelne Fahrt (nicht für den ganzen Auftrag)
       fahrten = fahrten.filter((f) => {
@@ -361,7 +460,7 @@ async function ansichtAuftraege(params, noch){
           ${aufraeumen ? `<td>${zweite ? "" : `<input type="checkbox" class="auswahl" data-id="${esc(r.id)}" ${auswahl.has(r.id) ? "checked" : ""}>`}</td>` : ""}<td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
           <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
-          <td>${esc(f.von)} → ${esc(f.nach)}</td>
+          <td class="strecke"><div>${esc(f.von)}</div><div>→ ${esc(f.nach)}</div>${f.ueber ? `<div class="klein">über ${esc(f.ueber)}</div>` : ""}</td>
           <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
           <td>${zweite ? '<span class="klein">wie Hinfahrt</span>' : abrechnungZelle(r)}</td>
           <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}${!zweite && r.mailProblem && r.status === "angefragt" ? `<div class="klein" style="color:var(--err);">⚠ Mail nicht angekommen</div>` : ""}</td></tr>`; }).join("") +
@@ -470,11 +569,12 @@ async function ansichtAuftrag(referenz, noch, params){
       $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a>
         <h2 class="seite">${esc(d.referenz)} – ${esc(name || "Auftrag")}</h2>
         <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
-          ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.von)} → ${esc(f.nach)}<br>
+          ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.abholadresse || f.von)} → ${esc(f.zieladresse || f.nach)}${f.zwischenziel ? ` <span class="klein">(über ${esc(f.zwischenziel)})</span>` : ""}<br>
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) + (f.rueckfahrt ? " (inkl. Rückfahrt)" : "") : ""}
-          ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.von)} → ${esc(f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
+          ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.abholadresse || f.rueckfahrt.von)} → ${esc(f.rueckfahrt.zieladresse || f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
+        ${d.alles ? `<details class="rahmenkarte alleangaben" id="alleAngaben" open style="padding-bottom:14px;"><summary>Alle Angaben zum Auftrag</summary>${alleAngabenHtml(d.alles)}</details>` : ""}
         ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
