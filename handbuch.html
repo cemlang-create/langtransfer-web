@@ -222,6 +222,15 @@
 <section class="thema" id="auftrag-aendern" data-gruppe="Abrechnung" data-titel="Auftrag ändern (Kontaktdaten, Adresse, Sprache)">
   <h2>Auftrag ändern: Kontaktdaten, Adresse, Sprache</h2>
   <p>Im Reiter <strong>Auftrag ändern</strong> korrigierst du Anrede, Titel, Name, E-Mail, Telefon, Rechnungsadresse, „Rechnung auf Firma“ (Firma, Ansprechpartner, Abteilung, Kostenstelle) und die Sprache. Der Kalendereintrag wird automatisch angepasst.</p>
+  <h3>Abholzeit ändern</h3>
+  <p>Im Auftrag gibt es die Karte <strong>Abholzeit ändern</strong> (für Online-Buchungen genauso wie für Aufträge aus „Neuer Auftrag“). Datum und Uhrzeit der Abholung eintragen, bei Hin- und Rückfahrt auch die der Rückfahrt, und auf „Abholzeit ändern“ klicken.</p>
+  <ul>
+    <li>Alle Zeiten gelten in <strong>deutscher Ortszeit</strong> (Stuttgart), egal wo dein Browser steht.</li>
+    <li>Ankunftszeit, Terminblocker und <strong>Kalendertermin</strong> werden um denselben Betrag mitverschoben. Gibt es zur neuen Zeit eine Überschneidung im Kalender, zeigt dir das Portal die kollidierenden Termine und fragt, ob du trotzdem ändern willst.</li>
+    <li>Mit dem Haken <strong>Kunden per Mail über die neue Zeit informieren</strong> bekommt der Kunde eine Mail mit „bisher“ und „neu“ (bei bestätigten Aufträgen mit aktualisierter Kalenderdatei). Ohne E-Mail-Adresse im Auftrag ist der Haken gesperrt.</li>
+    <li>Nicht möglich ist es bei stornierten Aufträgen und bei Aufträgen mit Rechnung (erst die Stornorechnung erstellen).</li>
+    <li>Jede Änderung wird am Auftrag protokolliert (unter „Weitere Angaben“ als <code>zeitHistorie</code>).</li>
+  </ul>
   <ul>
     <li>Aus einer Privatbuchung machst du eine Firmenrechnung, indem du „Rechnung auf Firma“ aktivierst und die Firma einträgst.</li>
     <li><strong>Nach einer Rechnung</strong> ist alles gesperrt, was auf der Rechnung steht (Name, Adresse, Titel, Rechnungsfirma, Sprache). Nur E-Mail und Telefon bleiben änderbar. Für alles andere erstellst du zuerst eine Stornorechnung.</li>
@@ -364,6 +373,8 @@
   <p>Pro Auftrag gibt es eine gültige Rechnung. Zum Ändern zuerst eine Stornorechnung erstellen.</p>
   <h3>Die Zahlung per Zahlungslink steht nicht auf „Bezahlt“</h3>
   <p>Zahlungen per Link erkennt das System nicht von selbst. Prüfe sie in Stripe und markiere sie im Bereich „Zahlung“.</p>
+  <h3>Der Gast hat die falsche Uhrzeit angegeben oder das System hat sie verschoben</h3>
+  <p>Das Buchungsformular rechnet Zeiten nicht mehr um: Was ein Gast als Abholzeit eingibt, gilt als <strong>deutsche Ortszeit</strong> am Abholort, auch wenn er aus einer anderen Zeitzone bucht. Bei älteren Anfragen kann die Zeit noch um den Zeitunterschied versetzt sein (z. B. 22:45 statt 18:45 bei einem Gast aus Brasilien). Prüfe die Zeit mit dem Gast (Flugdaten) und korrigiere sie im Auftrag mit „Abholzeit ändern“.</p>
   <h3>Ein alter Auftrag lässt sich nicht öffnen</h3>
   <p>Sehr alte Aufträge haben keine Referenz. Sie lassen sich nicht öffnen, aber über „Aufträge aufräumen“ stornieren oder löschen.</p>
   <h3>Zu einer neuen Anfrage ist keine Mail gekommen</h3>

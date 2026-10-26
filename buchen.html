@@ -563,7 +563,23 @@ const PLZ_NECKARTENZLINGEN = "72654";
 // GVV Neckartenzlingen: Neckartenzlingen, Altdorf, Altenriet, Bempflingen, Neckartailfingen, Schlaitdorf; zusätzlich Aichtal (alle Teilorte)
 const PLZ_GVV = ["72654", "72655", "72657", "72658", "72666", "72667", "72631"];
 const PLZ_FLUGHAFEN_STR = "70629";
-const AKTION_BIS = new Date("2026-12-20T23:59:59");
+// ---------- Zeitzone: Alle Eingaben und Anzeigen gelten in deutscher Ortszeit (Europe/Berlin), egal wo der Browser steht ----------
+// Ein Gast in Brasilien, der "18:45 Uhr" für die Abholung in Stuttgart eingibt, meint 18:45 Uhr in Stuttgart.
+const ZEITZONE = "Europe/Berlin";
+const BERLIN_FORMAT = new Intl.DateTimeFormat("en-CA", { timeZone: ZEITZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+function teileBerlin(d){ const o = {}; BERLIN_FORMAT.formatToParts(d).forEach((p) => { o[p.type] = p.value; }); return { y: +o.year, m: +o.month, d: +o.day, h: +o.hour, mi: +o.minute, s: +o.second }; }
+/** "2026-10-18" + "18:45" -> der Zeitpunkt, an dem es in Deutschland 18:45 Uhr ist (unabhängig von der Zeitzone des Browsers). */
+function berlinZeit(datumStr, zeitStr){
+  const [y, m, d] = String(datumStr).split("-").map(Number), [h, mi] = String(zeitStr).split(":").map(Number);
+  const ziel = Date.UTC(y, m - 1, d, h, mi);
+  if (!isFinite(ziel)) return new Date(NaN);
+  let t = ziel;
+  for (let i = 0; i < 3; i++) { const b = teileBerlin(new Date(t)); t -= Date.UTC(b.y, b.m - 1, b.d, b.h, b.mi) - ziel; }   // Sommer-/Winterzeit-Versatz ausgleichen
+  return new Date(t);
+}
+/** Der Vortag der Abholung um 18:00 Uhr deutscher Zeit. */
+function vortag18Uhr(d){ const b = teileBerlin(d); const v = new Date(Date.UTC(b.y, b.m - 1, b.d - 1)); const p = (n) => String(n).padStart(2, "0"); return berlinZeit(`${v.getUTCFullYear()}-${p(v.getUTCMonth() + 1)}-${p(v.getUTCDate())}`, "18:00"); }
+const AKTION_BIS = new Date(berlinZeit("2026-12-20", "23:59").getTime() + 59000);
 const VERFUEGBARKEIT_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/verfuegbarkeitPruefen";
 const GUTSCHEIN_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/gutscheinPruefen";
 const BUCHUNG_URL = "https://europe-west1-lang-transfer.cloudfunctions.net/buchungErstellen";
@@ -674,12 +690,12 @@ function initAutocomplete(){
 
 // ===================== HILFSFUNKTIONEN =====================
 function lokalesDatum(d){
-  const p = n => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  const p = n => String(n).padStart(2, "0"), b = teileBerlin(d);
+  return `${b.y}-${p(b.m)}-${p(b.d)}`;
 }
-function uhr(d){ return d.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"}); }
-function datumUhr(d){ return d.toLocaleString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) + " Uhr"; }
-function minTag(d){ return d.getHours() * 60 + d.getMinutes(); }
+function uhr(d){ return d.toLocaleTimeString("de-DE", {timeZone: ZEITZONE, hour:"2-digit", minute:"2-digit"}); }
+function datumUhr(d){ return d.toLocaleString("de-DE", {timeZone: ZEITZONE, weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) + " Uhr"; }
+function minTag(d){ const b = teileBerlin(d); return b.h * 60 + b.mi; }
 function plusMin(d, m){ return new Date(d.getTime() + m * 60000); }
 function abrunden5(d){ return new Date(Math.floor(d.getTime() / 300000) * 300000); }
 function aufrunden5(d){ return new Date(Math.ceil(d.getTime() / 300000) * 300000); }
@@ -930,9 +946,7 @@ async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabe
     throw `${praefix}Abholungen zwischen 22:30 und 4:30 Uhr sind online nicht buchbar (berechnete Abholzeit: ${uhr(abholung)} Uhr).` + telefon;
   }
   if (tAbhol < T_0900) {
-    const frist = new Date(abholung);
-    frist.setDate(frist.getDate() - 1);
-    frist.setHours(18, 0, 0, 0);
+    const frist = vortag18Uhr(abholung);
     if (jetzt >= frist) {
       throw `${praefix}Abholungen vor 9 Uhr müssen bis 18 Uhr am Vortag gebucht werden (Frist: ${datumUhr(frist)}).` + telefon;
     }
@@ -970,7 +984,7 @@ async function verfuegbarkeitPruefen(){
   const datumStr = document.getElementById("datum").value;
   const zeitStr = document.getElementById("uhrzeit").value;
   if (!datumStr || !zeitStr) return setStatus("status1", "Bitte Datum und Uhrzeit angeben.", "error");
-  const eingabeZeit = new Date(`${datumStr}T${zeitStr}`);
+  const eingabeZeit = berlinZeit(datumStr, zeitStr);
   if (isNaN(eingabeZeit.getTime())) return setStatus("status1", "Ungültiges Datum oder Uhrzeit.", "error");
 
   const hinRueckAktiv = fahrtart === "hinrueck";
@@ -987,7 +1001,7 @@ async function verfuegbarkeitPruefen(){
     const ruckDatumStr = document.getElementById("ruckDatum").value;
     const ruckZeitStr = document.getElementById("ruckUhrzeit").value;
     if (!ruckDatumStr || !ruckZeitStr) return setStatus("status1", "Bitte Datum und Uhrzeit der Rückfahrt angeben.", "error");
-    ruckEingabeZeit = new Date(`${ruckDatumStr}T${ruckZeitStr}`);
+    ruckEingabeZeit = berlinZeit(ruckDatumStr, ruckZeitStr);
     if (isNaN(ruckEingabeZeit.getTime())) return setStatus("status1", "Ungültiges Datum oder Uhrzeit für die Rückfahrt.", "error");
   }
 

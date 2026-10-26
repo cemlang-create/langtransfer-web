@@ -136,9 +136,22 @@ const BASIS = (window.INSTANZ && window.INSTANZ.technik && window.INSTANZ.techni
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const eur = (n) => Number(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const ZEITZONE = "Europe/Berlin";   // alle Zeiten im Portal gelten in deutscher Ortszeit, egal wo der Browser steht
 function zeitText(iso, mitJahr){
   if (!iso) return "–";
-  return new Date(iso).toLocaleString("de-DE", Object.assign({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, mitJahr ? { year: "numeric" } : {}));
+  return new Date(iso).toLocaleString("de-DE", Object.assign({ timeZone: ZEITZONE, weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, mitJahr ? { year: "numeric" } : {}));
+}
+const BERLIN_FORMAT = new Intl.DateTimeFormat("en-CA", { timeZone: ZEITZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** Zeitpunkt -> { datum: "2026-10-18", zeit: "18:45" } in deutscher Ortszeit (für die Eingabefelder). */
+function berlinTeile(iso){ const o = {}; BERLIN_FORMAT.formatToParts(new Date(iso)).forEach((p) => { o[p.type] = p.value; }); return { datum: `${o.year}-${o.month}-${o.day}`, zeit: `${o.hour}:${o.minute}` }; }
+/** "2026-10-18" + "18:45" (deutsche Ortszeit) -> ISO-Zeitpunkt; null bei ungültiger Eingabe. */
+function berlinZuISO(datum, zeit){
+  const [y, m, d] = String(datum).split("-").map(Number), [hh, mi] = String(zeit).split(":").map(Number);
+  const ziel = Date.UTC(y, m - 1, d, hh, mi);
+  if (!isFinite(ziel)) return null;
+  let t = ziel;
+  for (let i = 0; i < 3; i++) { const b = {}; BERLIN_FORMAT.formatToParts(new Date(t)).forEach((p) => { b[p.type] = p.value; }); t -= Date.UTC(+b.year, +b.month - 1, +b.day, +b.hour, +b.minute) - ziel; }   // Sommer-/Winterzeit ausgleichen
+  return new Date(t).toISOString();
 }
 const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", freifahrt: "Freifahrt", unbekannt: "Zahlungsart unbekannt" };
 const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform", freifahrt: "als Freifahrt (Zehnerkarte)" };
@@ -263,7 +276,7 @@ async function api(name, body){
   let daten = {};
   try { daten = await antwort.json(); } catch (e) {}
   if (antwort.status === 401) { if (eingeloggt) { eingeloggt = false; abmelden("Die Sitzung ist nicht mehr gültig. Bitte neu anmelden."); } throw new Error("Nicht angemeldet."); }
-  if (!antwort.ok) throw new Error(daten.fehler || `Fehler ${antwort.status}`);
+  if (!antwort.ok) { const e = new Error(daten.fehler || `Fehler ${antwort.status}`); e.daten = daten; e.status = antwort.status; throw e; }
   return daten;
 }
 function loginMeldung(text, cls){ const e = $("loginMeldung"); e.textContent = text || ""; e.className = "meldung" + (cls ? " " + cls : ""); }
@@ -549,6 +562,16 @@ async function ansichtAuftrag(referenz, noch, params){
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
+      // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
+      const kontaktMail = d.kunde ? (d.kunde.typ === "firma" ? (d.kunde.buchendePerson || {}).email : d.kunde.email) : "";
+      const hinZeit = d.fahrt && d.fahrt.zeitpunktISO ? berlinTeile(d.fahrt.zeitpunktISO) : null, rueckZeit = d.fahrt && d.fahrt.rueckfahrt && d.fahrt.rueckfahrt.zeitpunktISO ? berlinTeile(d.fahrt.rueckfahrt.zeitpunktISO) : null;
+      const zeitKarte = ["angefragt", "angebot", "bestaetigt"].includes(d.status) && hinZeit ? `<div class="rahmenkarte" id="zeitKarte" style="padding-bottom:16px;"><h3>Abholzeit ändern</h3>` + (d.rechnungsnummer
+        ? `<div class="klein" style="margin:6px 0;">Zu diesem Auftrag gibt es die Rechnung ${esc(d.rechnungsnummer)}. Die Zeit lässt sich erst nach einer Stornorechnung ändern (Reiter „Rechnung“).</div>`
+        : `<div class="klein" style="margin:6px 0 10px;">Alle Zeiten in <strong>deutscher Ortszeit</strong> (Stuttgart). Hat ein Gast aus dem Ausland seine Ortszeit eingegeben, korrigierst du sie hier. Der Kalendertermin wird mitverschoben.</div>
+           <div class="zeile"><div><label for="zeitHinDatum">${rueckZeit ? "Abholung Hinfahrt" : "Abholung"}</label><input type="date" id="zeitHinDatum" value="${hinZeit.datum}" style="width:170px;"> <input type="time" id="zeitHinUhr" value="${hinZeit.zeit}" style="width:125px;"></div>
+           ${rueckZeit ? `<div><label for="zeitRueckDatum">Abholung Rückfahrt</label><input type="date" id="zeitRueckDatum" value="${rueckZeit.datum}" style="width:170px;"> <input type="time" id="zeitRueckUhr" value="${rueckZeit.zeit}" style="width:125px;"></div>` : ""}</div>
+           <label class="check" style="display:flex;gap:8px;align-items:center;margin:12px 0 8px;font-weight:400;"><input type="checkbox" id="zeitMail" style="width:auto;margin:0;" ${kontaktMail ? "checked" : "disabled"}> Kunden per Mail über die neue Zeit informieren${kontaktMail ? "" : " (keine E-Mail-Adresse im Auftrag)"}</label>
+           <div class="zeile"><button type="button" class="knopf gold" id="zeitBtn">Abholzeit ändern</button></div>`) + `<div class="klein" id="zeitMeldung" style="margin-top:6px;"></div></div>` : "";
       // Benachrichtigung zu einer neuen Anfrage: Fehler beim Eingang sichtbar machen, Mails erneut senden
       const nbFehler = (d.benachrichtigung && d.benachrichtigung.fehler) || [];
       const benachrichtigungKarte = d.status === "angefragt" ? `<div class="rahmenkarte" id="benachrichtigungKarte" style="padding-bottom:16px;${nbFehler.length ? "border-color:#e0b4ad;background:#fdf3f1;" : ""}"><h3>Benachrichtigung</h3>` +
@@ -575,6 +598,7 @@ async function ansichtAuftrag(referenz, noch, params){
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
         ${d.alles ? `<details class="rahmenkarte alleangaben" id="alleAngaben" open style="padding-bottom:14px;"><summary>Alle Angaben zum Auftrag</summary>${alleAngabenHtml(d.alles)}</details>` : ""}
+        ${zeitKarte}
         ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
@@ -605,6 +629,41 @@ async function ansichtAuftrag(referenz, noch, params){
         $("abBtn").disabled = true; abMeldung("Wird gespeichert …");
         try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() } }); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
+      });
+      if ($("zeitBtn")) $("zeitBtn").addEventListener("click", async () => {
+        const btn = $("zeitBtn");
+        const meldung = (t, fehler) => { const e = $("zeitMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
+        const hinISO = berlinZuISO($("zeitHinDatum").value, $("zeitHinUhr").value);
+        if (!hinISO) return meldung("Bitte Datum und Uhrzeit der Abholung eingeben.", true);
+        let rueckISO = null;
+        if ($("zeitRueckDatum")) { rueckISO = berlinZuISO($("zeitRueckDatum").value, $("zeitRueckUhr").value); if (!rueckISO) return meldung("Bitte Datum und Uhrzeit der Rückfahrt eingeben.", true); }
+        const hinGeaendert = hinISO !== new Date(d.fahrt.zeitpunktISO).toISOString();
+        const rueckGeaendert = !!(rueckISO && rueckISO !== new Date(d.fahrt.rueckfahrt.zeitpunktISO).toISOString());
+        if (!hinGeaendert && !rueckGeaendert) return meldung("Die Zeit ist unverändert.", true);
+        const mail = $("zeitMail").checked;
+        const zeilen = [];
+        if (hinGeaendert) zeilen.push(`Abholung: ${zeitText(d.fahrt.zeitpunktISO, true)} → ${zeitText(hinISO, true)}`);
+        if (rueckGeaendert) zeilen.push(`Rückfahrt: ${zeitText(d.fahrt.rueckfahrt.zeitpunktISO, true)} → ${zeitText(rueckISO, true)}`);
+        if (!confirm(`Zeit ändern?\n\n${zeilen.join("\n")}\n\n${mail ? "Der Kunde wird per Mail informiert." : "Der Kunde wird NICHT benachrichtigt."} Der Kalendertermin wird verschoben.`)) return;
+        const senden = (ueberschreiben) => api("buchungZeitAendern", Object.assign({ referenz: d.referenz, abholungISO: hinISO, mailAnKunde: mail }, rueckGeaendert ? { rueckAbholungISO: rueckISO } : {}, ueberschreiben ? { konfliktUeberschreiben: true } : {}));
+        btn.disabled = true; meldung("Wird geändert …");
+        try {
+          let erg;
+          try { erg = await senden(false); }
+          catch (e) {
+            if (!(e.daten && e.daten.konflikt)) throw e;
+            const liste = Object.values(e.daten.konflikte).flat().map((k) => `• ${k.titel} (${zeitText(k.startISO)} – ${zeitText(k.endeISO)})`).join("\n");
+            if (!confirm(`Im Kalender gibt es zur neuen Zeit Überschneidungen:\n\n${liste}\n\nTrotzdem ändern?`)) { meldung("Nicht geändert."); btn.disabled = false; return; }
+            erg = await senden(true);
+          }
+          await laden();
+          const teile = [`✓ Abholzeit geändert: ${zeitText(erg.alt.hin, true)} → ${zeitText(erg.neu.hin, true)}.`];
+          if (erg.alt.rueck && erg.alt.rueck !== erg.neu.rueck) teile.push(`Rückfahrt: ${zeitText(erg.alt.rueck, true)} → ${zeitText(erg.neu.rueck, true)}.`);
+          if (erg.kalenderAngepasst) teile.push("Kalendertermin verschoben.");
+          if (erg.kalenderFehler) teile.push("⚠ Ein Kalendertermin konnte nicht verschoben werden, bitte von Hand ändern.");
+          if (erg.mail) teile.push(erg.mail.gesendet ? "Der Kunde wurde per Mail informiert." : `⚠ Mail an den Kunden nicht gesendet: ${erg.mail.grund}`);
+          const m = $("zeitMeldung"); if (m) { m.textContent = teile.join(" "); m.style.color = (erg.kalenderFehler || (erg.mail && !erg.mail.gesendet)) ? "var(--err)" : ""; }
+        } catch (e) { meldung(e.message, true); btn.disabled = false; }
       });
       async function mailErneut(art, knopf){
         const meldung = $("mailMeldung"); knopf.disabled = true; meldung.style.color = ""; meldung.textContent = "Wird gesendet …";
