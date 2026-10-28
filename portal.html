@@ -74,6 +74,9 @@
   th, td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
   th{font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap;}
   tbody tr{cursor:pointer;} tbody tr:hover{background:#f6f2e8;}
+  /* Auftragsliste: gefahrene Fahrten leicht ausgegraut, die nächste anstehende bestätigte Fahrt mit goldenem Hintergrund */
+  #listeBox tbody tr.vergangen td{opacity:.55;} #listeBox tbody tr.vergangen:hover td{opacity:.9;}
+  #listeBox tbody tr.naechste td{background:#f8ecd0;} #listeBox tbody tr.naechste:hover td{background:#f3e2bb;} #listeBox tbody tr.naechste td:first-child{box-shadow:inset 4px 0 0 var(--moss);}
   tbody tr:last-child td{border-bottom:none;}
   .klein{color:var(--muted);font-size:12.5px;}
   .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:600;background:#eee;color:var(--muted);white-space:nowrap;}
@@ -458,6 +461,9 @@ async function ansichtAuftraege(params, noch){
         return true;
       });
       fahrten.sort((x, y) => (d.aufsteigend ? (x.zeit || "").localeCompare(y.zeit || "") : (y.zeit || "").localeCompare(x.zeit || "")));
+      // Die nächste anstehende Fahrt: die früheste noch bevorstehende Fahrt eines bestätigten Auftrags (Hin- und Rückfahrt zählen einzeln)
+      const naechste = fahrten.filter((f) => f.zeit && new Date(f.zeit).getTime() >= jetztMs && f.r.status === "bestaetigt")
+        .reduce((m, f) => (!m || new Date(f.zeit) < new Date(m.zeit) ? f : m), null);
       const ART = ZAHLUNG_ART;
       const abrechnungZelle = (r) => {
         const ab = r.abrechnung || {};
@@ -469,7 +475,7 @@ async function ansichtAuftraege(params, noch){
       };
       const beinText = { hin: "Hinfahrt", rueck: "Rückfahrt" };
       $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr>${aufraeumen ? '<th style="width:30px;"><input type="checkbox" id="alleWaehlen" title="Alle sichtbaren auswählen"></th>' : ""}<th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
-        fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; return `<tr data-ref="${esc(r.referenz)}" data-id="${esc(r.id)}"${zweite ? ' data-fahrt="rueck"' : ""}>
+        fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; const klasse = f.zeit && new Date(f.zeit).getTime() < jetztMs ? "vergangen" : (f === naechste ? "naechste" : ""); return `<tr${klasse ? ` class="${klasse}"` : ""} data-ref="${esc(r.referenz)}" data-id="${esc(r.id)}"${zweite ? ' data-fahrt="rueck"' : ""}>
           ${aufraeumen ? `<td>${zweite ? "" : `<input type="checkbox" class="auswahl" data-id="${esc(r.id)}" ${auswahl.has(r.id) ? "checked" : ""}>`}</td>` : ""}<td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
           <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
