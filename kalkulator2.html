@@ -841,9 +841,8 @@ async function preisBerechnen(){
     const gutscheinStatusEl = document.getElementById("gutscheinStatus");
     gutscheinStatusEl.textContent = "";
     let gutscheinProzent = 0;
-    if (anyAktionGilt && gutscheinCode) {
-      gutscheinStatusEl.textContent = "Gutscheincodes sind mit dem Einführungsangebot nicht kombinierbar (nicht angewendet).";
-    } else if (gutscheinCode) {
+    // Ein Gutscheincode wirkt auch beim Flughafen-Einführungsangebot: Der Prozentwert wird vom Aktionspreis abgezogen
+  if (gutscheinCode) {
       try {
         const gAntwort = await fetch(GUTSCHEIN_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: gutscheinCode }) });
         const gDaten = await gAntwort.json();
@@ -900,7 +899,7 @@ async function preisBerechnen(){
     document.getElementById("ergebnis").style.display = "block";
 
     // ---------- Angebots-Vorbelegung ----------
-    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12 };
+    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "" };
     vermittlungAktualisieren();
     flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
@@ -1226,6 +1225,7 @@ async function angebotSenden(){
     zahlungsart: istVermittlung ? "vermittlung" : aktuelleZahlungsart(),
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
+    ...(letztesErgebnis.gutscheinCode ? { gutscheinCode: letztesErgebnis.gutscheinCode } : {}),
     ...(stammkundeAktuell ? { stammkundeId: stammkundeAktuell.id } : {}),
     ...(stammkundeAktuell && !istVermittlung && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
     kunde,

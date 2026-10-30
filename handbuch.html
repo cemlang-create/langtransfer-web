@@ -176,7 +176,7 @@
     <tr><td><span class="badge warn">Offen</span></td><td>Gefahren, aber noch keine Zahlung und keine Rechnung. Zählt unter „Abrechnung offen“.</td></tr>
     <tr><td><span class="badge warn">Rechnung offen</span></td><td>Eine Überweisungsrechnung ist raus, die Zahlung steht aus. Die Liste zeigt die Tage seit der Rechnung.</td></tr>
     <tr><td><span class="badge err">Überfällig</span></td><td>Die Überweisungsrechnung ist seit 7 Tagen oder länger offen.</td></tr>
-    <tr><td><span class="badge ok">Bezahlt</span></td><td>Zahlung markiert oder Rechnung „bereits bezahlt“. Mit Zahlungsart: Karte, bar, Überweisung, Zahlungslink, Plattform oder Freifahrt.</td></tr>
+    <tr><td><span class="badge ok">Bezahlt</span></td><td>Zahlung markiert oder Rechnung „bereits bezahlt“. Mit Zahlungsart: Karte, bar, Überweisung, Zahlungslink, Plattform, Freifahrt oder Gutschein (kostenlose Fahrt).</td></tr>
   </table>
   <h3>Zahlung markieren</h3>
   <p>Im Auftrag gibt es den Bereich <strong>Zahlung</strong>. Wähle Zahlungsart, Betrag, Datum und optional eine Notiz (z. B. SumUp-Beleg).</p>
@@ -416,6 +416,14 @@
     <li><strong>Bankverbindung:</strong> in <code>index.js</code> unter <code>RECHNUNG_BANK</code> (Kontoinhaber, IBAN, BIC, Bank). Die IBAN wird auf Tippfehler geprüft.</li>
     <li><strong>Rechnungsnummern:</strong> Firestore, Sammlung <code>rechnungszaehler</code>, Dokument je Jahr (z. B. <code>2026</code>) mit dem Zahlenfeld <code>naechsteNummer</code> (Startwert). Zum Jahreswechsel legst du das neue Jahr an, sonst meldet das System „Kein Rechnungsnummern-Zähler … angelegt“.</li>
     <li><strong>Fehlersuche:</strong> Firebase-Konsole, Functions, Logs. Filter auf die Funktion <code>buchungErstellen</code> und nach dem Zeitpunkt der Anfrage. Typische Meldungen: „Interne Aktionsmail fehlgeschlagen“, „Zusammenfassungsmail fehlgeschlagen“, „Kalendertermin konnte nicht angelegt werden“ (mit dem Fehlertext von IONOS bzw. Google).</li>
+    <li><strong>Gutscheincodes:</strong> Firebase-Konsole, Firestore Database, Sammlung <code>gutscheine</code>, „Dokument hinzufügen“. Dokument-ID = der Code in <strong>Großbuchstaben</strong> (z. B. <code>WILLKOMMEN10</code>). Felder: <code>prozent</code> (Zahl: 5, 10, 15, 20, 25, 40, 50, 90 oder 100), <code>aktiv</code> (true/false, fehlt es, gilt der Code als aktiv) und optional <code>gueltigBis</code> (Text mit Zeitzone, z. B. <code>2026-12-31T23:59:59+01:00</code>). Ändern oder sperren wirkt sofort, ohne Deploy.
+      <ul style="margin-top:6px;">
+        <li>Bei normalen Strecken (nicht Flughafen-Aktion) ersetzt ein Code den allgemeinen 10-%-Einführungsrabatt (bis 20.12.2026), beides zusammen gibt es nicht. Ein 5-%-Code wäre dort in dieser Zeit schlechter als kein Code.</li>
+        <li>Beim <strong>Flughafen-Einführungsangebot</strong> (Festpreis 45 €, 85 € für Hin und zurück) wirkt ein Code <strong>zusätzlich</strong>: Der Prozentwert wird vom Aktionspreis abgezogen. Beispiel: 25 % auf 45 € = 33,75 €, 25 % auf das Paket 85 € = 63,75 €. Wer einen Code hat, bekommt also immer ein besseres Angebot als ohne.</li>
+        <li><strong>100 %</strong> macht die Fahrt kostenlos: Es gibt keinen Zahlungslink, die Bestätigung sagt „kostenfrei“, der Auftrag gilt als bezahlt (Zahlungsart „Gutschein“) und braucht keine Rechnung. In „Neuer Auftrag“ ist ein Preis von 0 € nur mit einem gültigen 100-%-Code möglich.</li>
+        <li>Ein Code lässt sich beliebig oft einlösen, bis du ihn sperrst oder er abläuft.</li>
+        <li>In den <strong>Beförderungsbedingungen</strong> (Ziffern 8 bis 11, auch im Buchungsformular) ist geregelt: Kein Anspruch auf die Annahme eines Codes, du darfst einen Code ablehnen und die Fahrt zum regulären Preis anbieten oder ablehnen, die Weitergabe von Codes ist nicht gestattet, bei Missbrauch darfst du den Code sperren und den Differenzbetrag nachfordern.</li>
+      </ul></li>
     <li><strong>Überfällig-Grenze:</strong> <code>UEBERFAELLIG_NACH_TAGEN</code> in <code>index.js</code> (derzeit 7 Tage).</li>
     <li><strong>Zehnerkarte:</strong> Anzahl der Fahrten in <code>ZEHNERKARTE_FAHRTEN</code> (derzeit 10), Adresse der Kundenseite in <code>KARTE_URL</code>.</li>
   </ul>

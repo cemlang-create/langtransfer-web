@@ -522,6 +522,10 @@
           <p>5. Für Kinder ist ein den gesetzlichen Vorschriften entsprechender Kindersitz erforderlich; auf Wunsch stellen wir einen.</p>
           <p>6. Es gelten die gesetzlichen Bestimmungen des Personenbeförderungsgesetzes (PBefG) für den Mietwagenverkehr.</p>
           <p>7. Die Zahlung erfolgt nach Bestätigung der Buchung über den in der Bestätigungsmail enthaltenen Zahlungslink (Kreditkarte, Klarna oder giropay, abgewickelt über den Zahlungsdienstleister Stripe) oder alternativ per Kartenzahlung direkt im Fahrzeug. Barzahlung ist nicht möglich.</p>
+          <p>8. Gutscheincodes, Aktionen und Rabatte sind freiwillige Angebote von LANGtransfer. Ein Anspruch auf die Annahme eines Gutscheincodes oder auf einen Rabatt besteht nicht; wir sind grundsätzlich nicht verpflichtet, Gutscheincodes oder Rabatte anzunehmen. Wir sind berechtigt, einen Gutscheincode im Einzelfall nicht anzuerkennen und in diesem Fall die Fahrt zum regulären Preis anzubieten, die Fahrt abzulehnen oder die Buchung zu stornieren.</p>
+          <p>9. Von LANGtransfer erhaltene Gutscheincodes sind ausschließlich für den jeweiligen Empfänger bestimmt. Die Weitergabe, der Verkauf, die Veröffentlichung (z. B. in sozialen Medien, Messenger-Gruppen oder auf Gutscheinportalen) und jede sonstige Verbreitung eines Gutscheincodes sind ohne unsere vorherige Zustimmung nicht gestattet. Gutscheincodes sind nicht übertragbar, werden nicht bar ausgezahlt und können pro Buchung nur einmal eingelöst werden.</p>
+          <p>10. Bei Verstößen gegen Ziffer 9, bei missbräuchlicher Verwendung oder wenn keine Berechtigung zur Nutzung eines Gutscheincodes besteht, sind wir berechtigt, den Gutscheincode zu sperren, den Rabatt nachträglich zu verweigern, den Differenzbetrag zum regulären Preis nachzufordern sowie die Fahrt abzulehnen oder die Buchung zu stornieren.</p>
+          <p>11. Gutscheincodes können befristet sein und sind nur bis zu dem angegebenen Datum gültig. Eine nachträgliche Anrechnung auf bereits abgeschlossene oder bezahlte Fahrten ist ausgeschlossen. Wir können Gutscheinaktionen jederzeit ändern oder beenden; für bereits von uns bestätigte Buchungen gilt der bestätigte Preis, sofern kein Fall der Ziffer 10 vorliegt.</p>
         </div>
         <button type="button" class="primary" style="margin-top:18px;" onclick="agbSchliessen()">Schließen</button>
       </div>
@@ -1203,10 +1207,8 @@ async function preisBerechnen(){
   let rabattProzent = 0;
   gutscheinStatusEl.textContent = "";
   gutscheinStatusEl.classList.remove("warn");
-  if (anyAktionGilt && gutscheinCode) {
-    gutscheinStatusEl.textContent = "Gutscheincodes sind mit dem Einführungsangebot nicht kombinierbar.";
-    gutscheinStatusEl.classList.add("warn");
-  } else if (gutscheinCode) {
+  // Ein Gutscheincode wirkt auch beim Flughafen-Einführungsangebot: Der Prozentwert wird vom Aktionspreis abgezogen
+  if (gutscheinCode) {
     try {
       const gAntwort = await fetch(GUTSCHEIN_URL, {
         method: "POST",
