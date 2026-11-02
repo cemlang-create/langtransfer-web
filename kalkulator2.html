@@ -142,6 +142,16 @@
   </div>
   <p class="hint" style="margin-top:-6px;">Reihenfolge: Aktion/Gutschein → eigener Rabatt → Sonderzuschlag. Ein eigener Gesamtpreis (brutto) überschreibt das Ergebnis komplett.</p>
 
+  <div class="field" id="auslandBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:16px;">
+    <label>Fahrt ins Ausland: Wegstrecke im Ausland (ohne deutsche Umsatzsteuer)</label>
+    <div class="row3">
+      <div class="field"><label for="auslandLand">Land</label><input type="text" id="auslandLand" maxlength="60" placeholder="z. B. Belgien"></div>
+      <div class="field"><label for="auslandKmHin">Kilometer im Ausland (Hinfahrt)</label><input type="number" id="auslandKmHin" min="0" step="0.1" placeholder="0"></div>
+      <div class="field" id="auslandKmRueckFeld" style="display:none;"><label for="auslandKmRueck">Kilometer im Ausland (Rückfahrt)</label><input type="number" id="auslandKmRueck" min="0" step="0.1" placeholder="wie Hinfahrt"></div>
+    </div>
+    <div class="hint">Nur ausfüllen, wenn ein Teil der Kundenstrecke im Ausland liegt (die Kilometer ab der Grenze kannst du z. B. in Google Maps ablesen). Der Preis wird nach Kilometern aufgeteilt: Der Auslandsanteil wird <strong>ohne deutsche USt</strong> ausgewiesen, auch auf der Rechnung.</div>
+  </div>
+
   <button class="primary" id="berechnenBtn" onclick="preisBerechnen()">Preis berechnen</button>
   <div class="status" id="status"></div>
 
@@ -386,7 +396,11 @@ function nurOrt(adresse){
   if (!adresse) return "";
   const teile = adresse.split(",").map(s => s.trim()).filter(Boolean);
   if (!teile.length) return adresse;
-  return teile[teile.length - 1].replace(/^\d{4,5}\s*/, "").trim() || adresse;
+  // Steht am Ende das Land ("…, 1000 Bruxelles, Belgien"), gilt der Teil davor als Ort
+  const LAND = /^(deutschland|germany|belgien|belgium|belgi[eë]|belgique|niederlande|netherlands|nederland|luxemburg|luxembourg|frankreich|france|österreich|austria|schweiz|switzerland|suisse|italien|italy|spanien|spain|polen|poland|tschechien|czechia|dänemark|denmark)$/i;
+  let i = teile.length - 1;
+  if (i > 0 && (LAND.test(teile[i]) || (!/\d/.test(teile[i]) && /\d/.test(teile[i - 1])))) i -= 1;
+  return teile[i].replace(/^\d{4,5}\s*/, "").trim() || adresse;
 }
 function plz(place){
   if (!place || !place.address_components) return "";
@@ -467,7 +481,8 @@ function adresseAusPlace(place){
 // ===================== AUTOCOMPLETE =====================
 function initAutocomplete(){
   document.getElementById("datum").value = new Date().toISOString().slice(0, 10);
-  const optionen = { componentRestrictions:{country:"de"}, fields:["formatted_address","address_components","geometry","name","types"] };
+  // Keine Länderbeschränkung (Fahrten ins Ausland, z. B. Belgien): Deutschland und die Nachbarländer werden nur bevorzugt vorgeschlagen
+  const optionen = { bounds: { north: 56, south: 46, west: 2, east: 17 }, strictBounds: false, fields:["formatted_address","address_components","geometry","name","types"] };
   ["abhol", "zwischen", "ziel", "ruckAbhol", "ruckZiel"].forEach(id => {
     const input = document.getElementById(id);
     const ac = new google.maps.places.Autocomplete(input, optionen);
@@ -497,6 +512,7 @@ function setFahrtart(f){
   document.getElementById("fahrtartEinfach").classList.toggle("active", f === "einfach");
   document.getElementById("fahrtartHinRueck").classList.toggle("active", f === "hinrueck");
   document.getElementById("rueckfahrtBereich").style.display = f === "hinrueck" ? "block" : "none";
+  const auslandRueck = document.getElementById("auslandKmRueckFeld"); if (auslandRueck) auslandRueck.style.display = f === "hinrueck" ? "" : "none";
 }
 function zwischenUmschalten(){
   const feld = document.getElementById("zwischenFeld");
@@ -864,8 +880,23 @@ async function preisBerechnen(){
     const eigenerRaw = document.getElementById("eigenerPreis").value;
     const eigenerPreis = eigenerRaw !== "" ? Math.max(0, parseFloat(eigenerRaw)) : null;
     const gesamtBrutto = Math.round((eigenerPreis !== null ? eigenerPreis : berechnet) * 100) / 100;
-    const netto = gesamtBrutto / 1.19;
-    const mwst = gesamtBrutto - netto;
+    // Wegstrecke im Ausland: Der Preis wird nach Kilometern (Kundenstrecke) aufgeteilt, der Auslandsanteil trägt keine deutsche USt
+    const kmGesamt = hinPlan.kundenKm + (ruckPlan ? ruckPlan.kundenKm : 0);
+    const auslandLand = document.getElementById("auslandLand").value.trim();
+    const auslandHin = Math.max(0, parseFloat(document.getElementById("auslandKmHin").value || 0));
+    const rueckRoh = document.getElementById("auslandKmRueck").value;
+    const auslandRueck = ruckPlan ? (rueckRoh !== "" ? Math.max(0, parseFloat(rueckRoh)) : auslandHin) : 0;
+    const auslandKm = auslandHin + auslandRueck;
+    if (auslandKm > 0) {
+      const auslandFehler = !auslandLand ? "Bitte das Land der Wegstrecke im Ausland angeben (z. B. Belgien)."
+        : (auslandHin > hinPlan.kundenKm + 0.05 || (ruckPlan && auslandRueck > ruckPlan.kundenKm + 0.05)) ? `Die Kilometer im Ausland sind größer als die Kundenstrecke (Hinfahrt ${hinPlan.kundenKm.toFixed(1)} km${ruckPlan ? `, Rückfahrt ${ruckPlan.kundenKm.toFixed(1)} km` : ""}).` : "";
+      if (auslandFehler) { letztesErgebnis = null; document.getElementById("ergebnis").style.display = "none"; setStatus("status", auslandFehler, "error"); return; }   // kein altes Ergebnis stehen lassen
+    }
+    const auslandAnteil = auslandKm > 0 && gesamtBrutto > 0 && kmGesamt > 0 ? Math.min(1, auslandKm / kmGesamt) : 0;
+    const bruttoAusland = Math.round(gesamtBrutto * auslandAnteil * 100) / 100;
+    const bruttoInland = Math.round((gesamtBrutto - bruttoAusland) * 100) / 100;
+    const netto = bruttoInland / 1.19 + bruttoAusland;
+    const mwst = bruttoInland - bruttoInland / 1.19;
 
     // ---------- Anzeige ----------
     let r = beinDetailHtml(ruckPlan ? "Hinfahrt: " : "", hin, hinPlan, fahrgaeste);
@@ -892,14 +923,18 @@ async function preisBerechnen(){
       r += `<div class="sub2"><span>Berechneter Preis</span><span>${fmt(berechnet)} €</span></div>`;
       r += `<div><span>Eigener Gesamtpreis (überschreibt die Berechnung)</span><span>${fmt(eigenerPreis)} €</span></div>`;
     }
+    if (auslandAnteil > 0) {
+      r += `<div><span>Davon Wegstrecke Inland (Deutschland)<small>${(kmGesamt - auslandKm).toFixed(1)} km · mit 19 % USt.</small></span><span>${fmt(bruttoInland)} €</span></div>`;
+      r += `<div><span>Davon Wegstrecke Ausland (${auslandLand.replace(/[<>&]/g, "")})<small>${auslandKm.toFixed(1)} km · ohne deutsche USt.</small></span><span>${fmt(bruttoAusland)} €</span></div>`;
+    }
     r += `<div class="sub2"><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
-    r += `<div class="sub2"><span>zzgl. 19 % USt.</span><span>${fmt(mwst)} €</span></div>`;
+    r += `<div class="sub2"><span>zzgl. 19 % USt.${auslandAnteil > 0 ? " (nur Inland)" : ""}</span><span>${fmt(mwst)} €</span></div>`;
     r += `<div class="total"><span>Gesamtpreis (brutto)</span><span>${fmt(gesamtBrutto)} €</span></div>`;
     document.getElementById("tabelle").innerHTML = r;
     document.getElementById("ergebnis").style.display = "block";
 
     // ---------- Angebots-Vorbelegung ----------
-    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "" };
+    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "", ausland: auslandAnteil > 0 ? { land: auslandLand, kmHin: auslandHin, kmRueck: auslandRueck, kmGesamt } : null };
     vermittlungAktualisieren();
     flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
@@ -935,10 +970,10 @@ function lokalDatumZeit(iso){ const d = new Date(iso); return { datum: `${d.getF
  */
 function placeAusAdresse(text){
   const teile = String(text || "").split(",").map((t) => t.trim()).filter(Boolean);
-  const plzIdx = teile.findIndex((t) => /^\d{5}\s+\S/.test(t));
+  const plzIdx = teile.findIndex((t) => /^\d{4,5}\s+\S/.test(t));   // deutsche (5-stellige) und z. B. belgische (4-stellige) Postleitzahlen
   let plzNr = "", ort = "", strasse = "", land = "";
   if (plzIdx >= 0) {
-    const m = teile[plzIdx].match(/^(\d{5})\s+(.+)$/);
+    const m = teile[plzIdx].match(/^(\d{4,5})\s+(.+)$/);
     plzNr = m[1]; ort = m[2];
     if (plzIdx > 0) strasse = teile[plzIdx - 1];            // "Hotel Adler, Hauptstr. 5, 70173 Stuttgart": die Zeile direkt vor der PLZ
     land = teile.slice(plzIdx + 1).join(", ");
@@ -1044,6 +1079,7 @@ async function auftragInFormular(d, optionen = {}){
   }
   setzeWert("ab12", f.fahrgaesteAb12 || 1); setzeWert("unter12", f.fahrgaesteUnter12 || 0);
   setzeWert("gutschein", ""); setzeWert("manuellRabatt", ""); setzeWert("sonderzuschlag", "");
+  setzeWert("auslandLand", d.ausland ? d.ausland.land : ""); setzeWert("auslandKmHin", d.ausland ? d.ausland.kmHin : ""); setzeWert("auslandKmRueck", d.ausland && ruck ? d.ausland.kmRueck : "");
   // der bisherige Preis bleibt, bis du ihn änderst (bei einer Freifahrt der Preis VOR der Gutschrift, sie wird beim Senden wieder abgezogen)
   setzeWert("eigenerPreis", d.freifahrt ? d.freifahrt.bruttoVorher : (d.preisOffen ? "" : ((d.preis && d.preis.gesamtBrutto) || "")));
   // --- Kunde ---
@@ -1226,6 +1262,7 @@ async function angebotSenden(){
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
     ...(letztesErgebnis.gutscheinCode ? { gutscheinCode: letztesErgebnis.gutscheinCode } : {}),
+    ...(letztesErgebnis.ausland ? { ausland: letztesErgebnis.ausland } : {}),
     ...(stammkundeAktuell ? { stammkundeId: stammkundeAktuell.id } : {}),
     ...(stammkundeAktuell && !istVermittlung && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
     kunde,

@@ -156,8 +156,8 @@ function berlinZuISO(datum, zeit){
   for (let i = 0; i < 3; i++) { const b = {}; BERLIN_FORMAT.formatToParts(new Date(t)).forEach((p) => { b[p.type] = p.value; }); t -= Date.UTC(+b.year, +b.month - 1, +b.day, +b.hour, +b.minute) - ziel; }   // Sommer-/Winterzeit ausgleichen
   return new Date(t).toISOString();
 }
-const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", freifahrt: "Freifahrt", unbekannt: "Zahlungsart unbekannt" };
-const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform", freifahrt: "als Freifahrt (Zehnerkarte)" };
+const ZAHLUNG_ART = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", freifahrt: "Freifahrt", gutschein: "Gutschein", unbekannt: "Zahlungsart unbekannt" };
+const ZAHLUNG_ART_LANG = { karte: "per Karte im Fahrzeug", bar: "bar im Fahrzeug", ueberweisung: "per Überweisung", link: "per Zahlungslink", plattform: "über die Plattform", freifahrt: "als Freifahrt (Zehnerkarte)", gutschein: "kostenfrei per Gutschein" };
 /** Zeigt ALLE gespeicherten Angaben eines Auftrags (beschriftet), danach alles Übrige unter "Weitere Angaben". */
 function alleAngabenHtml(a){
   const benutzt = new Set();
@@ -225,6 +225,7 @@ function alleAngabenHtml(a){
     feld(add, "Preis offen", "preisOffen"); feld(add, "Trinkgeld (brutto)", "trinkgeldBrutto");
     feld(add, "Zahlungsart", "zahlungsart", (v) => esc({ link: "Zahlungslink (online im Voraus)", fahrzeug: "Im Fahrzeug per Karte", rechnung: "Auf Rechnung (Überweisung)", vermittlung: "Vermittlung" }[v] || v));
     feld(add, "Zahlung laut Formular", "kunde.zahlung"); feld(add, "Zahlungslink", "zahlungslink");
+    if (a.ausland) { markiere("ausland"); const x = a.ausland; add("Wegstrecke im Ausland (ohne deutsche USt)", esc(`${x.land}: ${x.kmAusland} von ${x.kmGesamt} km · Ausland ${eur(x.bruttoAusland)}, Inland ${eur(x.bruttoInland)} (19 % USt)`)); }
     if (a.freifahrt) { markiere("freifahrt"); add("Freifahrt (Zehnerkarte)", esc(`Gutschrift ${eur(a.freifahrt.abgezogen)} auf ${eur(a.freifahrt.bruttoVorher)} (Wert der Freifahrt ${eur(a.freifahrt.wert)})`)); }
     if (a.abgerechnet) { markiere("abgerechnet"); add("Bezahlt", esc(`${ZAHLUNG_ART[a.abgerechnet.art] || a.abgerechnet.art}, ${eur(a.abgerechnet.betragBrutto)}${a.abgerechnet.datum ? ", " + a.abgerechnet.datum.split("-").reverse().join(".") : ""}${a.abgerechnet.notiz ? " · " + a.abgerechnet.notiz : ""}`)); }
     feld(add, "Stammkunde", "stammkundeName"); markiere("stammkundeId");
