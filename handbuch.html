@@ -186,10 +186,41 @@
   <ul>
     <li><strong>Ohne Rechnung:</strong> „Als bezahlt markieren“. Eine Rechnung ist dann nicht nötig, du kannst sie aber jederzeit im Reiter „Rechnung“ erzeugen (Betrag und Zahlungsart sind übernommen).</li>
     <li><strong>Überweisungsrechnung offen:</strong> Ist das Geld da, klicke „Zahlung eingegangen“. Die Rechnung gilt dann als bezahlt.</li>
-    <li><strong>Zahlungslink:</strong> Das System erkennt Zahlungen per Link nicht automatisch. Prüfe sie in Stripe und markiere sie hier selbst.</li>
-    <li>„Markierung entfernen“ macht die Zahlung rückgängig (bei Rechnungen „bereits bezahlt“ nicht möglich, dort gilt die Rechnung).</li>
+    <li><strong>Zahlungslink:</strong> Im Menü „Umsatz“ holt <em>Stripe abrufen</em> bezahlte Links samt Gebühr und Auszahlungsdatum automatisch und markiert sie als bezahlt. Du kannst sie weiterhin auch selbst markieren.</li>
+    <li><strong>Bearbeiten:</strong> Eine als bezahlt markierte Zahlung lässt sich jederzeit ändern (Zahlungsart, Betrag, Datum, Notiz, Gebühr, bei Stripe das Auszahlungsdatum), auch wenn eine Rechnung existiert. Klicke im Bereich „Zahlung“ auf <strong>Bearbeiten</strong>.</li>
+    <li>„Markierung entfernen“ macht die Zahlung rückgängig (bei Rechnungen „bereits bezahlt“ nicht möglich, dort gilt die Rechnung). Gehört eine Plattformfahrt zu einer erfassten Auszahlung, lösche zuerst die Auszahlung im Menü „Umsatz“.</li>
   </ul>
   <div class="tipp"><strong>Übersicht und Filter</strong>Die Karten „Abrechnung offen“ und „Rechnung offen (davon n überfällig)“ in der Übersicht führen direkt zur gefilterten Liste.</div>
+</section>
+
+<section class="thema" id="umsatz" data-gruppe="Abrechnung" data-titel="Umsatzliste, Gebühren und Auszahlungen">
+  <h2>Umsatzliste, Gebühren und Auszahlungen</h2>
+  <p>Das Menü <strong>Umsatz</strong> zeigt für jeden Monat, was bei dir <em>angekommen</em> ist: Brutto, Netto, Umsatzsteuer, Gebühren und die Auszahlung. Eine Zahlung zählt in dem Monat, in dem das Geld eingegangen ist (Ist-Versteuerung). Mit den Pfeilen oder dem Monatsfeld wechselst du den Monat, ein Klick auf eine Zeile öffnet den Auftrag.</p>
+  <h3>Welcher Monat gilt?</h3>
+  <table>
+    <tr><th>Zahlungsart</th><th>Zählt im Monat von</th></tr>
+    <tr><td>Karte (SumUp), bar, Überweisung</td><td>dem Datum der Zahlung (das Datum der Markierung)</td></tr>
+    <tr><td>Zahlungslink (Stripe)</td><td>nach Einstellung: Auszahlung von Stripe auf dein Konto (Standard) oder Zahlung durch den Gast</td></tr>
+    <tr><td>Plattform (Welcome Pickups)</td><td>dem Datum der Sammelauszahlung. Bis dahin steht die Fahrt unter „Auszahlung offen“.</td></tr>
+  </table>
+  <div class="wichtig"><strong>Steuerlich bitte klären</strong>Welcher Zeitpunkt bei Stripe-Zahlungen zählt und ob bei Plattformfahrten der Gästebetrag oder die Auszahlung dein Umsatz ist, entscheidet dein Steuerberater. Die Liste zeigt beides nebeneinander (Brutto und Auszahlung), die Einstellung für Stripe findest du unter „Einstellungen für Gebühren und Monatszuordnung“.</div>
+  <h3>Export</h3>
+  <p><strong>CSV</strong> öffnet sich direkt in Excel (Semikolon, deutsche Zahlen, Umlaute korrekt). <strong>PDF</strong> ist eine übersichtliche Liste mit Summen und Aufteilung nach Zahlungsart. Beide enthalten: Zahlungseingang, Fahrtdatum, Referenz, Kunde, Strecke, Zahlungsart, Rechnung, Brutto, Netto, USt, davon Ausland (ohne deutsche USt), Gebühr/Provision, Auszahlung, Auszahlungsdatum. Die Geldtransfergebühren der Plattform stehen als eigene Zeilen darin.</p>
+  <h3>Stripe-Gebühren und Auszahlungsdatum</h3>
+  <p><strong>Stripe abrufen</strong> fragt Stripe ab dem Vormonat ab, ordnet bezahlte Zahlungslinks über die Buchungsreferenz dem Auftrag zu und trägt Betrag, Zahlungsdatum, <strong>genaue Gebühr</strong> und das <strong>Auszahlungsdatum</strong> ein. Noch nicht markierte Aufträge werden dabei automatisch als bezahlt markiert. Ist Stripe noch nicht ausgezahlt, fehlt das Auszahlungsdatum. Rufe dann später noch einmal ab. Bereits als Karte oder bar markierte Aufträge werden nicht überschrieben, sondern gemeldet.</p>
+  <ul>
+    <li><strong>Einmalig einrichten:</strong> Der Stripe-Schlüssel (Secret <code>STRIPE_SECRET_KEY</code>) braucht <strong>Lesezugriff</strong> auf Checkout-Sitzungen, PaymentIntents, Charges, Balance (Guthabentransaktionen) und Payouts. Bei einem eingeschränkten Schlüssel setzt du das im Stripe-Dashboard unter Entwickler, API-Schlüssel. Fehlt der Zugriff, meldet das Portal es ausdrücklich.</li>
+  </ul>
+  <h3>SumUp-Gebühren per Satz</h3>
+  <p>Hinterlege unter „Einstellungen für Gebühren und Monatszuordnung“ den SumUp-Satz (Prozent, optional plus fester Betrag). Beim Markieren einer Kartenzahlung schlägt das Portal die Gebühr danach vor (änderbar). Für ältere Kartenzahlungen ohne Gebühr berechnet der Knopf <em>SumUp-Gebühren berechnen</em> sie für den ganzen Monat. Bereits eingetragene Gebühren bleiben unverändert.</p>
+  <h3>Welcome Pickups: Sammelauszahlung</h3>
+  <ol>
+    <li>Markiere die Fahrt im Auftrag als bezahlt mit Zahlungsart <strong>Plattform</strong>: Betrag = was der Gast an Welcome Pickups zahlt, <strong>Provision</strong> = Abzug laut Abrechnung. Die Fahrt steht dann als „Auszahlung offen“ in Liste und Übersicht.</li>
+    <li>Kommt die Überweisung, öffne <strong>Umsatz</strong> und scrolle zu „Plattform-Auszahlung erfassen“. Wähle die Fahrten der Überweisung, prüfe die Provisionen und trage <strong>Datum</strong> und den <strong>erhaltenen Betrag</strong> ein. Die Differenz zu „Gästebeträge minus Provision“ ist die <strong>Geldtransfergebühr</strong>. Sie wird angezeigt und gespeichert.</li>
+    <li>Die Fahrten zählen jetzt im Monat der Auszahlung. Vertippt? „Löschen“ bei der erfassten Auszahlung macht sie rückgängig, die Fahrten sind dann wieder offen.</li>
+  </ol>
+  <h3>Hinweise über der Tabelle</h3>
+  <p>Gelbe Hinweisfelder erinnern dich an Gebühren, die noch fehlen, offene Plattform-Auszahlungen (mit Summe), noch nicht bezahlte Rechnungen, gefahrene Vermittlungsfahrten ohne Gästebetrag und Stripe-Zahlungen ohne Auszahlungsdatum.</p>
 </section>
 
 <section class="thema" id="rechnung" data-gruppe="Abrechnung" data-titel="Rechnung erstellen, Storno und Korrektur">

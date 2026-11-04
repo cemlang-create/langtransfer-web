@@ -74,6 +74,7 @@
   th, td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
   th{font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap;}
   tbody tr{cursor:pointer;} tbody tr:hover{background:#f6f2e8;}
+  th.re, td.re{text-align:right;white-space:nowrap;}
   /* Auftragsliste: gefahrene Fahrten leicht ausgegraut, die nächste anstehende bestätigte Fahrt mit goldenem Hintergrund */
   #listeBox tbody tr.vergangen td{opacity:.55;} #listeBox tbody tr.vergangen:hover td{opacity:.9;}
   #listeBox tbody tr.naechste td{background:#f8ecd0;} #listeBox tbody tr.naechste:hover td{background:#f3e2bb;} #listeBox tbody tr.naechste td:first-child{box-shadow:inset 4px 0 0 var(--moss);}
@@ -95,6 +96,7 @@
   .abrechnung label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;}
   .abrechnung input, .abrechnung select{font:inherit;font-size:14.5px;padding:9px 10px;border:1px solid #cfc9b8;border-radius:6px;background:#fff;color:var(--ink);}
   .abrechnung .zeile{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:8px;}
+  .leiste{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:8px;}
   .reiter{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--line);}
   .reiter button{background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;font:inherit;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer;}
   .reiter button:hover{color:var(--ink);}
@@ -319,6 +321,7 @@ const MENUE = [
   { pfad: "neu", text: "Neuer Auftrag", modul: "neuerAuftrag" },
   { pfad: "krankenfahrten", text: "Krankenfahrten", modul: "krankenfahrten" },
   { pfad: "stammkunden", text: "Stammkunden", modul: "stammkunden" },
+  { pfad: "umsatz", text: "Umsatz", modul: "umsatz" },
   { pfad: "handbuch", text: "Handbuch", modul: "handbuch" },
   { pfad: "einstellungen", text: "Einstellungen", modul: "einstellungen" }
 ];
@@ -350,6 +353,7 @@ function route(){
   if (abschnitt === "neu" && sichtbar("neuerAuftrag")) return ansichtRahmen("Neuer Auftrag", "Preis berechnen und Angebot oder Auftrag an den Kunden senden.", "kalkulator2.html?embedded=1", true);
   if (abschnitt === "krankenfahrten" && sichtbar("krankenfahrten")) return ansichtRahmen("Krankenfahrten", "Terminserien anlegen, Bestätigung senden, Zuzahlungsrechnungen je Fahrt.", "krankenfahrt.html?embedded=1", true);
   if (abschnitt === "stammkunden" && sichtbar("stammkunden")) return ansichtRahmen("Stammkunden", "Kunden mit festen Fahrten und digitaler Zehnerkarte.", "stammkunden.html?embedded=1" + (params.get("id") ? "&id=" + encodeURIComponent(params.get("id")) : ""), true);
+  if (abschnitt === "umsatz" && sichtbar("umsatz")) return ansichtUmsatz(params, noch);
   if (abschnitt === "handbuch" && sichtbar("handbuch")) return ansichtRahmen("Handbuch", "Anleitungen zu allen Funktionen des Portals.", "handbuch.html?embedded=1" + (params.get("thema") ? "#" + encodeURIComponent(params.get("thema")) : ""), true);
   return ansichtUebersicht(noch);
 }
@@ -360,6 +364,139 @@ window.addEventListener("message", (ev) => {
   if (!ev.data || ev.data.type !== "lt-hoehe") return;
   document.querySelectorAll("iframe.maske").forEach((f) => { if (f.contentWindow === ev.source) f.style.height = Math.max(300, ev.data.hoehe + 8) + "px"; });
 });
+
+// ===================== ANSICHT: UMSATZ =====================
+function dateiSpeichern(name, mime, base64){
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+const datumDe = (iso) => (iso ? iso.split("-").reverse().join(".") : "");
+const monatVersetzen = (monat, schritt) => { const [j, m] = monat.split("-").map(Number); return new Date(Date.UTC(j, m - 1 + schritt, 1)).toISOString().slice(0, 7); };
+const MONATSNAMEN = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const zahlDe = (n) => Number(n || 0).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+async function ansichtUmsatz(params, noch){
+  const heuteMonat = new Date().toLocaleDateString("sv-SE").slice(0, 7);
+  const monat = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.get("monat") || "") ? params.get("monat") : heuteMonat;
+  const kopf = `<h2 class="seite">Umsatz</h2><p class="unter">Zahlungseingänge je Monat (Ist-Versteuerung) mit Gebühren und Auszahlungen.</p>`;
+  $("main").innerHTML = kopf + `<div class="laden">Wird geladen …</div>`;
+  try {
+    const [d, off] = await Promise.all([api("umsatzAdmin", { aktion: "liste", monat }), api("umsatzAdmin", { aktion: "auszahlungOffen" })]);
+    if (!noch()) return;
+    const s = d.summen, e = d.einstellungen, of = d.offen;
+    const monatText = `${MONATSNAMEN[Number(monat.slice(5)) - 1]} ${monat.slice(0, 4)}`;
+    const karte = (zahl, text) => `<div class="karte"><div class="zahl" style="font-size:22px;">${esc(zahl)}</div><div class="text">${esc(text)}</div></div>`;
+    const hinweise = [];
+    if (of.ohneGebuehr) hinweise.push(`${of.ohneGebuehr} Zahlung${of.ohneGebuehr === 1 ? "" : "en"} ohne Gebühr in diesem Monat. ${e.sumupProzent !== null ? `<button type="button" class="knopf" id="umSumup">SumUp-Gebühren mit ${esc(String(e.sumupProzent).replace(".", ","))} % berechnen</button> (Stripe: „Stripe abrufen“)` : "Hinterlege unten den SumUp-Gebührensatz, dann lassen sich fehlende Kartengebühren berechnen; Stripe-Gebühren holt „Stripe abrufen“."}`);
+    if (of.auszahlungOffen.anzahl) hinweise.push(`<strong>Auszahlung offen:</strong> ${of.auszahlungOffen.anzahl} Plattformfahrt${of.auszahlungOffen.anzahl === 1 ? "" : "en"} mit ${zahlDe(of.auszahlungOffen.betrag)} €. Sie zählen erst im Monat der Auszahlung (unten erfassen).`);
+    if (of.rechnungOffen.anzahl) hinweise.push(`<strong>Rechnungen offen:</strong> ${of.rechnungOffen.anzahl} mit ${zahlDe(of.rechnungOffen.betrag)} € noch nicht bezahlt. Sie zählen, sobald die Zahlung markiert ist.`);
+    if (of.vermittlungOhneBetrag) hinweise.push(`${of.vermittlungOhneBetrag} gefahrene Vermittlungsfahrt${of.vermittlungOhneBetrag === 1 ? "" : "en"} ohne eingetragenen Gästebetrag.`);
+    if (of.stripeOhneAuszahlung) hinweise.push(`${of.stripeOhneAuszahlung} Stripe-Zahlung${of.stripeOhneAuszahlung === 1 ? "" : "en"} ohne Auszahlungsdatum („Stripe abrufen“ holt es, sobald Stripe ausgezahlt hat).`);
+    const zeilen = d.zeilen.map((z) => `<tr data-ref="${esc(z.referenz)}">
+        <td>${datumDe(z.eingang)}</td><td>${datumDe(z.fahrt)}</td><td><strong>${esc(z.referenz)}</strong></td><td>${esc(z.kunde)}</td><td>${esc(z.artText)}${z.rechnungsnummer ? `<div class="klein">${esc(z.rechnungsnummer)}</div>` : ""}</td>
+        <td class="re">${zahlDe(z.brutto)}</td><td class="re">${zahlDe(z.netto)}</td><td class="re">${zahlDe(z.ust)}${z.auslandBrutto ? `<div class="klein">Ausland ${zahlDe(z.auslandBrutto)}</div>` : ""}</td>
+        <td class="re">${z.gebuehr === null ? "–" : zahlDe(z.gebuehr)}${z.gebuehrQuelle === "satz" ? '<div class="klein">nach Satz</div>' : ""}</td><td class="re">${zahlDe(z.auszahlung)}</td>
+        <td>${z.hinweise.map((h) => `<span class="badge warn">${esc(h)}</span>`).join(" ")}</td></tr>`).join("");
+    const transferZeilen = d.auszahlungen.filter((a) => Number(a.transfergebuehr) > 0).map((a) => `<tr class="klein"><td>${datumDe(a.datum)}</td><td></td><td></td><td>${esc(a.plattform || "Plattform")}</td><td>Geldtransfergebühr (${a.anzahl} Fahrten)</td><td class="re"></td><td class="re"></td><td class="re"></td><td class="re">${zahlDe(a.transfergebuehr)}</td><td class="re">-${zahlDe(a.transfergebuehr)}</td><td></td></tr>`).join("");
+    const tabelle = d.zeilen.length || transferZeilen
+      ? `<div class="tabellenrahmen"><table><thead><tr><th>Eingang</th><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Zahlungsart</th><th class="re">Brutto</th><th class="re">Netto</th><th class="re">USt</th><th class="re">Gebühr</th><th class="re">Auszahlung</th><th></th></tr></thead><tbody>${zeilen}${transferZeilen}
+         <tr style="font-weight:700;background:#f6f2e8;cursor:default;"><td colspan="5">Summe (${s.anzahl} Zahlungen)</td><td class="re">${zahlDe(s.brutto)}</td><td class="re">${zahlDe(s.netto)}</td><td class="re">${zahlDe(s.ust)}</td><td class="re">${zahlDe(s.gebuehr + s.transfergebuehr)}</td><td class="re">${zahlDe(s.auszahlungGesamt)}</td><td></td></tr></tbody></table></div>`
+      : `<div class="leer">Keine Zahlungseingänge im ${esc(monatText)}.</div>`;
+    const nachArt = d.nachArt.length ? `<p class="klein" style="margin:10px 0 0;">Nach Zahlungsart: ${d.nachArt.map((a) => `${esc(a.artText)} ${a.anzahl} × ${zahlDe(a.brutto)} € (Gebühr ${zahlDe(a.gebuehr)} €)`).join(" · ")}. Davon Wegstrecke im Ausland ohne deutsche USt: ${zahlDe(s.auslandBrutto)} €.</p>` : "";
+
+    // Plattform-Auszahlungen (Sammelüberweisung): offene Fahrten auswählen, Provision prüfen, erhaltenen Betrag eintragen
+    const offeneFahrten = off.fahrten || [];
+    const auszahlBlock = `<div class="rahmenkarte" style="margin-top:22px;"><h3>Plattform-Auszahlung erfassen (z. B. Welcome Pickups)</h3>` + (offeneFahrten.length
+      ? `<p class="klein" style="margin:0 0 8px;">Wähle die Fahrten, die in einer Überweisung enthalten waren. Gästebetrag und Provision stehen in der Abrechnung der Plattform. Der Unterschied zum erhaltenen Betrag ist die Geldtransfergebühr.</p>
+         <div class="tabellenrahmen"><table><thead><tr><th></th><th>Fahrt</th><th>Referenz</th><th class="re">Gästebetrag</th><th class="re">Provision (€)</th><th class="re">Auszahlung</th></tr></thead><tbody>${offeneFahrten.map((f) => `<tr data-id="${esc(f.id)}" style="cursor:default;"><td><input type="checkbox" class="azWahl" checked></td><td>${datumDe(f.fahrt)}</td><td><strong>${esc(f.referenz)}</strong></td><td class="re azGast">${zahlDe(f.gaestebetrag)}</td><td class="re"><input type="number" step="0.01" min="0" class="azProv" value="${f.provision === null ? "" : f.provision}" style="width:90px;text-align:right;"></td><td class="re azNetto">${zahlDe(f.gaestebetrag - (f.provision || 0))}</td></tr>`).join("")}</tbody></table></div>
+         <div class="leiste" style="margin-top:10px;"><div><label for="azDatum">Auszahlung am</label><input type="date" id="azDatum" value="${new Date().toLocaleDateString("sv-SE")}"></div>
+           <div><label for="azErhalten">Erhalten auf dem Konto (€)</label><input type="number" step="0.01" min="0" id="azErhalten" style="width:130px;"></div>
+           <div style="flex:1;min-width:160px;"><label for="azNotiz">Notiz (optional)</label><input type="text" id="azNotiz" maxlength="200" placeholder="z. B. Sammelauszahlung KW 45" style="width:100%;"></div>
+           <button type="button" class="knopf gold" id="azSpeichern">Auszahlung erfassen</button></div>
+         <div class="klein" id="azSumme" style="margin-top:6px;"></div><div class="klein" id="azMeldung" style="margin-top:4px;"></div>`
+      : `<p class="klein" style="margin:0;">Keine offenen Plattformfahrten. Eine Fahrt erscheint hier, sobald sie als bezahlt („Plattform“) markiert ist und die Auszahlung noch aussteht.</p>`) + `</div>`;
+    const erfasst = d.auszahlungen.length ? `<div class="rahmenkarte" style="margin-top:16px;"><h3>Erfasste Auszahlungen im ${esc(monatText)}</h3>${d.auszahlungen.map((a) => `<div class="leiste" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:6px 0;"><div>${datumDe(a.datum)} · <strong>${esc(a.plattform || "Plattform")}</strong> · ${a.anzahl} Fahrt${a.anzahl === 1 ? "" : "en"} · erhalten ${zahlDe(a.betragErhalten)} €, Transfergebühr ${zahlDe(a.transfergebuehr)} €${a.notiz ? ` · ${esc(a.notiz)}` : ""}</div><button type="button" class="knopf azLoeschen" data-id="${esc(a.id)}">Löschen</button></div>`).join("")}</div>` : "";
+    const einstellungen = `<details class="rahmenkarte" style="margin-top:16px;"><summary style="cursor:pointer;font-weight:700;">Einstellungen für Gebühren und Monatszuordnung</summary><div class="leiste" style="margin-top:10px;">
+         <div><label for="esSumup">SumUp-Gebühr (%)</label><input type="number" step="0.01" min="0" max="10" id="esSumup" value="${e.sumupProzent === null ? "" : e.sumupProzent}" style="width:110px;"></div>
+         <div><label for="esFix">+ fester Betrag (€)</label><input type="number" step="0.01" min="0" max="5" id="esFix" value="${e.sumupFix}" style="width:110px;"></div>
+         <div><label for="esStripe">Stripe-Zahlungen zählen zum Monat der</label><select id="esStripe"><option value="auszahlung" ${e.stripeMonat === "auszahlung" ? "selected" : ""}>Auszahlung auf dein Konto</option><option value="zahlung" ${e.stripeMonat === "zahlung" ? "selected" : ""}>Zahlung durch den Gast</option></select></div>
+         <button type="button" class="knopf gold" id="esSpeichern">Speichern</button></div><div class="klein" id="esMeldung" style="margin-top:6px;"></div>
+         <p class="klein" style="margin:8px 0 0;">Welcher Zeitpunkt bei Stripe-Zahlungen für die Umsatzsteuer gilt, klärst du mit deinem Steuerberater. Der SumUp-Satz wird nur auf Zahlungen ohne eingetragene Gebühr angewendet.</p></details>`;
+
+    $("main").innerHTML = kopf + `<div class="leiste" style="align-items:flex-end;margin-bottom:6px;"><button type="button" class="knopf" id="umZurueck" title="Vorheriger Monat">◀</button><div style="width:170px;flex:0 0 170px;"><label for="umMonat">Monat</label><input type="month" id="umMonat" value="${esc(monat)}" style="width:100%;"></div><button type="button" class="knopf" id="umVor" title="Nächster Monat">▶</button><span style="flex:1;"></span>
+        <button type="button" class="knopf" id="umStripe">Stripe abrufen</button><button type="button" class="knopf" id="umCsv">CSV</button><button type="button" class="knopf gold" id="umPdf">PDF</button></div>
+      <div class="klein" id="umMeldung" style="min-height:18px;"></div>
+      <div class="karten" style="margin:8px 0 12px;">${karte(String(s.anzahl), "Zahlungen im " + monatText)}${karte(zahlDe(s.brutto) + " €", "Brutto (Umsatz)")}${karte(zahlDe(s.gebuehr + s.transfergebuehr) + " €", "Gebühren und Provision")}${karte(zahlDe(s.auszahlungGesamt) + " €", "Auszahlung")}</div>
+      ${hinweise.map((h) => `<div class="rahmenkarte" style="padding:8px 12px;margin-bottom:8px;">${h}</div>`).join("")}
+      ${tabelle}${nachArt}${auszahlBlock}${erfasst}${einstellungen}`;
+
+    const meldung = (t, fehler) => { const m = $("umMeldung"); m.textContent = t || ""; m.style.color = fehler ? "var(--err)" : ""; };
+    const sprung = (m) => { location.hash = "#/umsatz?monat=" + m; };
+    $("umMonat").addEventListener("change", () => { if (/^\d{4}-\d{2}$/.test($("umMonat").value)) sprung($("umMonat").value); });
+    $("umZurueck").addEventListener("click", () => sprung(monatVersetzen(monat, -1)));
+    $("umVor").addEventListener("click", () => sprung(monatVersetzen(monat, 1)));
+    document.querySelectorAll("#main tr[data-ref]").forEach((tr) => tr.addEventListener("click", () => { location.hash = "#/auftrag/" + encodeURIComponent(tr.dataset.ref); }));
+    for (const [id, format] of [["umCsv", "csv"], ["umPdf", "pdf"]]) $(id).addEventListener("click", async () => {
+      $(id).disabled = true; meldung("Datei wird erstellt …");
+      try { const x = await api("umsatzAdmin", { aktion: "export", monat, format }); dateiSpeichern(x.dateiname, x.mime, x.base64); meldung(`${x.dateiname} heruntergeladen.`); }
+      catch (err) { meldung(err.message, true); } finally { $(id).disabled = false; }
+    });
+    $("umStripe").addEventListener("click", async () => {
+      $("umStripe").disabled = true; meldung("Stripe wird abgefragt …");
+      try {
+        const x = await api("umsatzAdmin", { aktion: "stripeAbruf", von: monatVersetzen(monat, -1) + "-01" });
+        sessionStorage.setItem("umMeldung", `Stripe: ${x.aktualisiert} Zahlung${x.aktualisiert === 1 ? "" : "en"} aktualisiert, ${x.ohneAuszahlung} ohne Auszahlungsdatum${x.ohneAuftrag.length ? `, ohne Auftrag: ${x.ohneAuftrag.join(", ")}` : ""}${x.uebersprungen.length ? `. Übersprungen: ${x.uebersprungen.join("; ")}` : ""}.`);
+        route();
+      } catch (err) { meldung(err.message, true); $("umStripe").disabled = false; }
+    });
+    if ($("umSumup")) $("umSumup").addEventListener("click", async () => {
+      $("umSumup").disabled = true;
+      try { const x = await api("umsatzAdmin", { aktion: "sumupBerechnen", monat }); sessionStorage.setItem("umMeldung", `SumUp-Gebühr bei ${x.berechnet} Zahlung${x.berechnet === 1 ? "" : "en"} berechnet.`); route(); }
+      catch (err) { meldung(err.message, true); $("umSumup").disabled = false; }
+    });
+    $("esSpeichern").addEventListener("click", async () => {
+      const m = $("esMeldung"); m.textContent = "Wird gespeichert …"; m.style.color = "";
+      try { await api("umsatzAdmin", { aktion: "einstellungenSpeichern", einstellungen: { sumupProzent: $("esSumup").value === "" ? null : Number($("esSumup").value), sumupFix: $("esFix").value === "" ? 0 : Number($("esFix").value), stripeMonat: $("esStripe").value } }); sessionStorage.setItem("umMeldung", "Einstellungen gespeichert."); route(); }
+      catch (err) { m.textContent = err.message; m.style.color = "var(--err)"; }
+    });
+    document.querySelectorAll(".azLoeschen").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Diese Auszahlung löschen? Die Fahrten zählen danach wieder als „Auszahlung offen“.")) return;
+      try { await api("umsatzAdmin", { aktion: "auszahlungLoeschen", id: b.dataset.id }); sessionStorage.setItem("umMeldung", "Auszahlung gelöscht."); route(); }
+      catch (err) { meldung(err.message, true); }
+    }));
+    if ($("azSpeichern")) {
+      const zeilenWahl = () => [...document.querySelectorAll("#main tr[data-id]")].filter((tr) => tr.querySelector(".azWahl").checked);
+      const rechnen = () => {
+        let gaeste = 0, prov = 0;
+        document.querySelectorAll("#main tr[data-id]").forEach((tr) => {
+          const g = Number(tr.querySelector(".azGast").textContent.replace(/\./g, "").replace(",", ".")), p = Number(tr.querySelector(".azProv").value.replace(",", ".")) || 0;
+          tr.querySelector(".azNetto").textContent = zahlDe(g - p);
+          if (tr.querySelector(".azWahl").checked) { gaeste += g; prov += p; }
+        });
+        const erwartet = Math.round((gaeste - prov) * 100) / 100, erhalten = $("azErhalten").value === "" ? null : Number($("azErhalten").value);
+        $("azSumme").innerHTML = `Gästebeträge ${zahlDe(gaeste)} € − Provision ${zahlDe(prov)} € = <strong>${zahlDe(erwartet)} €</strong> erwartet` + (erhalten === null ? "." : `. Erhalten ${zahlDe(erhalten)} € → Geldtransfergebühr <strong>${zahlDe(Math.max(0, Math.round((erwartet - erhalten) * 100) / 100))} €</strong>${erhalten > erwartet + 0.005 ? ' <span style="color:var(--err)">(mehr erhalten als erwartet, bitte Provisionen prüfen)</span>' : ""}.`);
+        return erwartet;
+      };
+      document.querySelectorAll(".azWahl, .azProv, #azErhalten").forEach((x) => x.addEventListener("input", rechnen));
+      rechnen();
+      $("azSpeichern").addEventListener("click", async () => {
+        const gewaehlt = zeilenWahl(), m = $("azMeldung"); m.style.color = "var(--err)";
+        if (!gewaehlt.length) { m.textContent = "Bitte mindestens eine Fahrt auswählen."; return; }
+        if ($("azErhalten").value === "") { m.textContent = "Bitte den erhaltenen Betrag eintragen."; return; }
+        $("azSpeichern").disabled = true; m.style.color = ""; m.textContent = "Wird gespeichert …";
+        try {
+          const x = await api("umsatzAdmin", { aktion: "auszahlungErfassen", datum: $("azDatum").value, betragErhalten: Number($("azErhalten").value), notiz: $("azNotiz").value.trim(), positionen: gewaehlt.map((tr) => ({ id: tr.dataset.id, provision: tr.querySelector(".azProv").value === "" ? null : Number(tr.querySelector(".azProv").value) })) });
+          sessionStorage.setItem("umMeldung", `Auszahlung erfasst: ${zahlDe(x.erhalten)} € erhalten, Geldtransfergebühr ${zahlDe(x.transfergebuehr)} €. Die Fahrten zählen im Monat der Auszahlung.`);
+          const ziel = "#/umsatz?monat=" + $("azDatum").value.slice(0, 7);
+          if (location.hash === ziel) route(); else location.hash = ziel;   // nur ein Neuladen: entweder durch den Adresswechsel oder direkt
+        } catch (err) { m.style.color = "var(--err)"; m.textContent = err.message; $("azSpeichern").disabled = false; }
+      });
+    }
+    const gemerkt = sessionStorage.getItem("umMeldung"); if (gemerkt) { meldung(gemerkt); sessionStorage.removeItem("umMeldung"); }
+  } catch (e) { if (noch()) $("main").innerHTML = kopf + `<div class="rahmenkarte" style="color:var(--err);">${esc(e.message)}</div>`; }
+}
 
 // ===================== ANSICHT: ÜBERSICHT =====================
 async function ansichtUebersicht(noch){
@@ -379,6 +516,7 @@ async function ansichtUebersicht(noch){
       karte(z.angebot, "Offene Angebote", "#/auftraege?status=angebot", false) +
       karte(z.zuFakturieren, "Gefahren, Abrechnung offen", "#/auftraege?status=zu_fakturieren", true) +
       karte(z.rechnungOffen || 0, z.ueberfaellig ? `Rechnung offen (davon ${z.ueberfaellig} überfällig)` : "Rechnung offen", "#/auftraege?status=rechnung_offen", true) +
+      (portal.module.umsatz && z.auszahlungOffen ? karte(z.auszahlungOffen, "Plattform-Auszahlung offen", "#/umsatz", true) : "") +
       (z.mailProbleme ? karte(z.mailProbleme, "⚠ Neue Anfragen, bei denen eine Mail nicht ankam", "#/auftraege?status=angefragt", true) : "");
     if (kf && kf.liste) {
       const offen = kf.liste.reduce((s, a) => s + (a.offen || 0), 0);
@@ -470,7 +608,7 @@ async function ansichtAuftraege(params, noch){
         const ab = r.abrechnung || {};
         if (r.status !== "bestaetigt") return `<span class="klein">–</span>`;
         const art = esc(ART[ab.art] || "");
-        if (ab.status === "bezahlt") return `<span class="badge ok">Bezahlt</span><div class="klein">${art}${ab.rechnung ? " · Rechnung" : ""}</div>`;
+        if (ab.status === "bezahlt") return `<span class="badge ok">Bezahlt</span><div class="klein">${art}${ab.rechnung ? " · Rechnung" : ""}</div>${ab.auszahlungOffen ? `<div class="klein" style="color:var(--warn,#8a5a00);">Auszahlung offen</div>` : ""}`;
         if (ab.status === "rechnung_offen") return `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span><div class="klein">Überweisung · seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"}</div>`;
         return ab.faellig ? `<span class="badge warn">Offen</span><div class="klein">${art}</div>` : `<div class="klein">${art}</div>`;
       };
@@ -549,26 +687,28 @@ async function ansichtAuftrag(referenz, noch, params){
       const ab = d.abrechnung || { status: "offen" };
       const abg = d.abgerechnet;
       const heuteDatum = new Date().toLocaleDateString("sv-SE");   // YYYY-MM-DD in Ortszeit
-      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}` : "";
+      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}${abg.gebuehr != null ? (abg.art === "plattform" ? " · Provision " : " · Gebühr ") + eur(abg.gebuehr) : ""}${abg.art === "plattform" ? (abg.auszahlungId ? " · ausgezahlt am " + datumDe(abg.auszahlungDatum) : " · Auszahlung offen") : (abg.auszahlungDatum ? " · Auszahlung am " + datumDe(abg.auszahlungDatum) : "")}` : "";
       const artAuswahl = (vorgabe) => ["karte", "bar", "ueberweisung", "link", "plattform"].map((a) => `<option value="${a}" ${a === vorgabe ? "selected" : ""}>${ZAHLUNG_ART[a]}</option>`).join("");
-      const markierFormular = (vorgabeArt, vorgabeBetrag, knopfText) => `<div class="zeile">
+      const markierFormular = (vorgabeArt, vorgabeBetrag, knopfText, v) => `<div class="zeile">
              <div><label for="abArt">Zahlungsart</label><select id="abArt">${artAuswahl(vorgabeArt)}</select></div>
              <div><label for="abBetrag">Betrag (€)</label><input type="number" step="0.01" min="0" id="abBetrag" value="${vorgabeBetrag != null ? esc(String(vorgabeBetrag)) : ""}" style="width:110px;"></div>
-             <div><label for="abDatum">Datum</label><input type="date" id="abDatum" value="${heuteDatum}"></div>
-             <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" placeholder="z. B. SumUp-Beleg, Überweisung vom 20.10." style="width:100%;"></div>
+             <div><label for="abDatum">Datum</label><input type="date" id="abDatum" value="${v && v.datum ? esc(v.datum) : heuteDatum}"></div>
+             <div id="abGebuehrFeld" style="display:none;"><label for="abGebuehr" id="abGebuehrLabel">Gebühr (€)</label><input type="number" step="0.01" min="0" id="abGebuehr" value="${v && v.gebuehr != null ? esc(String(v.gebuehr)) : ""}" data-quelle="${v && v.gebuehrQuelle ? esc(v.gebuehrQuelle) : ""}" data-orig="${v && v.gebuehr != null ? esc(String(v.gebuehr)) : ""}" style="width:100px;"></div>
+             <div id="abAuszFeld" style="display:none;"><label for="abAuszahlung">Auszahlung am</label><input type="date" id="abAuszahlung" value="${v && v.auszahlungDatum && v.art !== "plattform" ? esc(v.auszahlungDatum) : ""}"></div>
+             <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" value="${v && v.notiz ? esc(v.notiz) : ""}" placeholder="z. B. SumUp-Beleg, Überweisung vom 20.10." style="width:100%;"></div>
              <button type="button" class="knopf gold" id="abBtn">${knopfText}</button>
-           </div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`;
+           </div><div class="klein" id="abHinweis" style="margin-top:6px;"></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`;
       const kannEntfernen = abg && (!d.rechnungsnummer || d.rechnungZahlungsart === "ueberweisung");
       const zahlungInhalt = ab.status === "bezahlt"
         ? `<p style="margin:8px 0 4px;"><strong>✓ Bezahlt:</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · Rechnung ${esc(d.rechnungsnummer)}` : ""}</p>
            <div class="klein">${d.rechnungsnummer ? "" : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen)."}</div>
-           ${kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>` : ""}`
+           ${abg && !["freifahrt", "gutschein"].includes(abg.art) ? `<div class="zeile" id="abKnoepfe"><button type="button" class="knopf" id="abBearbeiten">Bearbeiten</button>${kannEntfernen ? `<button type="button" class="knopf" id="abAufheben">Markierung entfernen</button>` : ""}</div><div id="abBearbeitenFeld"></div>` : (kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div>` : "")}<div class="klein" id="abMeldung" style="margin-top:6px;"></div>`
         : ab.status === "rechnung_offen"
         ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
-      const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
+      const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}${ab.auszahlungOffen ? " · Auszahlung offen" : ""}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
       const kontaktMail = d.kunde ? (d.kunde.typ === "firma" ? (d.kunde.buchendePerson || {}).email : d.kunde.email) : "";
       const hinZeit = d.fahrt && d.fahrt.zeitpunktISO ? berlinTeile(d.fahrt.zeitpunktISO) : null, rueckZeit = d.fahrt && d.fahrt.rueckfahrt && d.fahrt.rueckfahrt.zeitpunktISO ? berlinTeile(d.fahrt.rueckfahrt.zeitpunktISO) : null;
@@ -630,12 +770,41 @@ async function ansichtAuftrag(referenz, noch, params){
       zeigeTab(hatRechnung && hashLesen().params.get("tab") === "rechnung" ? "rechnung" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
       document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
       const abMeldung = (t, fehler) => { const e = $("abMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
-      if ($("abBtn")) $("abBtn").addEventListener("click", async () => {
+      // Zahlung speichern bzw. ändern: Gebühr (SumUp/Stripe/Provision) und Auszahlungsdatum je nach Zahlungsart
+      let satzCache = null;
+      const sumupSatz = async () => { if (satzCache === null) { try { satzCache = (await api("umsatzAdmin", { aktion: "einstellungenLaden" })).einstellungen; } catch (e) { satzCache = false; } } return satzCache; };
+      const abFelder = async () => {
+        if (!$("abArt")) return;
+        const art = $("abArt").value, g = $("abGebuehr");
+        const label = { karte: "SumUp-Gebühr (€)", link: "Stripe-Gebühr (€)", plattform: "Provision der Plattform (€)" }[art];
+        $("abGebuehrFeld").style.display = label ? "" : "none"; $("abAuszFeld").style.display = art === "link" ? "" : "none";
+        if (label) $("abGebuehrLabel").textContent = label;
+        $("abHinweis").textContent = art === "plattform" ? "Die Auszahlung der Plattform erfasst du gesammelt im Menü „Umsatz“ (Geldtransfergebühr inklusive)." : art === "link" ? "Gebühr und Auszahlungsdatum holt „Stripe abrufen“ im Menü „Umsatz“ automatisch." : "";
+        if (art === "karte" && (g.value === "" || g.dataset.auto === "1")) {   // Vorschlag nach hinterlegtem SumUp-Satz
+          const e = await sumupSatz(), betrag = Number($("abBetrag").value.replace(",", "."));
+          if (e && e.sumupProzent !== null && betrag > 0 && $("abArt").value === "karte") { g.value = (Math.round((betrag * e.sumupProzent / 100 + e.sumupFix) * 100) / 100).toFixed(2); g.dataset.auto = "1"; $("abHinweis").textContent = `Vorschlag nach SumUp-Satz ${String(e.sumupProzent).replace(".", ",")} %, du kannst ihn ändern.`; }
+        }
+      };
+      const abSpeichern = async () => {
         const betrag = Number($("abBetrag").value.replace(",", "."));
         if (!(betrag > 0)) return abMeldung("Bitte den bezahlten Betrag eingeben.", true);
+        const abgerechnet = { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() };
+        const g = $("abGebuehr"), gText = $("abGebuehrFeld").style.display !== "none" ? g.value.trim() : "";
+        if (gText !== "") { abgerechnet.gebuehr = Number(gText.replace(",", ".")); abgerechnet.gebuehrQuelle = g.dataset.auto === "1" ? "satz" : (g.value === g.dataset.orig && g.dataset.quelle ? g.dataset.quelle : "manuell"); }
+        if (abgerechnet.art === "link" && $("abAuszahlung").value) abgerechnet.auszahlungDatum = $("abAuszahlung").value;
         $("abBtn").disabled = true; abMeldung("Wird gespeichert …");
-        try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: { art: $("abArt").value, betragBrutto: betrag, datum: $("abDatum").value, notiz: $("abNotiz").value.trim() } }); await laden(); }
+        try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet }); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
+      };
+      const abFormularAnbinden = () => {
+        if ($("abBtn")) $("abBtn").addEventListener("click", abSpeichern);
+        if ($("abArt")) { $("abArt").addEventListener("change", () => { const g = $("abGebuehr"); if ($("abArt").value !== "karte") g.dataset.auto = ""; abFelder(); }); $("abBetrag").addEventListener("input", () => { if ($("abGebuehr").dataset.auto === "1") abFelder(); }); $("abGebuehr").addEventListener("input", () => { $("abGebuehr").dataset.auto = ""; }); abFelder(); }
+      };
+      abFormularAnbinden();
+      if ($("abBearbeiten")) $("abBearbeiten").addEventListener("click", () => {   // eine bereits als bezahlt markierte Zahlung ändern
+        $("abBearbeitenFeld").innerHTML = `<div style="margin-top:10px;">` + markierFormular(abg.art, abg.betragBrutto, "Änderungen speichern", abg) + `<div class="zeile"><button type="button" class="knopf" id="abAbbrechen">Abbrechen</button></div></div>`;
+        $("abKnoepfe").style.display = "none"; abFormularAnbinden();
+        $("abAbbrechen").addEventListener("click", () => { $("abBearbeitenFeld").innerHTML = ""; $("abKnoepfe").style.display = ""; });
       });
       if ($("zeitBtn")) $("zeitBtn").addEventListener("click", async () => {
         const btn = $("zeitBtn");
