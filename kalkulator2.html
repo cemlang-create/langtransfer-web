@@ -250,9 +250,9 @@
         </div>
       </div>
 
-      <!-- VERMITTLUNG (z. B. Welcome Pickups): nur der Gastname ist nötig -->
+      <!-- VERMITTLUNG (z. B. Welcome Pickups, Transfeero): nur der Gastname ist nötig -->
       <div id="formVermittlung" style="display:none;">
-        <div class="field"><label for="vmPlattform">Auftraggeber / Plattform</label><input type="text" id="vmPlattform" value="Welcome Pickups" maxlength="60" placeholder="Welcome Pickups oder Name des Hotels"></div>
+        <div class="field"><label for="vmPlattform">Auftraggeber / Plattform</label><input type="text" id="vmPlattform" list="vmPlattformListe" value="Welcome Pickups" maxlength="60" placeholder="Welcome Pickups, Transfeero oder Name des Hotels"><datalist id="vmPlattformListe"><option value="Welcome Pickups"><option value="Transfeero"></datalist></div>
         <div class="row">
           <div class="field"><label for="vmVorname">Vorname des Gastes (optional)</label><input type="text" id="vmVorname"></div>
           <div class="field"><label for="vmNachname">Nachname des Gastes (optional)</label><input type="text" id="vmNachname"></div>

@@ -152,11 +152,11 @@
 
 <section class="thema" id="vermittlung" data-gruppe="Aufträge" data-titel="Vermittlungs- und Hotelfahrten">
   <h2>Vermittlungs- und Hotelfahrten</h2>
-  <p>Für Fahrten, bei denen du den Gast nicht kennst oder nicht mailen kannst: Plattformfahrten (z. B. Welcome Pickups) und spontane Anrufe von Hotels.</p>
+  <p>Für Fahrten, bei denen du den Gast nicht kennst oder nicht mailen kannst: Plattformfahrten (z. B. Welcome Pickups, Transfeero) und spontane Anrufe von Hotels.</p>
   <h3>Anlegen</h3>
   <ol>
     <li>In „Neuer Auftrag“ Route und Zeit eintragen, <strong>Preis berechnen</strong> (er dient für Terminblocker und Festpreis).</li>
-    <li>Kundentyp <strong>Vermittlung</strong> wählen. Bei „Auftraggeber / Plattform“ steht z. B. „Welcome Pickups“ oder der Hotelname. Name, Telefon und E-Mail des Gastes sind <strong>optional</strong> (ohne Namen heißt der Auftrag „Gast“).</li>
+    <li>Kundentyp <strong>Vermittlung</strong> wählen. Bei „Auftraggeber / Plattform“ wählst du „Welcome Pickups“ oder „Transfeero“ aus der Liste oder tippst z. B. einen Hotelnamen. Name, Telefon und E-Mail des Gastes sind <strong>optional</strong> (ohne Namen heißt der Auftrag „Gast“).</li>
     <li><strong>Preis:</strong> „Offen“ (du trägst ihn nach der Fahrt ein) oder „Festpreis aus der Berechnung“ (Hotelfahrt).</li>
     <li><strong>Abrechnung:</strong> noch offen, per Karte oder bar bezahlt (mit Betrag). Dann gilt der Auftrag sofort als bezahlt.</li>
     <li><strong>Fahrt anlegen</strong> klicken.</li>
@@ -201,7 +201,7 @@
     <tr><th>Zahlungsart</th><th>Zählt im Monat von</th></tr>
     <tr><td>Karte (SumUp), bar, Überweisung</td><td>dem Datum der Zahlung (das Datum der Markierung)</td></tr>
     <tr><td>Zahlungslink (Stripe)</td><td>nach Einstellung: Auszahlung von Stripe auf dein Konto (Standard) oder Zahlung durch den Gast</td></tr>
-    <tr><td>Plattform (Welcome Pickups)</td><td>dem Datum der Sammelauszahlung. Bis dahin steht die Fahrt unter „Auszahlung offen“.</td></tr>
+    <tr><td>Plattform (Welcome Pickups, Transfeero)</td><td>dem Datum der Sammelauszahlung. Bis dahin steht die Fahrt unter „Auszahlung offen“.</td></tr>
   </table>
   <div class="wichtig"><strong>Steuerlich bitte klären</strong>Welcher Zeitpunkt bei Stripe-Zahlungen zählt und ob bei Plattformfahrten der Gästebetrag oder die Auszahlung dein Umsatz ist, entscheidet dein Steuerberater. Die Liste zeigt beides nebeneinander (Brutto und Auszahlung), die Einstellung für Stripe findest du unter „Einstellungen für Gebühren und Monatszuordnung“.</div>
   <h3>Export</h3>
@@ -213,10 +213,10 @@
   </ul>
   <h3>SumUp-Gebühren per Satz</h3>
   <p>Hinterlege unter „Einstellungen für Gebühren und Monatszuordnung“ den SumUp-Satz (Prozent, optional plus fester Betrag). Beim Markieren einer Kartenzahlung schlägt das Portal die Gebühr danach vor (änderbar). Für ältere Kartenzahlungen ohne Gebühr berechnet der Knopf <em>SumUp-Gebühren berechnen</em> sie für den ganzen Monat. Bereits eingetragene Gebühren bleiben unverändert.</p>
-  <h3>Welcome Pickups: Sammelauszahlung</h3>
+  <h3>Plattformen (Welcome Pickups, Transfeero): Sammelauszahlung</h3>
   <ol>
-    <li>Markiere die Fahrt im Auftrag als bezahlt mit Zahlungsart <strong>Plattform</strong>: Betrag = was der Gast an Welcome Pickups zahlt, <strong>Provision</strong> = Abzug laut Abrechnung. Die Fahrt steht dann als „Auszahlung offen“ in Liste und Übersicht.</li>
-    <li>Kommt die Überweisung, öffne <strong>Umsatz</strong> und scrolle zu „Plattform-Auszahlung erfassen“. Wähle die Fahrten der Überweisung, prüfe die Provisionen und trage <strong>Datum</strong> und den <strong>erhaltenen Betrag</strong> ein. Die Differenz zu „Gästebeträge minus Provision“ ist die <strong>Geldtransfergebühr</strong>. Sie wird angezeigt und gespeichert.</li>
+    <li>Markiere die Fahrt im Auftrag als bezahlt mit Zahlungsart <strong>Plattform</strong>: Betrag = was der Gast an die Plattform zahlt, <strong>Provision</strong> = Abzug laut Abrechnung. Die Fahrt steht dann als „Auszahlung offen“ in Liste und Übersicht.</li>
+    <li>Kommt die Überweisung, öffne <strong>Umsatz</strong> und scrolle zu „Plattform-Auszahlung erfassen“. Jede Plattform hat ihren eigenen Block: Wähle dort die Fahrten der Überweisung (eine Auszahlung gilt immer nur für eine Plattform), prüfe die Provisionen und trage <strong>Datum</strong> und den <strong>erhaltenen Betrag</strong> ein. Die Differenz zu „Gästebeträge minus Provision“ ist die <strong>Geldtransfergebühr</strong>. Sie wird angezeigt und gespeichert.</li>
     <li>Die Fahrten zählen jetzt im Monat der Auszahlung. Vertippt? „Löschen“ bei der erfassten Auszahlung macht sie rückgängig, die Fahrten sind dann wieder offen.</li>
   </ol>
   <h3>Hinweise über der Tabelle</h3>
@@ -386,8 +386,8 @@
   <p>„Neuer Auftrag“, Route und Zeit, Preis berechnen, Kunde eintragen, <strong>Auftrag senden</strong>. Ist es ein Stammkunde, wählst du ihn vorher aus.</p>
   <h3>Hotel ruft an, Gast unbekannt</h3>
   <p>Kundentyp „Vermittlung“ mit dem Hotel als Auftraggeber, Festpreis, bei Bezahlung im Fahrzeug gleich „Karte“ oder „bar“ markieren. Keine Mail an den Gast.</p>
-  <h3>Plattformfahrt (Welcome Pickups)</h3>
-  <p>Fahrt als Vermittlung mit offenem Preis anlegen. Nach der Fahrt Preis und E-Mail eintragen, Rechnung „bereits bezahlt“ mit Hinweis „Bezahlt über Welcome Pickups“.</p>
+  <h3>Plattformfahrt (Welcome Pickups, Transfeero)</h3>
+  <p>Fahrt als Vermittlung mit offenem Preis anlegen. Nach der Fahrt Preis und E-Mail eintragen, Rechnung „bereits bezahlt“ mit Hinweis „Bezahlt über Welcome Pickups“ (bzw. Transfeero).</p>
   <h3>Kunde will etwas ändern (Zeit, Route)</h3>
   <p>„Neuer Auftrag“, Referenz eingeben, <strong>Laden</strong>, ändern, neu senden. Hat der Auftrag schon eine Rechnung, erst die Stornorechnung erstellen.</p>
   <h3>Kunde hat zu viel oder zu wenig berechnet bekommen</h3>

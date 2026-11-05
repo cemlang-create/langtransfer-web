@@ -594,7 +594,7 @@ const MAX_ABWESENHEIT_MIN = 180;    // darüber: telefonische Anfrage
 const VORLAUF_MIN = 30;             // Tagesfahrten: 30 Min. + Anfahrt
 
 // Zeitfenster in Minuten ab Mitternacht
-const T_0430 = 4 * 60 + 30;
+const T_0400 = 4 * 60;
 const T_0530 = 5 * 60 + 30;
 const T_0900 = 9 * 60;
 const T_1800 = 18 * 60;
@@ -697,6 +697,7 @@ function lokalesDatum(d){
   const p = n => String(n).padStart(2, "0"), b = teileBerlin(d);
   return `${b.y}-${p(b.m)}-${p(b.d)}`;
 }
+function folgetag(p){ return lokalesDatum(p.ankunft) !== lokalesDatum(p.abholung) ? " (next day)" : ""; }
 function uhr(d){ return d.toLocaleTimeString("en-GB", {timeZone: ZEITZONE, hour:"2-digit", minute:"2-digit"}); }
 function datumUhr(d){ return d.toLocaleString("en-GB", {timeZone: ZEITZONE, weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}); }
 function minTag(d){ const b = teileBerlin(d); return b.h * 60 + b.mi; }
@@ -946,8 +947,8 @@ async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabe
   if (abholung <= jetzt) {
     throw `${praefix}The pickup time is in the past.`;
   }
-  if (tAbhol > T_2230 || tAbhol < T_0430) {
-    throw `${praefix}Pickups between 10:30pm and 4:30am cannot be booked online (calculated pickup time: ${uhr(abholung)}).` + telefon;
+  if (tAbhol > T_2330 || tAbhol < T_0400) {
+    throw `${praefix}Pickups between 11:30pm and 4:00am cannot be booked online (calculated pickup time: ${uhr(abholung)}).` + telefon;
   }
   if (tAbhol < T_0900) {
     const frist = vortag18Uhr(abholung);
@@ -959,9 +960,6 @@ async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabe
     if (abholung < frueheste) {
       throw `${praefix}Too short notice. Earliest possible pickup: ${datumUhr(frueheste)}.`;
     }
-  }
-  if (lokalesDatum(ankunft) !== lokalesDatum(abholung) || minTag(ankunft) > T_2330) {
-    throw `${praefix}Arrival at the destination would not be until ${uhr(ankunft)}. Rides arriving after 11:30pm cannot be booked online.` + telefon;
   }
   if (abwesenheitMin > MAX_ABWESENHEIT_MIN) {
     throw `${praefix}Including the drive there and back, this trip takes longer than 3 hours. We're happy to discuss longer trips and day rates personally.` + telefon;
@@ -1074,8 +1072,8 @@ async function verfuegbarkeitPruefen(){
 
     setStatus("status1",
       hinRueckAktiv
-        ? `✓ Available! Outbound: pickup ${uhr(hinPlan.abholung)}, arrival approx. ${uhr(hinPlan.ankunft)}. Return: pickup ${uhr(ruckPlan.abholung)}, arrival approx. ${uhr(ruckPlan.ankunft)}.`
-        : `✓ Available! Pickup at ${uhr(hinPlan.abholung)}, estimated arrival approx. ${uhr(hinPlan.ankunft)}.`,
+        ? `✓ Available! Outbound: pickup ${uhr(hinPlan.abholung)}, arrival approx. ${uhr(hinPlan.ankunft)}${folgetag(hinPlan)}. Return: pickup ${uhr(ruckPlan.abholung)}, arrival approx. ${uhr(ruckPlan.ankunft)}${folgetag(ruckPlan)}.`
+        : `✓ Available! Pickup at ${uhr(hinPlan.abholung)}, estimated arrival approx. ${uhr(hinPlan.ankunft)}${folgetag(hinPlan)}.`,
       "ok");
     document.getElementById("schritt2").style.display = "block";
   } catch (err) {

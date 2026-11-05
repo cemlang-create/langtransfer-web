@@ -594,7 +594,7 @@ const MAX_ABWESENHEIT_MIN = 180;    // darüber: telefonische Anfrage
 const VORLAUF_MIN = 30;             // Tagesfahrten: 30 Min. + Anfahrt
 
 // Zeitfenster in Minuten ab Mitternacht
-const T_0430 = 4 * 60 + 30;
+const T_0400 = 4 * 60;
 const T_0530 = 5 * 60 + 30;
 const T_0900 = 9 * 60;
 const T_1800 = 18 * 60;
@@ -697,6 +697,7 @@ function lokalesDatum(d){
   const p = n => String(n).padStart(2, "0"), b = teileBerlin(d);
   return `${b.y}-${p(b.m)}-${p(b.d)}`;
 }
+function folgetag(p){ return lokalesDatum(p.ankunft) !== lokalesDatum(p.abholung) ? " (am Folgetag)" : ""; }
 function uhr(d){ return d.toLocaleTimeString("de-DE", {timeZone: ZEITZONE, hour:"2-digit", minute:"2-digit"}); }
 function datumUhr(d){ return d.toLocaleString("de-DE", {timeZone: ZEITZONE, weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) + " Uhr"; }
 function minTag(d){ const b = teileBerlin(d); return b.h * 60 + b.mi; }
@@ -946,8 +947,8 @@ async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabe
   if (abholung <= jetzt) {
     throw `${praefix}Die Abholzeit liegt in der Vergangenheit.`;
   }
-  if (tAbhol > T_2230 || tAbhol < T_0430) {
-    throw `${praefix}Abholungen zwischen 22:30 und 4:30 Uhr sind online nicht buchbar (berechnete Abholzeit: ${uhr(abholung)} Uhr).` + telefon;
+  if (tAbhol > T_2330 || tAbhol < T_0400) {
+    throw `${praefix}Abholungen zwischen 23:30 und 4:00 Uhr sind online nicht buchbar (berechnete Abholzeit: ${uhr(abholung)} Uhr).` + telefon;
   }
   if (tAbhol < T_0900) {
     const frist = vortag18Uhr(abholung);
@@ -959,9 +960,6 @@ async function berechneFahrtplan({ abholPlace, zielPlace, zwischenPlace, eingabe
     if (abholung < frueheste) {
       throw `${praefix}Zu kurzfristig. Frühestmögliche Abholung: ${datumUhr(frueheste)}.`;
     }
-  }
-  if (lokalesDatum(ankunft) !== lokalesDatum(abholung) || minTag(ankunft) > T_2330) {
-    throw `${praefix}Die Ankunft am Ziel wäre erst um ${uhr(ankunft)} Uhr. Fahrten mit Ankunft nach 23:30 Uhr sind online nicht buchbar.` + telefon;
   }
   if (abwesenheitMin > MAX_ABWESENHEIT_MIN) {
     throw `${praefix}Diese Fahrt dauert inklusive An- und Rückfahrt länger als 3 Stunden. Längere Fahrten und Tagespauschalen besprechen wir gern persönlich.` + telefon;
@@ -1082,8 +1080,8 @@ async function verfuegbarkeitPruefen(){
 
     setStatus("status1",
       hinRueckAktiv
-        ? `✓ Verfügbar! Hinfahrt: Abholung ${uhr(hinPlan.abholung)} Uhr, Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr. Rückfahrt: Abholung ${uhr(ruckPlan.abholung)} Uhr, Ankunft ca. ${uhr(ruckPlan.ankunft)} Uhr.`
-        : `✓ Verfügbar! Abholung um ${uhr(hinPlan.abholung)} Uhr, voraussichtliche Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr.`,
+        ? `✓ Verfügbar! Hinfahrt: Abholung ${uhr(hinPlan.abholung)} Uhr, Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr${folgetag(hinPlan)}. Rückfahrt: Abholung ${uhr(ruckPlan.abholung)} Uhr, Ankunft ca. ${uhr(ruckPlan.ankunft)} Uhr${folgetag(ruckPlan)}.`
+        : `✓ Verfügbar! Abholung um ${uhr(hinPlan.abholung)} Uhr, voraussichtliche Ankunft ca. ${uhr(hinPlan.ankunft)} Uhr${folgetag(hinPlan)}.`,
       "ok");
     document.getElementById("schritt2").style.display = "block";
   } catch (err) {
