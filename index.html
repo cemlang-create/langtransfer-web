@@ -522,7 +522,7 @@
 
   /* eSIM-Hinweis (Partner Simbye) */
   .esim{ background:var(--panel); }
-  .esim-grid{ display:grid; grid-template-columns:1fr 300px; gap:48px; align-items:center; margin-top:26px; }
+  .esim-grid{ display:grid; grid-template-columns:1fr 336px; gap:48px; align-items:center; margin-top:26px; }
   .esim-text p{ margin:0 0 14px; max-width:640px; }
   .esim-anzeige{ display:inline-block; font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); border:1px solid var(--line-strong); border-radius:999px; padding:3px 11px; margin-bottom:14px; }
   .esim-code{ display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px 14px; background:var(--paper); border:1.5px dashed var(--accent-deep); border-radius:12px; padding:10px 14px 10px 18px; margin:0 0 18px; }
@@ -530,12 +530,9 @@
   .esim-code button{ font:inherit; font-size:14px; cursor:pointer; border:1px solid var(--line-strong); background:transparent; border-radius:999px; padding:6px 14px; color:var(--ink); }
   .esim-code button:hover{ border-color:var(--ink); }
   p.esim-hinweis{ font-size:13px; color:var(--ink-soft); margin:16px 0 0; }
-  .esim-banner{ justify-self:center; width:300px; max-width:100%; }
+  .esim-banner{ justify-self:center; width:336px; max-width:100%; }
+  .esim-banner .esim-anzeige{ margin-bottom:8px; }
   .esim-banner img{ display:block; max-width:100%; height:auto; border-radius:6px; }
-  .esim-platzhalter{ box-sizing:border-box; width:300px; max-width:100%; min-height:250px; background:var(--ink); color:var(--paper); border-radius:10px; padding:24px 22px; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:8px; }
-  .esim-platzhalter strong{ font-family:'HK Sentimentals','Work Sans',sans-serif; font-size:24px; font-weight:400; }
-  .esim-platzhalter button{ margin-top:8px; font:inherit; font-size:14px; cursor:pointer; border:0; background:var(--accent); color:#231c0e; border-radius:999px; padding:9px 18px; }
-  .esim-platzhalter small{ font-size:12px; line-height:1.45; color:#cfcac0; }
   @media (max-width:840px){ .esim-grid{ grid-template-columns:1fr; gap:28px; } .esim-banner{ justify-self:start; } }
 </style>
 </head>
@@ -923,15 +920,11 @@
         <p><strong>15&nbsp;% Rabatt auf eSIM-Tarife</strong> mit unserem Code – unabhängig davon, ob Sie bei uns eine Fahrt buchen:</p>
         <div class="esim-code"><strong id="esimCode">LANGTRANSFER</strong><button type="button" id="esimKopieren">Code kopieren</button></div>
         <p><a class="btn btn-primary" href="https://simbye.com/?ref=aheuctyt" target="_blank" rel="sponsored noopener">Zu Simbye</a></p>
-        <p class="esim-hinweis">Anzeige · Affiliate-Link: Bei einem Kauf über diesen Link erhält LANGtransfer eine Provision von Simbye. Der Rabattcode gilt für eSIM-Tarife. Anbieter: Simbye LLC, Sheridan, WY, USA. Mit dem Klick verlassen Sie unsere Website.</p>
+        <p class="esim-hinweis">Anzeige · Partnerlink zu Simbye LLC, Sheridan, WY, USA. Der Rabattcode gilt für eSIM-Tarife. Mit dem Klick verlassen Sie unsere Website.</p>
       </div>
-      <div class="esim-banner" id="esimBanner">
-        <div class="esim-platzhalter">
-          <strong>Simbye</strong>
-          <span>Reise-eSIM für über 190 Länder</span>
-          <button type="button" id="esimBannerLaden">Banner anzeigen</button>
-          <small>Beim Anzeigen wird eine Verbindung zu creatives.goaffpro.com hergestellt und Ihre IP-Adresse übertragen (siehe Datenschutz).</small>
-        </div>
+      <div class="esim-banner">
+        <span class="esim-anzeige">Anzeige</span>
+        <a href="https://simbye.com/?ref=aheuctyt" target="_blank" rel="sponsored noopener"><img src="images/simbye-banner-de.png" width="336" height="280" alt="Simbye eSIM: Landen. Online sein. 190+ Länder. Eine App. eSIM holen." loading="lazy" decoding="async"></a>
       </div>
     </div>
   </div>
@@ -944,13 +937,6 @@
     var fertig = function(){ kopieren.textContent = 'Kopiert ✓'; setTimeout(function(){ kopieren.textContent = 'Code kopieren'; }, 2000); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(fertig, function(){ window.prompt('Code kopieren:', code); });
     else window.prompt('Code kopieren:', code);
-  });
-  // Das Banner liegt bei einem externen Anbieter: Es wird erst nach Klick geladen (vorher keine Verbindung, keine Übertragung der IP-Adresse)
-  var laden = document.getElementById('esimBannerLaden');
-  if (laden) laden.addEventListener('click', function(){
-    var a = document.createElement('a'); a.href = 'https://simbye.com/?ref=aheuctyt'; a.target = '_blank'; a.rel = 'sponsored noopener';
-    var img = new Image(); img.src = 'https://creatives.goaffpro.com/7193881/isymzmfa-simbye-web-bigtype-rect-m-de-2x.png'; img.width = 300; img.height = 250; img.alt = 'Simbye Reise-eSIM – 190+ Länder';
-    a.appendChild(img); var box = document.getElementById('esimBanner'); box.innerHTML = ''; box.appendChild(a);
   });
 })();
 </script>
