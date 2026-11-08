@@ -396,6 +396,13 @@ async function ansichtUmsatz(params, noch){
     if (of.vermittlungErwartet && of.vermittlungErwartet.anzahl) hinweise.push(`<strong>Erwartet:</strong> ${of.vermittlungErwartet.anzahl} Plattformfahrt${of.vermittlungErwartet.anzahl === 1 ? "" : "en"} ohne Beleg, ${zahlDe(of.vermittlungErwartet.betrag)} € laut „Betrag, den ich bekomme“.`);
     if (of.vermittlungOhneBetrag) hinweise.push(`${of.vermittlungOhneBetrag} gefahrene Vermittlungsfahrt${of.vermittlungOhneBetrag === 1 ? "" : "en"} ohne eingetragenen Gästebetrag.`);
     if (of.stripeOhneAuszahlung) hinweise.push(`${of.stripeOhneAuszahlung} Stripe-Zahlung${of.stripeOhneAuszahlung === 1 ? "" : "en"} ohne Auszahlungsdatum („Stripe abrufen“ holt es, sobald Stripe ausgezahlt hat).`);
+    const ntHeute = new Date().toLocaleDateString("sv-SE"), ohneArt = of.ohneZahlungsart || [];
+    const nachtragBlock = ohneArt.length ? `<div class="rahmenkarte" id="nachtragBlock" style="margin:14px 0;"><h3>Bezahlte Rechnungen ohne Zahlungsart (${ohneArt.length})</h3>
+        <p class="klein" style="margin:0 0 8px;">Diese Rechnungen wurden als „bereits bezahlt“ ausgestellt, aber ohne Zahlungsart. Deshalb stehen sie nicht in der Umsatzliste. Wähle, wie bezahlt wurde, und das Zahlungsdatum (Vorschlag: Fahrtdatum). Danach zählen sie im Monat des Zahlungsdatums.</p>
+        <div class="tabellenrahmen"><table><thead><tr><th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Rechnung</th><th class="re">Betrag</th><th>Zahlungsart</th><th>Zahlungsdatum</th><th></th></tr></thead><tbody>${ohneArt.map((o) => `<tr data-nt="${esc(o.referenz)}" data-betrag="${o.betrag}" style="cursor:default;"><td>${datumDe(o.fahrt)}</td><td><a href="#/auftrag/${esc(o.referenz)}"><strong>${esc(o.referenz)}</strong></a></td><td>${esc(o.kunde)}</td><td>${esc(o.rechnungsnummer)}</td><td class="re">${zahlDe(o.betrag)}</td>
+          <td><select class="ntArt"><option value="">– wählen –</option><option value="karte">Karte (SumUp)</option><option value="bar">bar</option><option value="ueberweisung">Überweisung</option><option value="link">Zahlungslink (Stripe)</option></select></td>
+          <td><input type="date" class="ntDatum" value="${esc(o.fahrt && o.fahrt <= ntHeute ? o.fahrt : ntHeute)}"></td><td><button type="button" class="knopf ntSpeichern">Speichern</button></td></tr>`).join("")}</tbody></table></div>
+        <div class="leiste" style="margin-top:10px;"><button type="button" class="knopf gold" id="ntAlle">Alle mit gewählter Zahlungsart speichern</button></div></div>` : "";
     const zeilen = d.zeilen.map((z) => `<tr data-ref="${esc(z.referenz)}">
         <td>${datumDe(z.eingang)}</td><td>${datumDe(z.fahrt)}</td><td><strong>${esc(z.referenz)}</strong></td><td>${esc(z.kunde)}</td><td>${esc(z.artText)}${z.rechnungsnummer ? `<div class="klein">${esc(z.rechnungsnummer)}</div>` : ""}</td>
         <td class="re">${zahlDe(z.brutto)}</td><td class="re">${zahlDe(z.netto)}</td><td class="re">${zahlDe(z.ust)}${z.auslandBrutto ? `<div class="klein">Ausland ${zahlDe(z.auslandBrutto)}</div>` : ""}</td>
@@ -438,7 +445,7 @@ async function ansichtUmsatz(params, noch){
         <button type="button" class="knopf" id="umStripe">Stripe abrufen</button><button type="button" class="knopf" id="umCsv">CSV</button><button type="button" class="knopf gold" id="umPdf">PDF</button></div>
       <div class="klein" id="umMeldung" style="min-height:18px;"></div>
       <div class="karten" style="margin:8px 0 12px;">${karte(String(s.anzahl), "Zahlungen im " + monatText)}${karte(zahlDe(s.brutto) + " €", "Brutto (Umsatz)")}${karte(zahlDe(s.gebuehr + s.transfergebuehr) + " €", "Gebühren und Provision")}${karte(zahlDe(s.auszahlungGesamt) + " €", "Auszahlung")}</div>
-      ${hinweise.map((h) => `<div class="rahmenkarte" style="padding:8px 12px;margin-bottom:8px;">${h}</div>`).join("")}
+      ${hinweise.map((h) => `<div class="rahmenkarte" style="padding:8px 12px;margin-bottom:8px;">${h}</div>`).join("")}${nachtragBlock}
       ${tabelle}${nachArt}${auszahlBlock}${erfasst}${einstellungen}`;
 
     const meldung = (t, fehler) => { const m = $("umMeldung"); m.textContent = t || ""; m.style.color = fehler ? "var(--err)" : ""; };
@@ -501,6 +508,25 @@ async function ansichtUmsatz(params, noch){
           if (location.hash === ziel) route(); else location.hash = ziel;   // nur ein Neuladen: entweder durch den Adresswechsel oder direkt
         } catch (err) { m.style.color = "var(--err)"; m.textContent = err.message; q(".azSpeichern").disabled = false; }
       });
+    });
+    // Zahlungsart bei älteren, als bezahlt ausgestellten Rechnungen nachtragen (setzt die Zahlungsmarkierung, danach zählt die Zahlung in der Umsatzliste)
+    const ntSpeichern = (tr) => {
+      const art = tr.querySelector(".ntArt").value, datum = tr.querySelector(".ntDatum").value;
+      if (!art) throw new Error(`${tr.dataset.nt}: Bitte zuerst die Zahlungsart wählen.`);
+      if (!datum) throw new Error(`${tr.dataset.nt}: Bitte das Zahlungsdatum angeben.`);
+      return api("rechnungAdmin", { aktion: "abrechnen", referenz: tr.dataset.nt, abgerechnet: { art, betragBrutto: Number(tr.dataset.betrag), datum } });
+    };
+    document.querySelectorAll("#main .ntSpeichern").forEach((btn) => btn.addEventListener("click", async () => {
+      const tr = btn.closest("tr"); btn.disabled = true; meldung("Wird gespeichert …");
+      try { await ntSpeichern(tr); sessionStorage.setItem("umMeldung", `${tr.dataset.nt}: Zahlungsart nachgetragen. Die Zahlung zählt im Monat ${datumDe(tr.querySelector(".ntDatum").value).slice(3)}.`); route(); }
+      catch (err) { meldung(err.message, true); btn.disabled = false; }
+    }));
+    if ($("ntAlle")) $("ntAlle").addEventListener("click", async () => {
+      const zeilenGewaehlt = [...document.querySelectorAll("#nachtragBlock tr[data-nt]")].filter((tr) => tr.querySelector(".ntArt").value);
+      if (!zeilenGewaehlt.length) return meldung("Bitte bei mindestens einer Rechnung die Zahlungsart wählen.", true);
+      $("ntAlle").disabled = true; let ok = 0; const fehlerListe = [];
+      for (const tr of zeilenGewaehlt) { meldung(`Wird gespeichert … (${ok + 1} von ${zeilenGewaehlt.length})`); try { await ntSpeichern(tr); ok += 1; } catch (err) { fehlerListe.push(err.message); } }
+      sessionStorage.setItem("umMeldung", `${ok} Zahlungsart${ok === 1 ? "" : "en"} nachgetragen.${fehlerListe.length ? " Nicht gespeichert: " + fehlerListe.join(" · ") : ""}`); route();
     });
     const gemerkt = sessionStorage.getItem("umMeldung"); if (gemerkt) { meldung(gemerkt); sessionStorage.removeItem("umMeldung"); }
   } catch (e) { if (noch()) $("main").innerHTML = kopf + `<div class="rahmenkarte" style="color:var(--err);">${esc(e.message)}</div>`; }
@@ -707,10 +733,14 @@ async function ansichtAuftrag(referenz, noch, params){
              <button type="button" class="knopf gold" id="abBtn">${knopfText}</button>
            </div><div class="klein" id="abHinweis" style="margin-top:6px;"></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`;
       const kannEntfernen = abg && (!d.rechnungsnummer || d.rechnungZahlungsart === "ueberweisung");
+      // Ältere Rechnung "bereits bezahlt" ohne Zahlungsmarkierung: Zahlungsart und Datum nachtragen, damit die Zahlung in der Umsatzliste erscheint
+      const fahrtTag = d.fahrt && d.fahrt.zeitpunktISO ? new Date(d.fahrt.zeitpunktISO).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }) : heuteDatum;
+      const nachtragKarte = `<div class="klein" style="margin:8px 0 4px;">Diese Rechnung wurde als bezahlt ausgestellt, aber ohne Zahlungsart. Trag sie nach, damit die Zahlung in der Umsatzliste erscheint.</div>` + markierFormular(["karte", "bar", "ueberweisung", "link"].includes(ab.art) ? ab.art : "karte", d.rechnungBrutto != null ? d.rechnungBrutto : d.preisBrutto, "Zahlungsart nachtragen", { datum: fahrtTag <= heuteDatum ? fahrtTag : heuteDatum });
       const zahlungInhalt = ab.status === "bezahlt"
         ? `<p style="margin:8px 0 4px;"><strong>${ab.auszahlungOffen ? "Abgerechnet, Auszahlung offen:" : "✓ Bezahlt:"}</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · ${ab.beleg ? "Beleg" : "Rechnung"} ${esc(d.rechnungsnummer)}` : ""}</p>
            <div class="klein">${d.rechnungsnummer ? "" : (d.vermittlung ? "Für die Buchhaltung erzeugst du im Reiter „Beleg / Rechnung“ einen Beleg (keine Adresse nötig)." : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).")}${ab.auszahlungOffen ? ' Sobald die Plattform das Geld überwiesen hat, erfasst du die Auszahlung im Menü <a href="#/umsatz">Umsatz</a>. Dann gilt die Fahrt als bezahlt.' : ""}</div>
-           ${abg && !["freifahrt", "gutschein"].includes(abg.art) ? `<div class="zeile" id="abKnoepfe"><button type="button" class="knopf" id="abBearbeiten">Bearbeiten</button>${kannEntfernen ? `<button type="button" class="knopf" id="abAufheben">Markierung entfernen</button>` : ""}</div><div id="abBearbeitenFeld"></div>` : (kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div>` : "")}<div class="klein" id="abMeldung" style="margin-top:6px;"></div>`
+           ${!abg && d.rechnungsnummer ? nachtragKarte : ""}
+           ${abg && !["freifahrt", "gutschein"].includes(abg.art) ? `<div class="zeile" id="abKnoepfe"><button type="button" class="knopf" id="abBearbeiten">Bearbeiten</button>${kannEntfernen ? `<button type="button" class="knopf" id="abAufheben">Markierung entfernen</button>` : ""}</div><div id="abBearbeitenFeld"></div>` : (kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div>` : "")}${abg || !d.rechnungsnummer ? '<div class="klein" id="abMeldung" style="margin-top:6px;"></div>' : ""}`
         : ab.status === "rechnung_offen"
         ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
