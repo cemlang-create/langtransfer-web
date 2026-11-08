@@ -63,7 +63,7 @@
 </script>
 <div class="card">
   <h1 class="embedded-aus">Rechnung</h1>
-  <p class="sub embedded-aus">Intern. Rechnungsentwurf mit Positionen prüfen, Vorschau ansehen, Rechnung erzeugen. Bereits ausgestellte Rechnungen werden nur per Stornorechnung korrigiert.</p>
+  <p class="sub embedded-aus">Intern. Rechnungsentwurf mit Positionen prüfen, Vorschau ansehen, Rechnung erzeugen. Bereits ausgestellte Rechnungen werden nur per Stornorechnung korrigiert. Bei Plattformfahrten gibt es stattdessen den Beleg für die Buchhaltung.</p>
 
   <div class="field embedded-aus">
     <label for="adminKey">Admin-Passwort</label>
@@ -91,19 +91,33 @@
 
     <div id="aktuelleBox" style="display:none;">
       <div class="warn" id="aktuelleHinweis"></div>
-      <label class="check"><input type="checkbox" id="stornoSenden" checked> Stornorechnung per E-Mail an den Kunden senden</label>
+      <label class="check" id="stornoSendenZeile"><input type="checkbox" id="stornoSenden" checked> Stornorechnung per E-Mail an den Kunden senden</label>
       <button type="button" class="sekundaer rot" id="stornoBtn" onclick="stornoErstellen()">Stornorechnung erstellen</button>
       <div class="status" id="statusStorno"></div>
     </div>
 
     <div id="entwurf" style="display:none;">
       <h2 class="erste" id="entwurfTitel">Neue Rechnung</h2>
+      <div class="field" id="dokTypBox" style="display:none;">
+        <label>Dokument</label>
+        <label class="check"><input type="radio" name="dokTyp" value="beleg" onchange="dokTypGeaendert()"> <strong>Beleg für die Buchhaltung</strong> (Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)</label>
+        <label class="check"><input type="radio" name="dokTyp" value="rechnung" onchange="dokTypGeaendert()"> Rechnung (wenn du den Gast mit Adresse kennst)</label>
+      </div>
       <div class="row">
-        <div class="field"><label for="sprache">Sprache der Rechnung</label>
+        <div class="field" id="spracheBox"><label for="sprache">Sprache der Rechnung</label>
           <select id="sprache" onchange="spracheGeaendert()"><option value="de">Deutsch</option><option value="en">English</option></select></div>
         <div class="field"><label for="leistungsdatum">Leistungsdatum</label><input type="date" id="leistungsdatum"></div>
       </div>
-      <div class="field">
+      <div class="box" id="belegBox" style="display:none;">
+        <strong>Abrechnung mit der Plattform <span id="belegPlattform"></span></strong>
+        <div class="row" style="margin-top:8px;">
+          <div class="field"><label for="belegProvision">Provision der Plattform (€)</label><input type="number" step="0.01" min="0" id="belegProvision" placeholder="noch offen" oninput="provisionGeaendert()"></div>
+          <div class="field"><label>Erwartete Auszahlung (Gästebetrag − Provision)</label><div id="belegAuszahlung" style="padding:9px 0;font-weight:600;">–</div></div>
+        </div>
+        <div class="hint" id="belegHinweis" style="margin:0;"></div>
+        <div class="hint" style="margin:6px 0 0;">Der Beleg bekommt eine Nummer aus dem normalen Rechnungsnummernkreis, wird nie verschickt und startet mit „Auszahlung offen“. Bezahlt ist er, sobald du die Auszahlung der Plattform im Menü „Umsatz“ erfasst.</div>
+      </div>
+      <div class="field" id="zahlungsartBox">
         <label>Zahlungsart</label>
         <label class="check"><input type="radio" name="zahlungsart" value="bezahlt" onchange="zahlungsartGeaendert()"> Bereits bezahlt</label>
         <div id="bezahltArtZeile" style="margin:-2px 0 8px 25px;"><label for="bezahltArt" style="font-weight:400;font-size:13px;">Wie wurde bezahlt?</label>
@@ -114,6 +128,7 @@
 
       <h2>Positionen</h2>
       <div class="warn" id="preisHinweis" style="display:none;">Der Preis ist bei dieser Vermittlungsfahrt noch offen. Trage den Betrag ein, den der Gast bezahlt hat (steht nach Fahrtende in der Plattform).</div>
+      <div class="hint" id="belegPositionHinweis" style="display:none;margin:0 0 10px;">Hier steht der <strong>Gästebetrag</strong>: was der Gast an die Plattform bezahlt hat (steht nach der Fahrt in der Abrechnung der Plattform).</div>
       <p class="hint" style="margin-top:-6px;">Preise sind Bruttopreise. Netto und Umsatzsteuer werden je Steuersatz herausgerechnet. Ein Rabatt ist eine Position mit negativem Preis.</p>
       <div class="tabellenrahmen pos"><table>
         <thead><tr><th>Beschreibung</th><th style="width:78px;">Menge</th><th style="width:112px;">Einzelpreis (€)</th><th style="width:88px;">USt</th><th class="zahl" style="width:96px;">Summe</th><th style="width:34px;"></th></tr></thead>
@@ -127,8 +142,8 @@
       <div class="warn" id="kleinbetragHinweis" style="display:none;">Bei Rechnungen über 250 € brutto muss die Anschrift des Empfängers auf der Rechnung stehen. Bitte unten bei „Kontaktdaten ändern“ eintragen.</div>
 
       <div class="field" style="margin-top:16px;"><label for="hinweis">Hinweis auf der Rechnung (optional)</label><textarea id="hinweis" rows="2" maxlength="500" placeholder="z. B. Zahlungsreferenz, Kostenstelle, Dank an den Kunden"></textarea></div>
-      <label class="check"><input type="checkbox" id="senden" checked> Rechnung per E-Mail an den Kunden senden</label>
-      <div class="hint" id="sendenHinweis" style="display:none;margin:-4px 0 8px 25px;">Für diesen Auftrag ist keine E-Mail-Adresse hinterlegt. Die Rechnung wird nur erzeugt; die PDF lädst du danach im Verlauf herunter. E-Mail ergänzen: unten bei „Kontaktdaten ändern“.</div>
+      <div id="sendenBox"><label class="check"><input type="checkbox" id="senden" checked> Rechnung per E-Mail an den Kunden senden</label>
+      <div class="hint" id="sendenHinweis" style="display:none;margin:-4px 0 8px 25px;">Für diesen Auftrag ist keine E-Mail-Adresse hinterlegt. Die Rechnung wird nur erzeugt; die PDF lädst du danach im Verlauf herunter. E-Mail ergänzen: unten bei „Kontaktdaten ändern“.</div></div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
         <button type="button" class="sekundaer" id="vorschauBtn" onclick="vorschau()">Vorschau (PDF)</button>
         <button type="button" class="primary" id="erzeugenBtn" onclick="erzeugen()">Rechnung erzeugen</button>
@@ -172,6 +187,8 @@ function berechnen(pos){
 let daten = null;            // Antwort von "laden"
 let positionen = [];         // [{ text, menge, einzelBrutto, ust }]
 let vorherigeSprache = "de";
+let provisionBerührt = false;   // Provision wurde von Hand geändert: nicht mehr automatisch vorschlagen
+const istBelegModus = () => !!daten && daten.belegMoeglich && ((document.querySelector("input[name=dokTyp]:checked") || {}).value === "beleg");
 
 async function laden(nachAktion){
   const ref = (daten && daten.referenz) || $("referenz").value.trim().toUpperCase();
@@ -185,13 +202,22 @@ async function laden(nachAktion){
     const entwurfWurdeFrei = !!daten && !daten.kannErstellen && j.kannErstellen;   // z. B. direkt nach einer Stornorechnung
     daten = j;
     $("referenz").value = j.referenz;
-    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true; }
+    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true;
+      provisionBerührt = false;
+      const dt = document.querySelector(`input[name=dokTyp][value=${j.typVorschlag === "beleg" ? "beleg" : "rechnung"}]`); if (dt) dt.checked = true;
+      $("belegProvision").value = j.belegVorschlag && j.belegVorschlag.provision != null ? j.belegVorschlag.provision : "";
+      if (j.typVorschlag === "beleg" && (j.hinweis || "").startsWith(j.vermittlung ? ($("sprache").value === "en" ? "Paid via" : "Bezahlt über") : "\u0000")) $("hinweis").value = ""; }
     aufbauen();
     setStatus("statusLaden", "", "");
   } catch (e) { $("inhalt").style.display = "none"; setStatus("statusLaden", e.message, "error"); }
 }
 
 function empfaengerRendern(){
+  if (istBelegModus()) {   // Beleg: kein Rechnungsempfänger, Auftraggeber ist die Plattform
+    $("empfaengerBox").innerHTML = `<strong>Beleg für:</strong> ${esc((daten.belegVorschlag && daten.belegVorschlag.plattform) || "die Plattform")}<br><span class="grau">Für einen Beleg brauchst du keine Adresse und keine E-Mail des Gastes. Er ist für deine Buchhaltung und wird nicht verschickt.</span>`;
+    versandZustand();
+    return;
+  }
   const e = daten.empfaenger || {};
   $("empfaengerBox").innerHTML = `<strong>Rechnungsempfänger:</strong> ${esc(e.name || "–")}${e.abteilung ? ", " + esc(e.abteilung) : ""}${e.zHd ? " (z. Hd. " + esc(e.zHd) + ")" : ""}` +
     `<br>${(e.adressZeilen || []).map(esc).join(", ") || "<span class='grau'>keine Adresse hinterlegt</span>"}<br><span class="grau">E-Mail: ${esc(daten.empfaengerEmail || "–")} · Name, Adresse und „Rechnung auf Firma“ ändert man unten bei den Kontaktdaten.</span>`;
@@ -211,13 +237,13 @@ function aufbauen(){
   const v = daten.verlauf || [];
   $("verlaufBereich").style.display = v.length ? "block" : "none";
   $("verlaufTabelle").innerHTML = v.map((h) => {
-    const art = h.typ === "storno" ? `Stornorechnung zu ${esc(h.bezugNummer)}` : "Rechnung";
+    const art = h.typ === "storno" ? (h.istBeleg ? `Stornobeleg zu ${esc(h.bezugNummer)}` : `Stornorechnung zu ${esc(h.bezugNummer)}`) : (h.istBeleg ? "Beleg" : "Rechnung");
     const abrH = daten.abrechnung || {};
-    const zahlBadge = h.aktuell && abrH.status === "bezahlt" ? ` <span class="badge ok">bezahlt</span>` : h.aktuell && abrH.status === "rechnung_offen" ? ` <span class="badge ${abrH.ueberfaellig ? "err" : "warn"}">${abrH.ueberfaellig ? "überfällig" : "offen"}</span>` : "";
+    const zahlBadge = h.aktuell && abrH.status === "bezahlt" && abrH.auszahlungOffen ? ` <span class="badge warn">Auszahlung offen</span>` : h.aktuell && abrH.status === "bezahlt" ? ` <span class="badge ok">bezahlt</span>` : h.aktuell && abrH.status === "rechnung_offen" ? ` <span class="badge ${abrH.ueberfaellig ? "err" : "warn"}">${abrH.ueberfaellig ? "überfällig" : "offen"}</span>` : "";
     const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>${zahlBadge}`;
     return `<tr><td style="white-space:nowrap;"><strong>${esc(h.nummer)}</strong>${h.aeltere ? ' <span class="grau">(ältere Rechnung)</span>' : ""}</td><td>${art}</td><td>${h.datumISO ? new Date(h.datumISO).toLocaleDateString("de-DE") : "–"}</td>` +
       `<td class="zahl">${h.gesamtBrutto == null ? "–" : eur(h.gesamtBrutto)}</td><td>${status}</td>` +
-      `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">PDF</button> <button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button></td></tr>`;
+      `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">PDF</button> ${h.istBeleg ? "" : `<button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button>`}</td></tr>`;
   }).join("");
   document.querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", () => pdfOeffnen(b.dataset.pdf)));
   document.querySelectorAll("[data-senden]").forEach((b) => b.addEventListener("click", () => erneutSenden(b.dataset.senden)));
@@ -226,14 +252,19 @@ function aufbauen(){
   $("aktuelleBox").style.display = hatAktuelle ? "block" : "none";
   const abr = daten.abrechnung || {};
   const zahlungText = abr.status === "bezahlt" ? ` Zahlung: <strong>bezahlt</strong> (${esc(ARTEN[abr.art] || "")}).` : abr.status === "rechnung_offen" ? ` Zahlung: <strong>${abr.ueberfaellig ? "überfällig, " : ""}offen seit ${abr.tage} ${abr.tage === 1 ? "Tag" : "Tagen"}</strong> (Zahlungseingang markierst du oben im Bereich „Zahlung“).` : "";
-  if (hatAktuelle) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es die gültige Rechnung <strong>${esc(daten.aktuelleNummer)}</strong>.${zahlungText} Eine ausgestellte Rechnung wird nicht überschrieben: Zum Ändern erstellst du zuerst eine <strong>Stornorechnung</strong> (eigene Nummer, hebt die Rechnung auf) und danach eine neue Rechnung.`;
+  const aktuellBeleg = hatAktuelle && !!abr.beleg;
+  $("stornoSendenZeile").style.display = aktuellBeleg ? "none" : "";
+  $("stornoBtn").textContent = aktuellBeleg ? "Stornobeleg erstellen" : "Stornorechnung erstellen";
+  if (aktuellBeleg) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es den Beleg <strong>${esc(daten.aktuelleNummer)}</strong>. Zahlung: <strong>${abr.auszahlungOffen ? "Auszahlung der Plattform offen" : "bezahlt (Auszahlung erhalten)"}</strong>${abr.auszahlungOffen ? " (die Auszahlung erfasst du im Menü „Umsatz“)" : ""}. Ein ausgestellter Beleg wird nicht überschrieben: Zum Ändern erstellst du zuerst einen <strong>Stornobeleg</strong> (eigene Nummer) und danach einen neuen Beleg.`;
+  else if (hatAktuelle) $("aktuelleHinweis").innerHTML = `Zu diesem Auftrag gibt es die gültige Rechnung <strong>${esc(daten.aktuelleNummer)}</strong>.${zahlungText} Eine ausgestellte Rechnung wird nicht überschrieben: Zum Ändern erstellst du zuerst eine <strong>Stornorechnung</strong> (eigene Nummer, hebt die Rechnung auf) und danach eine neue Rechnung.`;
   $("entwurf").style.display = daten.kannErstellen ? "block" : "none";
   const nm = $("nichtMoeglich");
   nm.style.display = (!daten.kannErstellen && !hatAktuelle) ? "block" : "none";
   if (!daten.kannErstellen && !hatAktuelle) nm.textContent = `Eine Rechnung ist nur bei bestätigten Aufträgen möglich (Status: ${daten.status}).`;
-  $("entwurfTitel").textContent = daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen");
+  $("dokTypBox").style.display = daten.belegMoeglich ? "block" : "none";
+  dokTypGeaendert(true);
   zahlungsartGeaendert();
-  $("preisHinweis").style.display = daten.preisOffen ? "block" : "none";
+  $("preisHinweis").style.display = !istBelegModus() && daten.preisOffen ? "block" : "none";
   versandZustand();
   positionenRendern();
 }
@@ -289,8 +320,9 @@ function summenAktualisieren(){
   else c.steuer.forEach((g) => { html += `<div><span>Netto ${g.satz} %</span><span>${eur(g.netto)}</span></div><div><span>zzgl. ${g.satz} % USt.</span><span>${eur(g.mwst)}</span></div>`; });
   html += `<div class="gesamt"><span>Gesamtbetrag</span><span>${eur(c.gesamtBrutto)}</span></div>`;
   $("summen").innerHTML = html;
-  // Kleinbetragsrechnung bis 250 € brutto darf ohne Empfängeranschrift sein, darüber nicht
-  $("kleinbetragHinweis").style.display = (c.gesamtBrutto > 250 && !((daten && daten.empfaenger && daten.empfaenger.adressZeilen) || []).length) ? "block" : "none";
+  // Kleinbetragsrechnung bis 250 € brutto darf ohne Empfängeranschrift sein, darüber nicht (ein Beleg braucht keinen Empfänger)
+  $("kleinbetragHinweis").style.display = (!istBelegModus() && c.gesamtBrutto > 250 && !((daten && daten.empfaenger && daten.empfaenger.adressZeilen) || []).length) ? "block" : "none";
+  if (istBelegModus()) { provisionVorschlagen(); }
 }
 /** Sprache gewechselt: Standardtexte der Fahrt und des Trinkgelds wandern mit, selbst geschriebene Texte bleiben. */
 function spracheGeaendert(){
@@ -304,6 +336,42 @@ function spracheGeaendert(){
   vorherigeSprache = neu;
   positionenRendern();
 }
+/** Dokumenttyp (Beleg oder Rechnung) wurde gewählt oder der Entwurf neu aufgebaut: nur das Passende zeigen. */
+function dokTypGeaendert(aufbau){
+  const beleg = istBelegModus();
+  if (daten) empfaengerRendern();
+  $("belegBox").style.display = beleg ? "block" : "none";
+  $("zahlungsartBox").style.display = beleg ? "none" : "";
+  $("spracheBox").style.display = beleg ? "none" : "";
+  $("sendenBox").style.display = beleg ? "none" : "";
+  $("belegPositionHinweis").style.display = beleg ? "block" : "none";
+  $("preisHinweis").style.display = !beleg && daten && daten.preisOffen ? "block" : "none";
+  $("kleinbetragHinweis").style.display = "none";
+  $("erzeugenBtn").textContent = beleg ? "Beleg erzeugen" : "Rechnung erzeugen";
+  const hinweisLabel = document.querySelector("label[for=hinweis]"); if (hinweisLabel) hinweisLabel.textContent = beleg ? "Hinweis auf dem Beleg (optional)" : "Hinweis auf der Rechnung (optional)";
+  const v = (daten && daten.verlauf) || [];
+  $("entwurfTitel").textContent = beleg
+    ? (daten.vorlageNummer ? `Neuer Beleg (vorbelegt mit dem stornierten Beleg ${daten.vorlageNummer})` : "Beleg erstellen")
+    : (daten && daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen"));
+  if (beleg) { $("belegPlattform").textContent = daten.belegVorschlag && daten.belegVorschlag.plattform ? `(${daten.belegVorschlag.plattform})` : ""; provisionVorschlagen(); }
+  if (!aufbau && daten) summenAktualisieren();
+}
+/** Provision vorschlagen: Gästebetrag minus "Betrag, den ich bekomme" (bei der Buchung eingetragen), solange du sie nicht selbst änderst. */
+function provisionVorschlagen(){
+  const bv = daten && daten.belegVorschlag, gast = berechnen(positionen.map((p) => ({ text: p.text, menge: Number(p.menge) || 0, einzelBrutto: Number(p.einzelBrutto) || 0, ust: Number(p.ust) }))).gesamtBrutto;
+  if (!provisionBerührt && bv && bv.provision == null && bv.erwarteteAuszahlung != null && gast > 0) {
+    const vorschlag = rund2(Math.max(0, Math.min(gast, gast - bv.erwarteteAuszahlung)));
+    $("belegProvision").value = vorschlag;
+    $("belegHinweis").textContent = `Vorschlag aus „Betrag, den ich bekomme“ (${eur(bv.erwarteteAuszahlung)}): Gästebetrag ${eur(gast)} minus ${eur(bv.erwarteteAuszahlung)} = Provision ${eur(vorschlag)}. Du kannst sie ändern.`;
+  } else if (!bv || bv.erwarteteAuszahlung == null) $("belegHinweis").textContent = "";
+  belegAuszahlungAnzeigen();
+}
+function provisionGeaendert(){ provisionBerührt = true; $("belegHinweis").textContent = ""; belegAuszahlungAnzeigen(); }
+function belegAuszahlungAnzeigen(){
+  const gast = berechnen(positionen.map((p) => ({ text: p.text, menge: Number(p.menge) || 0, einzelBrutto: Number(p.einzelBrutto) || 0, ust: Number(p.ust) }))).gesamtBrutto;
+  const roh = $("belegProvision").value, prov = roh === "" ? null : Number(roh);
+  $("belegAuszahlung").innerHTML = prov === null ? "<span class='grau'>Provision noch offen</span>" : prov > gast ? "<span style='color:#a02020'>Provision größer als der Gästebetrag</span>" : eur(rund2(gast - prov));
+}
 const ARTEN = { karte: "Karte", bar: "bar", ueberweisung: "Überweisung", link: "Zahlungslink", plattform: "Plattform", unbekannt: "Zahlungsart unbekannt" };
 function zahlungsartGeaendert(){
   const art = (document.querySelector("input[name=zahlungsart]:checked") || {}).value;
@@ -313,6 +381,8 @@ function zahlungsartGeaendert(){
 
 // ---------- Aktionen ----------
 function entwurfAuslesen(){
+  if (istBelegModus()) return { typ: "beleg", leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(), provision: $("belegProvision").value === "" ? null : Number($("belegProvision").value),
+    positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
   const zahlungsart = (document.querySelector("input[name=zahlungsart]:checked") || {}).value || "bezahlt";
   return { sprache: $("sprache").value, zahlungsart, bezahltArt: $("bezahltArt").value, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
     positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
@@ -324,7 +394,9 @@ function entwurfPruefen(e){
     if (!(p.menge > 0)) return `Position ${i + 1}: Die Menge muss größer als 0 sein.`;
     if (!Number.isFinite(p.einzelBrutto)) return `Position ${i + 1}: Bitte einen Preis eingeben.`;
   }
-  if (!(berechnen(e.positionen).gesamtBrutto > 0)) return "Der Rechnungsbetrag muss größer als 0 sein.";
+  const gesamt = berechnen(e.positionen).gesamtBrutto;
+  if (!(gesamt > 0)) return e.typ === "beleg" ? "Der Gästebetrag muss größer als 0 sein." : "Der Rechnungsbetrag muss größer als 0 sein.";
+  if (e.typ === "beleg" && e.provision != null && !(e.provision >= 0 && e.provision <= gesamt)) return "Die Provision muss zwischen 0 und dem Gästebetrag liegen.";
   return null;
 }
 function pdfAnzeigen(base64, fenster){
@@ -344,25 +416,30 @@ async function vorschau(){
 async function erzeugen(){
   const e = entwurfAuslesen(), fehler = entwurfPruefen(e);
   if (fehler) return setStatus("statusEntwurf", fehler, "error");
-  const senden = $("senden").checked, c = berechnen(e.positionen);
-  const frage = `Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
+  const senden = e.typ === "beleg" ? false : $("senden").checked, c = berechnen(e.positionen);
+  const frage = e.typ === "beleg"
+    ? `Beleg über den Gästebetrag ${eur(c.gesamtBrutto)} erzeugen${e.provision != null ? ` (Provision ${eur(e.provision)}, erwartete Auszahlung ${eur(rund2(c.gesamtBrutto - e.provision))})` : ""}?\n\nEr bekommt sofort eine Nummer aus dem Rechnungsnummernkreis, wird nicht verschickt und ist danach unveränderlich. Änderungen sind nur per Stornobeleg möglich.`
+    : `Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
   if (!confirm(frage)) return;
   $("erzeugenBtn").disabled = true; setStatus("statusEntwurf", "Rechnung wird erzeugt …", "");
   try {
     const d = await api("erstellen", { rechnung: e, senden });
     await laden(true);
+    if (d.beleg) return setStatus("statusEntwurf", `✓ Beleg ${d.nummer} erzeugt (Auszahlung offen). Die PDF findest du im Verlauf. Sobald die Plattform auszahlt, erfasst du die Auszahlung im Menü „Umsatz“.`, "ok");
     setStatus("statusEntwurf", `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : d.keineEmail ? " (nicht verschickt: keine E-Mail-Adresse hinterlegt, die PDF findest du im Verlauf)" : " (nicht verschickt)"}.`, "ok");
   } catch (err) { setStatus("statusEntwurf", err.message, "error"); await laden(true).catch(() => {}); }
   finally { $("erzeugenBtn").disabled = false; }
 }
 async function stornoErstellen(){
   const senden = $("stornoSenden").checked;
-  if (!confirm(`Stornorechnung zu ${daten.aktuelleNummer} erstellen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nDie Stornorechnung bekommt eine eigene Nummer und hebt die Rechnung auf. Danach kannst du eine neue Rechnung erstellen.`)) return;
+  const istB = !!(daten.abrechnung && daten.abrechnung.beleg);
+  if (istB && !confirm(`Stornobeleg zu ${daten.aktuelleNummer} erstellen?\n\nDer Stornobeleg bekommt eine eigene Nummer und hebt den Beleg auf. Danach kannst du einen neuen Beleg erstellen.`)) return;
+  if (!istB && !confirm(`Stornorechnung zu ${daten.aktuelleNummer} erstellen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nDie Stornorechnung bekommt eine eigene Nummer und hebt die Rechnung auf. Danach kannst du eine neue Rechnung erstellen.`)) return;
   $("stornoBtn").disabled = true; setStatus("statusStorno", "Stornorechnung wird erzeugt …", "");
   try {
     const d = await api("stornieren", { senden });
     await laden(true);
-    setStatus("statusEntwurf", `✓ Stornorechnung ${d.nummer} zu ${d.bezugNummer} erstellt${d.versendet ? " und verschickt" : ""}. Jetzt kannst du die neue Rechnung erstellen.`, "ok");
+    setStatus("statusEntwurf", d.beleg ? `✓ Stornobeleg ${d.nummer} zu ${d.bezugNummer} erstellt. Jetzt kannst du einen neuen Beleg erstellen.` : `✓ Stornorechnung ${d.nummer} zu ${d.bezugNummer} erstellt${d.versendet ? " und verschickt" : ""}. Jetzt kannst du die neue Rechnung erstellen.`, "ok");
   } catch (err) { setStatus("statusStorno", err.message, "error"); }
   finally { $("stornoBtn").disabled = false; }
 }

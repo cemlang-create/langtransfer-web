@@ -268,6 +268,11 @@
           <label class="check"><input type="radio" name="vmPreis" value="fest" onchange="vermittlungAktualisieren()"> Festpreis aus der Berechnung: <strong id="vmPreisFest">–</strong> (z. B. Fahrt für ein Hotel)</label>
         </div>
         <div class="field">
+          <label for="vmAuszahlung">Betrag, den ich bekomme (€, optional)</label>
+          <input type="number" step="0.01" min="0" id="vmAuszahlung" placeholder="z. B. 39,20" style="max-width:200px;">
+          <div class="hint">Was dir die Plattform für diese Fahrt auszahlt (Gästebetrag minus Provision, ohne die Geldtransfergebühr der Überweisung). Den Betrag, den der Gast zahlt, trägst du später im Beleg ein.</div>
+        </div>
+        <div class="field">
           <label>Abrechnung</label>
           <label class="check"><input type="radio" name="vmAbr" value="" checked onchange="vermittlungAktualisieren()"> Noch offen (später im Auftrag als abgerechnet markieren)</label>
           <label class="check"><input type="radio" name="vmAbr" value="karte" onchange="vermittlungAktualisieren()"> Der Gast hat per Karte im Fahrzeug bezahlt</label>
@@ -1090,6 +1095,7 @@ async function auftragInFormular(d, optionen = {}){
     setzeWert("vmPlattform", d.vermittlung.plattform);
     setzeWert("vmVorname", k.name === "Gast" ? "" : k.vorname); setzeWert("vmNachname", k.name === "Gast" ? "" : k.nachname);
     setzeWert("vmTelefon", k.mobil); setzeWert("vmEmail", k.email);
+    setzeWert("vmAuszahlung", d.vermittlung.erwarteteAuszahlung != null ? d.vermittlung.erwarteteAuszahlung : "");
     document.querySelector(`input[name="vmPreis"][value="${d.preisOffen ? "offen" : "fest"}"]`).checked = true;
     const abg = d.abgerechnet && (d.abgerechnet.art === "karte" || d.abgerechnet.art === "bar") ? d.abgerechnet : null;
     document.querySelector(`input[name="vmAbr"][value="${abg ? abg.art : ""}"]`).checked = true;
@@ -1195,7 +1201,7 @@ async function angebotSenden(){
     const abrBetrag = Number(v("vmBetrag").replace(",", "."));
     if (abrArt && !(abrBetrag > 0)) return setAngebotStatus("Bitte den bezahlten Betrag eingeben.", "error");
     vermittlungDaten = { preisFest, abgerechnet: abrArt ? { art: abrArt, betragBrutto: abrBetrag } : null };
-    kunde = { typ: "vermittlung", plattform: v("vmPlattform") || "Vermittlung", vorname: v("vmVorname"), nachname: v("vmNachname"), preisFest,
+    kunde = { typ: "vermittlung", plattform: v("vmPlattform") || "Vermittlung", vorname: v("vmVorname"), nachname: v("vmNachname"), preisFest, erwarteteAuszahlung: v("vmAuszahlung") === "" ? null : Number(v("vmAuszahlung").replace(",", ".")),
       name: `${v("vmVorname")} ${v("vmNachname")}`.trim(), telefon: v("vmTelefon"), email: v("vmEmail") };
   } else if (kundentyp === "privat") {
     if (!v("pVorname") || !v("pNachname")) return setAngebotStatus("Bitte Vor- und Nachnamen angeben.", "error");

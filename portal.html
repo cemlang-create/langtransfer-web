@@ -238,6 +238,7 @@ function alleAngabenHtml(a){
     feld(add, "Herkunft", "quelle", (v) => esc({ online: "Online-Buchungsformular", kalkulator: "Neuer Auftrag (Portal)", vermittlung: "Vermittlungsfahrt" }[v] || v));
     feld(add, "Sprache", "sprache", (v) => esc(v === "en" ? "English" : "Deutsch"));
     feld(add, "Plattform / Auftraggeber", "vermittlung.plattform"); markiere("vermittlung");
+    feld(add, "Betrag, den du bekommst (erwartete Auszahlung)", "vermittlung.erwarteteAuszahlung", (v) => esc(eur(v)));
     feld(add, "Angelegt am", "erstelltAm"); feld(add, "Bestätigt am", "bestaetigtAm"); feld(add, "Storniert am", "storniertAm");
     const blk = (label, s, e) => { const x = holen(s), y = holen(e); markiere(s, e); if (x || y) add(label, esc([x && zeit(x), y && zeit(y)].filter(Boolean).join(" bis "))); };
     blk("Terminblocker Hinfahrt", "kalenderBlockStartISO", "kalenderBlockEndeISO"); blk("Terminblocker Rückfahrt", "kalenderRueckBlockStartISO", "kalenderRueckBlockEndeISO");
@@ -392,6 +393,7 @@ async function ansichtUmsatz(params, noch){
     if (of.ohneGebuehr) hinweise.push(`${of.ohneGebuehr} Zahlung${of.ohneGebuehr === 1 ? "" : "en"} ohne Gebühr in diesem Monat. ${e.sumupProzent !== null ? `<button type="button" class="knopf" id="umSumup">SumUp-Gebühren mit ${esc(String(e.sumupProzent).replace(".", ","))} % berechnen</button> (Stripe: „Stripe abrufen“)` : "Hinterlege unten den SumUp-Gebührensatz, dann lassen sich fehlende Kartengebühren berechnen; Stripe-Gebühren holt „Stripe abrufen“."}`);
     if (of.auszahlungOffen.anzahl) hinweise.push(`<strong>Auszahlung offen:</strong> ${(of.auszahlungOffenNachPlattform && of.auszahlungOffenNachPlattform.length ? of.auszahlungOffenNachPlattform : [{ plattform: "Plattformen", anzahl: of.auszahlungOffen.anzahl, betrag: of.auszahlungOffen.betrag }]).map((x) => `${esc(x.plattform)}: ${x.anzahl} Fahrt${x.anzahl === 1 ? "" : "en"} mit ${zahlDe(x.betrag)} €`).join(" · ")}. Sie zählen erst im Monat der Auszahlung (unten erfassen).`);
     if (of.rechnungOffen.anzahl) hinweise.push(`<strong>Rechnungen offen:</strong> ${of.rechnungOffen.anzahl} mit ${zahlDe(of.rechnungOffen.betrag)} € noch nicht bezahlt. Sie zählen, sobald die Zahlung markiert ist.`);
+    if (of.vermittlungErwartet && of.vermittlungErwartet.anzahl) hinweise.push(`<strong>Erwartet:</strong> ${of.vermittlungErwartet.anzahl} Plattformfahrt${of.vermittlungErwartet.anzahl === 1 ? "" : "en"} ohne Beleg, ${zahlDe(of.vermittlungErwartet.betrag)} € laut „Betrag, den ich bekomme“.`);
     if (of.vermittlungOhneBetrag) hinweise.push(`${of.vermittlungOhneBetrag} gefahrene Vermittlungsfahrt${of.vermittlungOhneBetrag === 1 ? "" : "en"} ohne eingetragenen Gästebetrag.`);
     if (of.stripeOhneAuszahlung) hinweise.push(`${of.stripeOhneAuszahlung} Stripe-Zahlung${of.stripeOhneAuszahlung === 1 ? "" : "en"} ohne Auszahlungsdatum („Stripe abrufen“ holt es, sobald Stripe ausgezahlt hat).`);
     const zeilen = d.zeilen.map((z) => `<tr data-ref="${esc(z.referenz)}">
@@ -614,7 +616,7 @@ async function ansichtAuftraege(params, noch){
         const ab = r.abrechnung || {};
         if (r.status !== "bestaetigt") return `<span class="klein">–</span>`;
         const art = esc(ART[ab.art] || "");
-        if (ab.status === "bezahlt") return `<span class="badge ok">Bezahlt</span><div class="klein">${art}${ab.rechnung ? " · Rechnung" : ""}</div>${ab.auszahlungOffen ? `<div class="klein" style="color:var(--warn,#8a5a00);">Auszahlung offen</div>` : ""}`;
+        if (ab.status === "bezahlt") return `${ab.auszahlungOffen ? '<span class="badge warn">Auszahlung offen</span>' : '<span class="badge ok">Bezahlt</span>'}<div class="klein">${art}${ab.beleg ? " · Beleg" : ab.rechnung ? " · Rechnung" : ""}</div>`;
         if (ab.status === "rechnung_offen") return `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span><div class="klein">Überweisung · seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"}</div>`;
         return ab.faellig ? `<span class="badge warn">Offen</span><div class="klein">${art}</div>` : `<div class="klein">${art}</div>`;
       };
@@ -693,7 +695,7 @@ async function ansichtAuftrag(referenz, noch, params){
       const ab = d.abrechnung || { status: "offen" };
       const abg = d.abgerechnet;
       const heuteDatum = new Date().toLocaleDateString("sv-SE");   // YYYY-MM-DD in Ortszeit
-      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}${abg.gebuehr != null ? (abg.art === "plattform" ? " · Provision " : " · Gebühr ") + eur(abg.gebuehr) : ""}${abg.art === "plattform" ? (abg.auszahlungId ? " · ausgezahlt am " + datumDe(abg.auszahlungDatum) : " · Auszahlung offen") : (abg.auszahlungDatum ? " · Auszahlung am " + datumDe(abg.auszahlungDatum) : "")}` : "";
+      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}${abg.gebuehr != null ? (abg.art === "plattform" ? " · Provision " : " · Gebühr ") + eur(abg.gebuehr) : ""}${abg.art === "plattform" ? (abg.auszahlungId ? " · ausgezahlt am " + datumDe(abg.auszahlungDatum) : "") : (abg.auszahlungDatum ? " · Auszahlung am " + datumDe(abg.auszahlungDatum) : "")}` : "";
       const artAuswahl = (vorgabe) => ["karte", "bar", "ueberweisung", "link", "plattform"].map((a) => `<option value="${a}" ${a === vorgabe ? "selected" : ""}>${ZAHLUNG_ART[a]}</option>`).join("");
       const markierFormular = (vorgabeArt, vorgabeBetrag, knopfText, v) => `<div class="zeile">
              <div><label for="abArt">Zahlungsart</label><select id="abArt">${artAuswahl(vorgabeArt)}</select></div>
@@ -706,15 +708,15 @@ async function ansichtAuftrag(referenz, noch, params){
            </div><div class="klein" id="abHinweis" style="margin-top:6px;"></div><div class="klein" id="abMeldung" style="margin-top:6px;"></div>`;
       const kannEntfernen = abg && (!d.rechnungsnummer || d.rechnungZahlungsart === "ueberweisung");
       const zahlungInhalt = ab.status === "bezahlt"
-        ? `<p style="margin:8px 0 4px;"><strong>✓ Bezahlt:</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · Rechnung ${esc(d.rechnungsnummer)}` : ""}</p>
-           <div class="klein">${d.rechnungsnummer ? "" : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen)."}</div>
+        ? `<p style="margin:8px 0 4px;"><strong>${ab.auszahlungOffen ? "Abgerechnet, Auszahlung offen:" : "✓ Bezahlt:"}</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · ${ab.beleg ? "Beleg" : "Rechnung"} ${esc(d.rechnungsnummer)}` : ""}</p>
+           <div class="klein">${d.rechnungsnummer ? "" : (d.vermittlung ? "Für die Buchhaltung erzeugst du im Reiter „Beleg / Rechnung“ einen Beleg (keine Adresse nötig)." : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).")}${ab.auszahlungOffen ? ' Sobald die Plattform das Geld überwiesen hat, erfasst du die Auszahlung im Menü <a href="#/umsatz">Umsatz</a>. Dann gilt die Fahrt als bezahlt.' : ""}</div>
            ${abg && !["freifahrt", "gutschein"].includes(abg.art) ? `<div class="zeile" id="abKnoepfe"><button type="button" class="knopf" id="abBearbeiten">Bearbeiten</button>${kannEntfernen ? `<button type="button" class="knopf" id="abAufheben">Markierung entfernen</button>` : ""}</div><div id="abBearbeitenFeld"></div>` : (kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div>` : "")}<div class="klein" id="abMeldung" style="margin-top:6px;"></div>`
         : ab.status === "rechnung_offen"
         ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
-        : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
+        : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.${d.vermittlung ? " Bei Plattformfahrten erzeugst du stattdessen im Reiter „Beleg / Rechnung“ einen Beleg: Er setzt Gästebetrag und Provision und wartet auf die Auszahlung der Plattform." : ""}</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
-      const zahlBadge = ab.status === "bezahlt" ? `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}${ab.auszahlungOffen ? " · Auszahlung offen" : ""}</span>` : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
+      const zahlBadge = ab.status === "bezahlt" ? (ab.auszahlungOffen ? `<span class="badge warn">Auszahlung offen · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>`) : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
       const kontaktMail = d.kunde ? (d.kunde.typ === "firma" ? (d.kunde.buchendePerson || {}).email : d.kunde.email) : "";
       const hinZeit = d.fahrt && d.fahrt.zeitpunktISO ? berlinTeile(d.fahrt.zeitpunktISO) : null, rueckZeit = d.fahrt && d.fahrt.rueckfahrt && d.fahrt.rueckfahrt.zeitpunktISO ? berlinTeile(d.fahrt.rueckfahrt.zeitpunktISO) : null;
@@ -755,7 +757,7 @@ async function ansichtAuftrag(referenz, noch, params){
         ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
-        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">Rechnung${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
+        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">${d.vermittlung ? "Beleg / Rechnung" : "Rechnung"}${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
         <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
           ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
           <div class="platz"></div></div>

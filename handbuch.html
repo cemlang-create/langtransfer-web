@@ -215,7 +215,7 @@
   <p>Hinterlege unter „Einstellungen für Gebühren und Monatszuordnung“ den SumUp-Satz (Prozent, optional plus fester Betrag). Beim Markieren einer Kartenzahlung schlägt das Portal die Gebühr danach vor (änderbar). Für ältere Kartenzahlungen ohne Gebühr berechnet der Knopf <em>SumUp-Gebühren berechnen</em> sie für den ganzen Monat. Bereits eingetragene Gebühren bleiben unverändert.</p>
   <h3>Plattformen (Welcome Pickups, Transfeero): Sammelauszahlung</h3>
   <ol>
-    <li>Markiere die Fahrt im Auftrag als bezahlt mit Zahlungsart <strong>Plattform</strong>: Betrag = was der Gast an die Plattform zahlt, <strong>Provision</strong> = Abzug laut Abrechnung. Die Fahrt steht dann als „Auszahlung offen“ in Liste und Übersicht.</li>
+    <li>Erzeuge für die Fahrt den <strong>Beleg</strong> (Reiter „Beleg / Rechnung“): Er setzt den Gästebetrag und die <strong>Provision</strong> und markiert die Fahrt als Plattformfahrt. Alternativ markierst du die Zahlung von Hand (Zahlungsart <strong>Plattform</strong>). Die Fahrt steht dann als „Auszahlung offen“ in Liste und Übersicht.</li>
     <li>Kommt die Überweisung, öffne <strong>Umsatz</strong> und scrolle zu „Plattform-Auszahlung erfassen“. Jede Plattform hat ihren eigenen Block: Wähle dort die Fahrten der Überweisung (eine Auszahlung gilt immer nur für eine Plattform), prüfe die Provisionen und trage <strong>Datum</strong> und den <strong>erhaltenen Betrag</strong> ein. Die Differenz zu „Gästebeträge minus Provision“ ist die <strong>Geldtransfergebühr</strong>. Sie wird angezeigt und gespeichert.</li>
     <li>Die Fahrten zählen jetzt im Monat der Auszahlung. Vertippt? „Löschen“ bei der erfassten Auszahlung macht sie rückgängig, die Fahrten sind dann wieder offen.</li>
   </ol>
@@ -239,6 +239,17 @@
     <li><strong>Rechnung erzeugen</strong> vergibt die fortlaufende Nummer (LT-Jahr-Nr.) und verschickt die PDF per Mail an den Kunden (mit Kopie an dich), solange der Haken „Rechnung per E-Mail an den Kunden senden“ gesetzt ist.</li>
     <li>Im <strong>Verlauf</strong> siehst du alle Rechnungen und Stornorechnungen des Auftrags. „PDF“ öffnet sie, „Erneut senden“ schickt dieselbe Rechnung noch einmal (gleicher Inhalt, keine neue Nummer).</li>
   </ol>
+  <h3>Beleg für Plattformfahrten (Welcome Pickups, Transfeero)</h3>
+  <p>Von Plattformgästen kennst du keine Adresse, deshalb gibt es bei <strong>Vermittlungsfahrten</strong> im Reiter „Beleg / Rechnung“ einen <strong>Beleg für die Buchhaltung</strong> statt einer Rechnung. Er ist ausdrücklich keine Rechnung an den Fahrgast.</p>
+  <ul>
+    <li><strong>Nummer:</strong> aus dem normalen Rechnungsnummernkreis (LT-Jahr-Nr.), fortlaufend wie bei Rechnungen.</li>
+    <li><strong>Inhalt:</strong> Plattform als Auftraggeber, Fahrt, <strong>Gästebetrag</strong> mit Netto und USt, darunter die Abrechnung mit der Plattform: Provision und <strong>erwartete Auszahlung</strong> (ohne die Geldtransfergebühr, die je Überweisung anfällt).</li>
+    <li><strong>Keine Adresse und keine Mail nötig.</strong> Ein Beleg wird nie verschickt, die PDF lädst du im Verlauf herunter.</li>
+    <li><strong>Zahlung:</strong> Der Beleg startet als <em>Auszahlung offen</em>. Sobald du die Fahrt im Menü „Umsatz“ in einer Sammelauszahlung erfasst, gilt er als bezahlt, und das PDF zeigt „Auszahlung erhalten am …“.</li>
+    <li><strong>Korrigieren</strong> geht wie bei Rechnungen nur per Storno: „Stornobeleg erstellen“ (eigene Nummer), dann einen neuen Beleg.</li>
+    <li>Kennst du den Gast mit Adresse und willst ihm eine echte Rechnung ausstellen, wähle oben „Rechnung“.</li>
+  </ul>
+  <p class="klein">Wie die Provision steuerlich zu behandeln ist, klärst du mit deinem Steuerberater. Der Beleg weist sie nur aus.</p>
   <h3>Eine Rechnung korrigieren</h3>
   <p>Ausgestellte Rechnungen werden <strong>nie überschrieben</strong>. So korrigierst du:</p>
   <ol>
@@ -387,7 +398,11 @@
   <h3>Hotel ruft an, Gast unbekannt</h3>
   <p>Kundentyp „Vermittlung“ mit dem Hotel als Auftraggeber, Festpreis, bei Bezahlung im Fahrzeug gleich „Karte“ oder „bar“ markieren. Keine Mail an den Gast.</p>
   <h3>Plattformfahrt (Welcome Pickups, Transfeero)</h3>
-  <p>Fahrt als Vermittlung mit offenem Preis anlegen. Nach der Fahrt Preis und E-Mail eintragen, Rechnung „bereits bezahlt“ mit Hinweis „Bezahlt über Welcome Pickups“ (bzw. Transfeero).</p>
+  <ol>
+    <li>Fahrt in „Neuer Auftrag“ als <strong>Vermittlung</strong> anlegen (Preis offen). Trage bei <strong>„Betrag, den ich bekomme“</strong> ein, was dir die Plattform für die Fahrt auszahlt (Gästebetrag minus Provision). Das weißt du schon bei der Buchung.</li>
+    <li>Nach der Fahrt: im Auftrag den Reiter <strong>„Beleg / Rechnung“</strong> öffnen, <strong>Beleg</strong> gewählt lassen, den <strong>Gästebetrag</strong> (was der Gast an die Plattform gezahlt hat) eintragen und „Beleg erzeugen“. Die Provision wird aus den beiden Beträgen vorgeschlagen.</li>
+    <li>Der Beleg steht auf <strong>„Auszahlung offen“</strong>, bis du die Sammelauszahlung im Menü <strong>Umsatz</strong> erfasst. Dann gilt er als bezahlt.</li>
+  </ol>
   <h3>Kunde will etwas ändern (Zeit, Route)</h3>
   <p>„Neuer Auftrag“, Referenz eingeben, <strong>Laden</strong>, ändern, neu senden. Hat der Auftrag schon eine Rechnung, erst die Stornorechnung erstellen.</p>
   <h3>Kunde hat zu viel oder zu wenig berechnet bekommen</h3>
