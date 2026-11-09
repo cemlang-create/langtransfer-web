@@ -227,6 +227,7 @@ function alleAngabenHtml(a){
     feld(add, "Preis offen", "preisOffen"); feld(add, "Trinkgeld (brutto)", "trinkgeldBrutto");
     feld(add, "Zahlungsart", "zahlungsart", (v) => esc({ link: "Zahlungslink (online im Voraus)", fahrzeug: "Im Fahrzeug per Karte", rechnung: "Auf Rechnung (Überweisung)", vermittlung: "Vermittlung" }[v] || v));
     feld(add, "Zahlung laut Formular", "kunde.zahlung"); feld(add, "Zahlungslink", "zahlungslink");
+    if (a.wartezeit) { markiere("wartezeit"); const w = a.wartezeit; add("Wartezeit", esc(`${w.minuten} Min.${w.minRueck ? ` (Hinfahrt ${w.minHin}, Rückfahrt ${w.minRueck})` : ""}${w.brutto > 0 ? ` · ${eur(w.brutto)} (19 % USt)` : " · ohne Aufpreis"}`)); }
     if (a.ausland) { markiere("ausland"); const x = a.ausland; add("Wegstrecke im Ausland (ohne deutsche USt)", esc(`${x.land}: ${x.kmAusland} von ${x.kmGesamt} km · Ausland ${eur(x.bruttoAusland)}, Inland ${eur(x.bruttoInland)} (19 % USt)`)); }
     if (a.freifahrt) { markiere("freifahrt"); add("Freifahrt (Zehnerkarte)", esc(`Gutschrift ${eur(a.freifahrt.abgezogen)} auf ${eur(a.freifahrt.bruttoVorher)} (Wert der Freifahrt ${eur(a.freifahrt.wert)})`)); }
     if (a.abgerechnet) { markiere("abgerechnet"); add("Bezahlt", esc(`${ZAHLUNG_ART[a.abgerechnet.art] || a.abgerechnet.art}, ${eur(a.abgerechnet.betragBrutto)}${a.abgerechnet.datum ? ", " + a.abgerechnet.datum.split("-").reverse().join(".") : ""}${a.abgerechnet.notiz ? " · " + a.abgerechnet.notiz : ""}`)); }

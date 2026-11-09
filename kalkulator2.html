@@ -142,6 +142,16 @@
   </div>
   <p class="hint" style="margin-top:-6px;">Reihenfolge: Aktion/Gutschein → eigener Rabatt → Sonderzuschlag. Ein eigener Gesamtpreis (brutto) überschreibt das Ergebnis komplett.</p>
 
+  <div class="field" id="wartezeitBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:16px;">
+    <label>Wartezeit (z. B. beim Einkauf oder Arztbesuch)</label>
+    <div class="row3">
+      <div class="field"><label for="wzMinHin" id="wzMinHinLabel">Wartezeit (Minuten)</label><input type="number" id="wzMinHin" min="0" max="600" step="5" placeholder="0"></div>
+      <div class="field" id="wzMinRueckFeld" style="display:none;"><label for="wzMinRueck">Wartezeit Rückfahrt (Minuten)</label><input type="number" id="wzMinRueck" min="0" max="600" step="5" placeholder="0"></div>
+      <div class="field"><label for="wzPreis">Preis der Wartezeit (€ brutto)</label><input type="number" id="wzPreis" min="0" step="0.01" placeholder="0,00"></div>
+    </div>
+    <div class="hint">Beispiel Einkauf: Abholung zu Hause, <em>Zwischenziel</em> Supermarkt, Ziel zu Hause, 20 Minuten Wartezeit. Den Preis trägst du selbst ein. Die Wartezeit verlängert Ankunft und Terminblock im Kalender und steht als eigene Position „Wartezeit (20 Min.)“ auf Angebot und Rechnung. Ohne Preis wird sie nur im Kalender geblockt.</div>
+  </div>
+
   <div class="field" id="auslandBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:16px;">
     <label>Fahrt ins Ausland: Wegstrecke im Ausland (ohne deutsche Umsatzsteuer)</label>
     <div class="row3">
@@ -518,6 +528,8 @@ function setFahrtart(f){
   document.getElementById("fahrtartHinRueck").classList.toggle("active", f === "hinrueck");
   document.getElementById("rueckfahrtBereich").style.display = f === "hinrueck" ? "block" : "none";
   const auslandRueck = document.getElementById("auslandKmRueckFeld"); if (auslandRueck) auslandRueck.style.display = f === "hinrueck" ? "" : "none";
+  const wzRueck = document.getElementById("wzMinRueckFeld"); if (wzRueck) wzRueck.style.display = f === "hinrueck" ? "" : "none";
+  const wzLabel = document.getElementById("wzMinHinLabel"); if (wzLabel) wzLabel.textContent = f === "hinrueck" ? "Wartezeit Hinfahrt (Minuten)" : "Wartezeit (Minuten)";
 }
 function zwischenUmschalten(){
   const feld = document.getElementById("zwischenFeld");
@@ -706,7 +718,7 @@ function rechnungsadresseStatus(){
 }
 
 // ===================== STRECKEN-/ZEITPLAN (OHNE REGELN, OHNE KALENDER) =====================
-async function fahrtplanBerechnen({ abholPlace, zielPlace, zwischenPlace, abholung }){
+async function fahrtplanBerechnen({ abholPlace, zielPlace, zwischenPlace, abholung, wartezeitMin = 0 }){
   const A = abholPlace.formatted_address;
   const Z = zielPlace.formatted_address;
   const W = zwischenPlace ? zwischenPlace.formatted_address : null;
@@ -731,7 +743,7 @@ async function fahrtplanBerechnen({ abholPlace, zielPlace, zwischenPlace, abholu
   const ladeBis = ladeMinuten(kmNachKunde) - ladeVor;
   const ladeNach = ladeMinuten(kmGesamt) - ladeMinuten(kmNachKunde);
 
-  const ankunft = plusMin(abholung, kundenGesamtMin + ladeBis);
+  const ankunft = plusMin(abholung, kundenGesamtMin + ladeBis + wartezeitMin);   // Wartezeit (Standzeit) verlängert die Fahrt
   const abfahrtBasis = plusMin(abholung, -(anfahrtMin + ladeVor));
   const rueckkehrBasis = plusMin(ankunft, rueckMin + ladeNach);
 
@@ -741,7 +753,7 @@ async function fahrtplanBerechnen({ abholPlace, zielPlace, zwischenPlace, abholu
     umwegKm: direkt ? Math.max(0, kundenKm - direkt.km) : 0,
     abholung, ankunft, abfahrtBasis, rueckkehrBasis,
     abwesenheitMin: Math.round((rueckkehrBasis - abfahrtBasis) / 60000),
-    ladeMin: ladeVor + ladeBis + ladeNach
+    ladeMin: ladeVor + ladeBis + ladeNach, wartezeitMin
   };
 }
 
@@ -782,7 +794,7 @@ function beinPreisBerechnen(fp, fahrgaeste){
 function beinDetailHtml(praefix, b, fp, fahrgaeste){
   const route = `${nurOrt(fp.abhol.formatted_address)} → ${nurOrt(fp.ziel.formatted_address)}`;
   let s = `<div class="titel"><span>${praefix}${route}</span><span></span></div>`;
-  s += `<div class="note"><span>Abholung ${datumUhr(fp.abholung)} · Ankunft ${uhr(fp.ankunft)} · Basis: ab ${uhr(fp.abfahrtBasis)}, zurück ${uhr(fp.rueckkehrBasis)} (${Math.floor(fp.abwesenheitMin/60)} Std. ${fp.abwesenheitMin%60} Min.${fp.ladeMin ? `, inkl. ${fp.ladeMin} Min. Laden` : ""})</span><span></span></div>`;
+  s += `<div class="note"><span>Abholung ${datumUhr(fp.abholung)} · Ankunft ${uhr(fp.ankunft)} · Basis: ab ${uhr(fp.abfahrtBasis)}, zurück ${uhr(fp.rueckkehrBasis)} (${Math.floor(fp.abwesenheitMin/60)} Std. ${fp.abwesenheitMin%60} Min.${fp.ladeMin ? `, inkl. ${fp.ladeMin} Min. Laden` : ""}${fp.wartezeitMin ? `, inkl. ${fp.wartezeitMin} Min. Wartezeit` : ""})</span><span></span></div>`;
   s += `<div><span>Anfahrt Basis → Abholort<small>${fp.anfahrtKm.toFixed(1)} km · ${b.innerhalb ? "Pauschale 2,50 € (Abholort in Neckartenzlingen)" : "0,75 €/km bis 10 km, danach 1,50 €/km"}</small></span><span>${fmt(b.anfahrtBetrag)} €</span></div>`;
   s += `<div><span>Kundenstrecke<small>${fp.kundenKm.toFixed(1)} km × 1,50 €${fp.zwischen ? " (inkl. Zwischenziel)" : ""}</small></span><span>${fmt(b.kundenBetrag)} €</span></div>`;
   s += `<div><span>Rückfahrt zur Basis<small>${fp.rueckKm.toFixed(1)} km × 1,50 €</small></span><span>${fmt(b.rueckBetrag)} €</span></div>`;
@@ -832,14 +844,20 @@ async function preisBerechnen(){
   const fahrgaeste = ab12 + unter12;
   if (fahrgaeste < 1) return setStatus("status", "Bitte mindestens einen Fahrgast angeben.", "error");
 
+  // Wartezeit: Minuten je Fahrtabschnitt und der selbst eingetragene Preis (brutto)
+  const wzMinHin = Math.min(600, Math.max(0, Math.round(parseFloat(document.getElementById("wzMinHin").value || 0))));
+  const wzMinRueck = hinRueckAktiv ? Math.min(600, Math.max(0, Math.round(parseFloat(document.getElementById("wzMinRueck").value || 0)))) : 0;
+  const wzPreis = Math.max(0, Math.round(parseFloat(document.getElementById("wzPreis").value || 0) * 100) / 100);
+  if (wzPreis > 0 && wzMinHin + wzMinRueck === 0) { letztesErgebnis = null; document.getElementById("ergebnis").style.display = "none"; return setStatus("status", "Bitte die Wartezeit in Minuten angeben (der Preis der Wartezeit ist eingetragen).", "error"); }
+
   const btn = document.getElementById("berechnenBtn");
   btn.disabled = true;
   setStatus("status", "Strecke wird berechnet …", "");
 
   try {
-    const hinPlan = await fahrtplanBerechnen({ abholPlace: places.abhol, zielPlace: places.ziel, zwischenPlace: zwischenAktiv ? places.zwischen : null, abholung });
+    const hinPlan = await fahrtplanBerechnen({ abholPlace: places.abhol, zielPlace: places.ziel, zwischenPlace: zwischenAktiv ? places.zwischen : null, abholung, wartezeitMin: wzMinHin });
     const ruckPlan = hinRueckAktiv
-      ? await fahrtplanBerechnen({ abholPlace: ruckAbholPlace, zielPlace: ruckZielPlace, zwischenPlace: null, abholung: ruckAbholung })
+      ? await fahrtplanBerechnen({ abholPlace: ruckAbholPlace, zielPlace: ruckZielPlace, zwischenPlace: null, abholung: ruckAbholung, wartezeitMin: wzMinRueck })
       : null;
 
     const hin = beinPreisBerechnen(hinPlan, fahrgaeste);
@@ -884,7 +902,8 @@ async function preisBerechnen(){
     const berechnet = nachManuell + sonderzuschlag;
     const eigenerRaw = document.getElementById("eigenerPreis").value;
     const eigenerPreis = eigenerRaw !== "" ? Math.max(0, parseFloat(eigenerRaw)) : null;
-    const gesamtBrutto = Math.round((eigenerPreis !== null ? eigenerPreis : berechnet) * 100) / 100;
+    const fahrpreis = Math.round((eigenerPreis !== null ? eigenerPreis : berechnet) * 100) / 100;
+    const gesamtBrutto = Math.round((fahrpreis + wzPreis) * 100) / 100;   // die Wartezeit bleibt von Rabatt, Gutschein und eigenem Gesamtpreis unberührt
     // Wegstrecke im Ausland: Der Preis wird nach Kilometern (Kundenstrecke) aufgeteilt, der Auslandsanteil trägt keine deutsche USt
     const kmGesamt = hinPlan.kundenKm + (ruckPlan ? ruckPlan.kundenKm : 0);
     const auslandLand = document.getElementById("auslandLand").value.trim();
@@ -897,8 +916,8 @@ async function preisBerechnen(){
         : (auslandHin > hinPlan.kundenKm + 0.05 || (ruckPlan && auslandRueck > ruckPlan.kundenKm + 0.05)) ? `Die Kilometer im Ausland sind größer als die Kundenstrecke (Hinfahrt ${hinPlan.kundenKm.toFixed(1)} km${ruckPlan ? `, Rückfahrt ${ruckPlan.kundenKm.toFixed(1)} km` : ""}).` : "";
       if (auslandFehler) { letztesErgebnis = null; document.getElementById("ergebnis").style.display = "none"; setStatus("status", auslandFehler, "error"); return; }   // kein altes Ergebnis stehen lassen
     }
-    const auslandAnteil = auslandKm > 0 && gesamtBrutto > 0 && kmGesamt > 0 ? Math.min(1, auslandKm / kmGesamt) : 0;
-    const bruttoAusland = Math.round(gesamtBrutto * auslandAnteil * 100) / 100;
+    const auslandAnteil = auslandKm > 0 && fahrpreis > 0 && kmGesamt > 0 ? Math.min(1, auslandKm / kmGesamt) : 0;
+    const bruttoAusland = Math.round(fahrpreis * auslandAnteil * 100) / 100;   // nur der Fahrpreis wird nach Kilometern aufgeteilt, die Wartezeit zählt als Inland
     const bruttoInland = Math.round((gesamtBrutto - bruttoAusland) * 100) / 100;
     const netto = bruttoInland / 1.19 + bruttoAusland;
     const mwst = bruttoInland - bruttoInland / 1.19;
@@ -928,8 +947,12 @@ async function preisBerechnen(){
       r += `<div class="sub2"><span>Berechneter Preis</span><span>${fmt(berechnet)} €</span></div>`;
       r += `<div><span>Eigener Gesamtpreis (überschreibt die Berechnung)</span><span>${fmt(eigenerPreis)} €</span></div>`;
     }
+    if (wzMinHin + wzMinRueck > 0) {
+      r += `<div><span>Fahrpreis</span><span>${fmt(fahrpreis)} €</span></div>`;
+      r += `<div><span>Wartezeit (${wzMinHin + wzMinRueck} Min.)<small>${wzPreis > 0 ? "Preis von dir eingetragen · mit 19 % USt." : "ohne Aufpreis, nur im Kalender geblockt"}</small></span><span>${fmt(wzPreis)} €</span></div>`;
+    }
     if (auslandAnteil > 0) {
-      r += `<div><span>Davon Wegstrecke Inland (Deutschland)<small>${(kmGesamt - auslandKm).toFixed(1)} km · mit 19 % USt.</small></span><span>${fmt(bruttoInland)} €</span></div>`;
+      r += `<div><span>Davon Wegstrecke Inland (Deutschland)<small>${(kmGesamt - auslandKm).toFixed(1)} km · mit 19 % USt.</small></span><span>${fmt(bruttoInland - wzPreis)} €</span></div>`;
       r += `<div><span>Davon Wegstrecke Ausland (${auslandLand.replace(/[<>&]/g, "")})<small>${auslandKm.toFixed(1)} km · ohne deutsche USt.</small></span><span>${fmt(bruttoAusland)} €</span></div>`;
     }
     r += `<div class="sub2"><span>Nettobetrag</span><span>${fmt(netto)} €</span></div>`;
@@ -939,12 +962,12 @@ async function preisBerechnen(){
     document.getElementById("ergebnis").style.display = "block";
 
     // ---------- Angebots-Vorbelegung ----------
-    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "", ausland: auslandAnteil > 0 ? { land: auslandLand, kmHin: auslandHin, kmRueck: auslandRueck, kmGesamt } : null };
+    letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "", ausland: auslandAnteil > 0 ? { land: auslandLand, kmHin: auslandHin, kmRueck: auslandRueck, kmGesamt } : null, wartezeit: wzMinHin + wzMinRueck > 0 ? { minHin: wzMinHin, minRueck: wzMinRueck, brutto: wzPreis } : null };
     vermittlungAktualisieren();
     flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
     if (!kurz.value.trim() || kurz.dataset.auto === "1") {
-      kurz.value = `Transfer ${nurOrt(hinPlan.abhol.formatted_address)} → ${nurOrt(hinPlan.ziel.formatted_address)}${ruckPlan ? " (Hin- und Rückfahrt)" : ""}`;
+      kurz.value = `Transfer ${nurOrt(hinPlan.abhol.formatted_address)} → ${nurOrt(hinPlan.ziel.formatted_address)}${ruckPlan ? " (Hin- und Rückfahrt)" : ""}${wzMinHin + wzMinRueck > 0 ? ` · inkl. ${wzMinHin + wzMinRueck} Min. Wartezeit` : ""}`;
       kurz.dataset.auto = "1";
     }
     document.getElementById("agBlockStart").value = isoZuDatetimeLocal(hinPlan.abfahrtBasis);
@@ -1086,7 +1109,8 @@ async function auftragInFormular(d, optionen = {}){
   setzeWert("gutschein", ""); setzeWert("manuellRabatt", ""); setzeWert("sonderzuschlag", "");
   setzeWert("auslandLand", d.ausland ? d.ausland.land : ""); setzeWert("auslandKmHin", d.ausland ? d.ausland.kmHin : ""); setzeWert("auslandKmRueck", d.ausland && ruck ? d.ausland.kmRueck : "");
   // der bisherige Preis bleibt, bis du ihn änderst (bei einer Freifahrt der Preis VOR der Gutschrift, sie wird beim Senden wieder abgezogen)
-  setzeWert("eigenerPreis", d.freifahrt ? d.freifahrt.bruttoVorher : (d.preisOffen ? "" : ((d.preis && d.preis.gesamtBrutto) || "")));
+  setzeWert("eigenerPreis", d.freifahrt ? d.freifahrt.bruttoVorher : (d.preisOffen ? "" : (d.preis && d.preis.gesamtBrutto ? Math.round((d.preis.gesamtBrutto - (d.wartezeit ? d.wartezeit.brutto : 0)) * 100) / 100 : "")));
+  setzeWert("wzMinHin", d.wartezeit ? d.wartezeit.minHin || "" : ""); setzeWert("wzMinRueck", d.wartezeit && ruck ? d.wartezeit.minRueck || "" : ""); setzeWert("wzPreis", d.wartezeit && d.wartezeit.brutto ? d.wartezeit.brutto : "");
   // --- Kunde ---
   const ra = k.rechnungsadresse || {};
   let bemerkungen = k.bemerkungen || "";
@@ -1269,6 +1293,7 @@ async function angebotSenden(){
     referenz: v("agReferenz").toUpperCase() || null,
     ...(letztesErgebnis.gutscheinCode ? { gutscheinCode: letztesErgebnis.gutscheinCode } : {}),
     ...(letztesErgebnis.ausland ? { ausland: letztesErgebnis.ausland } : {}),
+    ...(letztesErgebnis.wartezeit ? { wartezeit: letztesErgebnis.wartezeit } : {}),
     ...(stammkundeAktuell ? { stammkundeId: stammkundeAktuell.id } : {}),
     ...(stammkundeAktuell && !istVermittlung && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
     kunde,
