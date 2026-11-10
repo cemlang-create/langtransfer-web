@@ -100,8 +100,20 @@
       <h2 class="erste" id="entwurfTitel">Neue Rechnung</h2>
       <div class="field" id="dokTypBox" style="display:none;">
         <label>Dokument</label>
-        <label class="check"><input type="radio" name="dokTyp" value="beleg" onchange="dokTypGeaendert()"> <strong>Beleg für die Buchhaltung</strong> (Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)</label>
-        <label class="check"><input type="radio" name="dokTyp" value="rechnung" onchange="dokTypGeaendert()"> Rechnung (wenn du den Gast mit Adresse kennst)</label>
+        <label class="check" id="dokBelegZeile"><input type="radio" name="dokTyp" value="beleg" onchange="dokTypGeaendert()"> <strong>Beleg für die Buchhaltung</strong> (Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)</label>
+        <label class="check"><input type="radio" name="dokTyp" value="rechnung" onchange="dokTypGeaendert()"> <span id="dokRechnungText">Rechnung</span></label>
+        <label class="check" id="dokNoShowZeile"><input type="radio" name="dokTyp" value="noshow" onchange="dokTypGeaendert()"> <strong>No-Show-Rechnung</strong> (Fahrgast nicht angetroffen, Fahrt nicht angetreten)</label>
+      </div>
+      <div class="box" id="noShowBox" style="display:none;">
+        <strong>No-Show: Sachverhalt auf der Rechnung</strong>
+        <div class="field" id="noShowAbschnittFeld" style="display:none;margin-top:8px;"><label for="noShowAbschnitt">Fahrtabschnitt</label><select id="noShowAbschnitt" onchange="noShowGeaendert()"></select></div>
+        <p class="hint" id="noShowIntro" style="margin:8px 0 4px;"></p>
+        <div id="noShowSaetze"></div>
+        <div class="row" style="margin-top:10px;">
+          <div class="field"><label for="noShowWartezeit">Gewartete Minuten (Fahrer vor Ort)</label><input type="number" id="noShowWartezeit" min="0" max="600" step="1" placeholder="0" oninput="noShowWartezeitGeaendert()"></div>
+          <div class="field"><label>Wartezeit-Position</label><div id="noShowWartezeitInfo" class="grau" style="padding:9px 0;">keine</div></div>
+        </div>
+        <div class="hint" style="margin:0;">Nur Aussagen angehakt lassen, die stimmen: Sie erscheinen als Abschnitt „Sachverhalt“ über den Positionen. Datum, Uhrzeit und Ort kommen aus dem Auftrag. Vorgeschlagen ist der volle vereinbarte Preis, die Wartezeit rechnet 5 Minuten frei und danach 1 € je Minute (Ziffer 4 der Beförderungsbedingungen) als eigene Position. Alle Beträge und der Steuersatz sind in den Positionen änderbar. Ob bei einem No-Show Umsatzsteuer anfällt, klärst du mit deinem Steuerberater.</div>
       </div>
       <div class="row">
         <div class="field" id="spracheBox"><label for="sprache">Sprache der Rechnung</label>
@@ -188,6 +200,9 @@ let daten = null;            // Antwort von "laden"
 let positionen = [];         // [{ text, menge, einzelBrutto, ust }]
 let vorherigeSprache = "de";
 let provisionBerührt = false;   // Provision wurde von Hand geändert: nicht mehr automatisch vorschlagen
+let letzterModus = "rechnung";   // zuletzt gewählter Dokumenttyp: rechnung, beleg oder noshow
+const noShowAuswahl = {};       // angehakte Sachverhalts-Aussagen (Standard: alle)
+const istNoShowModus = () => !!daten && !!daten.noShowMoeglich && ((document.querySelector("input[name=dokTyp]:checked") || {}).value === "noshow");
 const istBelegModus = () => !!daten && daten.belegMoeglich && ((document.querySelector("input[name=dokTyp]:checked") || {}).value === "beleg");
 
 async function laden(nachAktion){
@@ -204,7 +219,10 @@ async function laden(nachAktion){
     $("referenz").value = j.referenz;
     if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true;
       provisionBerührt = false;
-      const dt = document.querySelector(`input[name=dokTyp][value=${j.typVorschlag === "beleg" ? "beleg" : "rechnung"}]`); if (dt) dt.checked = true;
+      const typ = j.typVorschlag === "beleg" ? "beleg" : (j.typVorschlag === "noshow" && j.noShowMoeglich ? "noshow" : "rechnung");
+      const dt = document.querySelector(`input[name=dokTyp][value=${typ}]`); if (dt) dt.checked = true;
+      letzterModus = typ;
+      if (typ === "noshow") positionen.forEach((p, i) => { p._ns = /^(Wartezeit|Waiting time)/.test(p.text) ? "wz" : (i === 0 ? "haupt" : undefined); });   // aus der stornierten Rechnung übernommen: Positionen wieder zuordnen
       $("belegProvision").value = j.belegVorschlag && j.belegVorschlag.provision != null ? j.belegVorschlag.provision : "";
       if (j.typVorschlag === "beleg" && (j.hinweis || "").startsWith(j.vermittlung ? ($("sprache").value === "en" ? "Paid via" : "Bezahlt über") : "\u0000")) $("hinweis").value = ""; }
     aufbauen();
@@ -237,7 +255,7 @@ function aufbauen(){
   const v = daten.verlauf || [];
   $("verlaufBereich").style.display = v.length ? "block" : "none";
   $("verlaufTabelle").innerHTML = v.map((h) => {
-    const art = h.typ === "storno" ? (h.istBeleg ? `Stornobeleg zu ${esc(h.bezugNummer)}` : `Stornorechnung zu ${esc(h.bezugNummer)}`) : (h.istBeleg ? "Beleg" : "Rechnung");
+    const art = h.typ === "storno" ? (h.istBeleg ? `Stornobeleg zu ${esc(h.bezugNummer)}` : `Stornorechnung zu ${esc(h.bezugNummer)}`) : (h.istBeleg ? "Beleg" : h.noShow ? "Rechnung (No-Show)" : "Rechnung");
     const abrH = daten.abrechnung || {};
     const zahlBadge = h.aktuell && abrH.status === "bezahlt" && abrH.auszahlungOffen ? ` <span class="badge warn">Auszahlung offen</span>` : h.aktuell && abrH.status === "bezahlt" ? ` <span class="badge ok">bezahlt</span>` : h.aktuell && abrH.status === "rechnung_offen" ? ` <span class="badge ${abrH.ueberfaellig ? "err" : "warn"}">${abrH.ueberfaellig ? "überfällig" : "offen"}</span>` : "";
     const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>${zahlBadge}`;
@@ -334,27 +352,84 @@ function spracheGeaendert(){
     else if (p.text === (alt === "en" ? "Tip" : "Trinkgeld")) p.text = neu === "en" ? "Tip" : "Trinkgeld";
   });
   vorherigeSprache = neu;
+  if (istNoShowModus()) {   // No-Show-Texte (Sachverhalt, Positionstexte) in der neuen Sprache
+    noShowRendern();
+    const t = daten.noShowVorschlag.texte[neu][$("noShowAbschnitt").value || "hin"], hp = positionen.find((p) => p._ns === "haupt"); if (hp) hp.text = t.positionText;
+    if (positionen.find((p) => p._ns === "wz")) { noShowWartezeitGeaendert(); return; }
+  }
   positionenRendern();
 }
 /** Dokumenttyp (Beleg oder Rechnung) wurde gewählt oder der Entwurf neu aufgebaut: nur das Passende zeigen. */
 function dokTypGeaendert(aufbau){
-  const beleg = istBelegModus();
+  const beleg = istBelegModus(), ns = istNoShowModus(), modus = beleg ? "beleg" : ns ? "noshow" : "rechnung";
+  if (daten) {   // welche Dokumenttypen es für diesen Auftrag gibt
+    $("dokTypBox").style.display = daten.belegMoeglich || daten.noShowMoeglich ? "block" : "none";
+    $("dokBelegZeile").style.display = daten.belegMoeglich ? "" : "none";
+    $("dokNoShowZeile").style.display = daten.noShowMoeglich ? "" : "none";
+    $("dokRechnungText").textContent = daten.belegMoeglich ? "Rechnung (wenn du den Gast mit Adresse kennst)" : "Normale Rechnung";
+  }
+  $("noShowBox").style.display = ns ? "block" : "none";
   if (daten) empfaengerRendern();
   $("belegBox").style.display = beleg ? "block" : "none";
   $("zahlungsartBox").style.display = beleg ? "none" : "";
   $("spracheBox").style.display = beleg ? "none" : "";
   $("sendenBox").style.display = beleg ? "none" : "";
   $("belegPositionHinweis").style.display = beleg ? "block" : "none";
-  $("preisHinweis").style.display = !beleg && daten && daten.preisOffen ? "block" : "none";
+  $("preisHinweis").style.display = !beleg && !ns && daten && daten.preisOffen ? "block" : "none";
   $("kleinbetragHinweis").style.display = "none";
-  $("erzeugenBtn").textContent = beleg ? "Beleg erzeugen" : "Rechnung erzeugen";
+  $("erzeugenBtn").textContent = beleg ? "Beleg erzeugen" : ns ? "No-Show-Rechnung erzeugen" : "Rechnung erzeugen";
   const hinweisLabel = document.querySelector("label[for=hinweis]"); if (hinweisLabel) hinweisLabel.textContent = beleg ? "Hinweis auf dem Beleg (optional)" : "Hinweis auf der Rechnung (optional)";
   const v = (daten && daten.verlauf) || [];
   $("entwurfTitel").textContent = beleg
     ? (daten.vorlageNummer ? `Neuer Beleg (vorbelegt mit dem stornierten Beleg ${daten.vorlageNummer})` : "Beleg erstellen")
+    : ns ? (daten.vorlageNummer ? `Neue No-Show-Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : "No-Show-Rechnung erstellen")
     : (daten && daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen"));
   if (beleg) { $("belegPlattform").textContent = daten.belegVorschlag && daten.belegVorschlag.plattform ? `(${daten.belegVorschlag.plattform})` : ""; provisionVorschlagen(); }
+  if (ns) noShowRendern();
+  if (!aufbau && daten && modus !== letzterModus) {   // beim Wechsel des Dokumenttyps: Positionen und Zahlungsart passend setzen
+    if (ns) { noShowPositionenSetzen(); const z = document.querySelector("input[name=zahlungsart][value=ueberweisung]"); if (z) { z.checked = true; zahlungsartGeaendert(); } }
+    else if (letzterModus === "noshow") {
+      positionen = daten.positionen.map((p) => Object.assign({}, p)); positionenRendern();
+      const z0 = document.querySelector(`input[name=zahlungsart][value=${daten.zahlungsart}]`); if (z0) { z0.checked = true; zahlungsartGeaendert(); }   // ursprüngliche Zahlungsart wiederherstellen
+    }
+  }
+  letzterModus = modus;
   if (!aufbau && daten) summenAktualisieren();
+}
+/** No-Show: Fahrtabschnitt und Sachverhalts-Aussagen (als Häkchen) in der Sprache der Rechnung anzeigen. */
+function noShowRendern(){
+  const v = daten && daten.noShowVorschlag; if (!v) return;
+  const sel = $("noShowAbschnitt"), aktuell = sel.value;
+  sel.innerHTML = v.abschnitte.map((a) => `<option value="${a.key}">${esc(a.label)}</option>`).join("");
+  if ([...sel.options].some((o) => o.value === aktuell)) sel.value = aktuell;
+  $("noShowAbschnittFeld").style.display = v.abschnitte.length > 1 ? "block" : "none";
+  const sp = $("sprache").value, t = (v.texte[sp] && v.texte[sp][sel.value]) || v.texte.de.hin;
+  $("noShowIntro").textContent = t.intro;
+  $("noShowSaetze").innerHTML = t.saetze.map((s) => `<label class="check"><input type="checkbox" class="nsAussage" value="${esc(s.key)}" ${noShowAuswahl[s.key] === false ? "" : "checked"} onchange="noShowAuswahlGeaendert()"> ${esc(s.text)}</label>`).join("");
+}
+function noShowAuswahlGeaendert(){ document.querySelectorAll(".nsAussage").forEach((c) => { noShowAuswahl[c.value] = c.checked; }); }
+function noShowGeaendert(){   // anderer Fahrtabschnitt (Hin-/Rückfahrt): Texte und Positionstext anpassen
+  noShowRendern();
+  const v = daten.noShowVorschlag, sp = $("sprache").value, t = v.texte[sp][$("noShowAbschnitt").value] || v.texte.de.hin;
+  const hp = positionen.find((p) => p._ns === "haupt"); if (hp) { hp.text = t.positionText; positionenRendern(); }
+}
+/** Positionen für die No-Show-Rechnung: voller vereinbarter Preis (Vorschlag 100 %). */
+function noShowPositionenSetzen(){
+  const v = daten.noShowVorschlag, sp = $("sprache").value, t = v.texte[sp][$("noShowAbschnitt").value || "hin"] || v.texte.de.hin;
+  positionen = [{ text: t.positionText, menge: 1, einzelBrutto: v.preisBrutto, ust: 19, _ns: "haupt" }];
+  $("noShowWartezeit").value = ""; $("noShowWartezeitInfo").textContent = "keine";
+  positionenRendern();
+}
+/** Gewartete Minuten: 5 Minuten frei, danach 1 € je Minute als eigene Position "Wartezeit (…)". */
+function noShowWartezeitGeaendert(){
+  const v = daten.noShowVorschlag, sp = $("sprache").value, min = Math.max(0, Math.round(Number($("noShowWartezeit").value) || 0));
+  const extraMin = Math.max(0, min - v.freiMin), betrag = rund2(extraMin * v.proMin);
+  const text = v.wartezeitText[sp].replace("{min}", String(min)).replace("{frei}", String(v.freiMin));
+  const wz = positionen.find((p) => p._ns === "wz");
+  if (betrag > 0) { if (wz) { wz.text = text; wz.einzelBrutto = betrag; } else positionen.push({ text, menge: 1, einzelBrutto: betrag, ust: 19, _ns: "wz" }); }
+  else if (wz) positionen.splice(positionen.indexOf(wz), 1);
+  $("noShowWartezeitInfo").textContent = min ? `${min} Min. − ${v.freiMin} Min. frei = ${extraMin} Min. × ${eur(v.proMin)} = ${eur(betrag)}` : "keine";
+  positionenRendern();
 }
 /** Provision vorschlagen: Gästebetrag minus "Betrag, den ich bekomme" (bei der Buchung eingetragen), solange du sie nicht selbst änderst. */
 function provisionVorschlagen(){
@@ -384,8 +459,10 @@ function entwurfAuslesen(){
   if (istBelegModus()) return { typ: "beleg", leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(), provision: $("belegProvision").value === "" ? null : Number($("belegProvision").value),
     positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
   const zahlungsart = (document.querySelector("input[name=zahlungsart]:checked") || {}).value || "bezahlt";
-  return { sprache: $("sprache").value, zahlungsart, bezahltArt: $("bezahltArt").value, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
+  const e = { sprache: $("sprache").value, zahlungsart, bezahltArt: $("bezahltArt").value, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
     positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
+  if (istNoShowModus()) e.noShow = { abschnitt: $("noShowAbschnitt").value || "hin", aussagen: [...document.querySelectorAll(".nsAussage")].filter((c) => c.checked).map((c) => c.value), wartezeitMin: Math.max(0, Math.round(Number($("noShowWartezeit").value) || 0)) };
+  return e;
 }
 function entwurfPruefen(e){
   for (let i = 0; i < e.positionen.length; i++) {
@@ -397,6 +474,7 @@ function entwurfPruefen(e){
   const gesamt = berechnen(e.positionen).gesamtBrutto;
   if (!(gesamt > 0)) return e.typ === "beleg" ? "Der Gästebetrag muss größer als 0 sein." : "Der Rechnungsbetrag muss größer als 0 sein.";
   if (e.typ === "beleg" && e.provision != null && !(e.provision >= 0 && e.provision <= gesamt)) return "Die Provision muss zwischen 0 und dem Gästebetrag liegen.";
+  if (e.noShow && !e.noShow.aussagen.length) return "Bitte mindestens eine Aussage zum Sachverhalt anhaken.";
   return null;
 }
 function pdfAnzeigen(base64, fenster){
@@ -419,7 +497,7 @@ async function erzeugen(){
   const senden = e.typ === "beleg" ? false : $("senden").checked, c = berechnen(e.positionen);
   const frage = e.typ === "beleg"
     ? `Beleg über den Gästebetrag ${eur(c.gesamtBrutto)} erzeugen${e.provision != null ? ` (Provision ${eur(e.provision)}, erwartete Auszahlung ${eur(rund2(c.gesamtBrutto - e.provision))})` : ""}?\n\nEr bekommt sofort eine Nummer aus dem Rechnungsnummernkreis, wird nicht verschickt und ist danach unveränderlich. Änderungen sind nur per Stornobeleg möglich.`
-    : `Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
+    : `${e.noShow ? "No-Show-" : ""}Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
   if (!confirm(frage)) return;
   $("erzeugenBtn").disabled = true; setStatus("statusEntwurf", "Rechnung wird erzeugt …", "");
   try {

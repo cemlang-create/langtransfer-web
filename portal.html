@@ -227,6 +227,7 @@ function alleAngabenHtml(a){
     feld(add, "Preis offen", "preisOffen"); feld(add, "Trinkgeld (brutto)", "trinkgeldBrutto");
     feld(add, "Zahlungsart", "zahlungsart", (v) => esc({ link: "Zahlungslink (online im Voraus)", fahrzeug: "Im Fahrzeug per Karte", rechnung: "Auf Rechnung (Überweisung)", vermittlung: "Vermittlung" }[v] || v));
     feld(add, "Zahlung laut Formular", "kunde.zahlung"); feld(add, "Zahlungslink", "zahlungslink");
+    if (a.noShow) { markiere("noShow"); add("No-Show", esc(`Fahrt nicht angetreten (${a.noShow.abschnitt === "rueck" ? "Rückfahrt" : "Hinfahrt"}), Rechnung mit Sachverhalt erstellt`)); }
     if (a.wartezeit) { markiere("wartezeit"); const w = a.wartezeit; add("Wartezeit", esc(`${w.minuten} Min.${w.minRueck ? ` (Hinfahrt ${w.minHin}, Rückfahrt ${w.minRueck})` : ""}${w.brutto > 0 ? ` · ${eur(w.brutto)} (19 % USt)` : " · ohne Aufpreis"}`)); }
     if (a.ausland) { markiere("ausland"); const x = a.ausland; add("Wegstrecke im Ausland (ohne deutsche USt)", esc(`${x.land}: ${x.kmAusland} von ${x.kmGesamt} km · Ausland ${eur(x.bruttoAusland)}, Inland ${eur(x.bruttoInland)} (19 % USt)`)); }
     if (a.freifahrt) { markiere("freifahrt"); add("Freifahrt (Zehnerkarte)", esc(`Gutschrift ${eur(a.freifahrt.abgezogen)} auf ${eur(a.freifahrt.bruttoVorher)} (Wert der Freifahrt ${eur(a.freifahrt.wert)})`)); }
@@ -656,7 +657,7 @@ async function ansichtAuftraege(params, noch){
           <td class="strecke"><div>${esc(f.von)}</div><div>→ ${esc(f.nach)}</div>${f.ueber ? `<div class="klein">über ${esc(f.ueber)}</div>` : ""}</td>
           <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
           <td>${zweite ? '<span class="klein">wie Hinfahrt</span>' : abrechnungZelle(r)}</td>
-          <td>${statusBadge(r.status)}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}${!zweite && r.mailProblem && r.status === "angefragt" ? `<div class="klein" style="color:var(--err);">⚠ Mail nicht angekommen</div>` : ""}</td></tr>`; }).join("") +
+          <td>${statusBadge(r.status)}${!zweite && r.noShow ? ' <span class="badge warn">No-Show</span>' : ""}${!zweite && r.rechnungsnummer ? `<div class="klein">${esc(r.rechnungsnummer)}</div>` : ""}${!zweite && r.mailProblem && r.status === "angefragt" ? `<div class="klein" style="color:var(--err);">⚠ Mail nicht angekommen</div>` : ""}</td></tr>`; }).join("") +
         `</tbody></table></div>` + (d.gesamt > d.liste.length ? `<p class="klein" style="margin-top:8px;">${d.liste.length} von ${d.gesamt} Treffern angezeigt. Bitte die Suche eingrenzen.${stornoHinweis ? " ·" + stornoHinweis : ""}</p>` : `<p class="klein" style="margin-top:8px;">${d.gesamt} Aufträge${fahrten.length !== d.gesamt ? " (" + fahrten.length + " Fahrten)" : ""}${stornoHinweis ? " ·" + stornoHinweis : ""}</p>`);
       stornoLink();
       letzteListe = d.liste;
@@ -777,7 +778,7 @@ async function ansichtAuftrag(referenz, noch, params){
       if (d.status === "angebot") { knoepfe.push(["ablehnen", "Angebot stornieren", "rot"]); }
       $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a>
         <h2 class="seite">${esc(d.referenz)} – ${esc(name || "Auftrag")}</h2>
-        <div class="kopfkarte">${statusBadge(d.status)} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
+        <div class="kopfkarte">${statusBadge(d.status)}${d.noShow ? ' <span class="badge warn">No-Show</span>' : ""} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
           ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.abholadresse || f.von)} → ${esc(f.zieladresse || f.nach)}${f.zwischenziel ? ` <span class="klein">(über ${esc(f.zwischenziel)})</span>` : ""}<br>
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) + (f.rueckfahrt ? " (inkl. Rückfahrt)" : "") : ""}
           ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.abholadresse || f.rueckfahrt.von)} → ${esc(f.rueckfahrt.zieladresse || f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
