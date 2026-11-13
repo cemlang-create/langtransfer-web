@@ -768,9 +768,10 @@ async function ansichtAuftrag(referenz, noch, params){
       // Stammkunde: aus diesem Auftrag anlegen bzw. Daten und Route in den bestehenden Stammkunden übernehmen
       const stammkundeKarte = d.status !== "storniert" ? `<div class="rahmenkarte" id="stammkundeKarte" style="padding-bottom:16px;"><h3>Stammkunde</h3>` + (d.stammkundeId
         ? `<p style="margin:8px 0 4px;">★ Stammkunde: <a href="#/stammkunden?id=${encodeURIComponent(d.stammkundeId)}"><strong>${esc(d.stammkundeName || "")}</strong></a></p>
-           <div class="klein">Die Fahrten dieses Auftrags zählen für die Zehnerkarte. Hat sich etwas geändert, übernimmst du Kundendaten und Route in den Stammkunden.</div>
-           <div class="zeile"><button type="button" class="knopf" id="skAktualisieren">Daten und Route in den Stammkunden übernehmen</button></div>`
-        : `<div class="klein" style="margin:6px 0 4px;">Bleibt bei diesem Kunden vieles gleich (Name, Adresse, Route, Preis)? Dann speichere ihn als Stammkunden: Er bekommt eine digitale Zehnerkarte, und du wählst ihn in „Neuer Auftrag“ aus.</div>
+           <div class="klein">Hat sich bei den Kundendaten etwas geändert, übernimmst du sie in den Stammkunden. Die Route als feste Stammfahrt speicherst du nur, wenn du das willst. Die Fahrten dieses Auftrags zählen für die Zehnerkarte, sofern der Stammkunde eine hat.</div>
+           <div class="zeile"><button type="button" class="knopf" id="skDaten">Nur Kundendaten übernehmen</button><button type="button" class="knopf" id="skAktualisieren">Daten und Route als Stammfahrt übernehmen</button></div>`
+        : `<div class="klein" id="skGastHinweis" style="margin:6px 0 4px;"></div>
+           <div class="klein" style="margin:6px 0 4px;">Bucht dieser Gast öfter? Dann speichere ihn als Stammkunden: Seine Kundendaten (Name, Kontakt, Rechnungsanschrift) stehen dann in „Neuer Auftrag“ bereit. Das geschieht <strong>ohne Zehnerkarte</strong> und ohne Stammfahrt, beides schaltest du bei Bedarf in der Stammkunden-Verwaltung ein.</div>
            <div class="zeile"><button type="button" class="knopf gold" id="skAnlegen">Als Stammkunde speichern</button></div>`) + `<div class="klein" id="skMeldung" style="margin-top:6px;"></div></div>` : "";
       const knoepfe = [];
       if (d.status === "angefragt") { knoepfe.push(["bestaetigen", "Bestätigen", "gold"]); knoepfe.push(["ablehnen", "Ablehnen", "rot"]); }
@@ -897,9 +898,21 @@ async function ansichtAuftrag(referenz, noch, params){
         try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, name: name.trim() }); await laden(); }
         catch (e) { skMeldung(e.message, true); $("skAnlegen").disabled = false; }
       });
+      if ($("skGastHinweis")) {   // Gast schon von früher bekannt? (gleiche E-Mail, Telefonnummer oder Name)
+        const k = d.kunde || {}, bp = k.buchendePerson || {};
+        api("stammkundeAdmin", { aktion: "gastSuche", email: k.email || bp.email || "", telefon: k.mobil || bp.telefon || "", vorname: k.vorname || bp.vorname || "", nachname: k.nachname || bp.nachname || "", ausserReferenz: d.referenz })
+          .then((r) => { const g = (r.liste || [])[0], e = $("skGastHinweis"); if (g && e) e.innerHTML = `<strong>Bekannter Gast:</strong> ${esc(g.name)} hat schon ${g.anzahl} ${g.anzahl === 1 ? "weiteren Auftrag" : "weitere Aufträge"} (zuletzt ${esc(new Date(g.letzteZeit).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }))}, ${esc(g.letzteReferenz)})${g.stammkundeId ? ` und ist bereits Stammkunde „${esc(g.stammkundeName || "")}“: „Als Stammkunde speichern“ ordnet diesen Auftrag dort zu.` : "."}`; })
+          .catch(() => {});
+      }
+      if ($("skDaten")) $("skDaten").addEventListener("click", async () => {
+        $("skDaten").disabled = true; skMeldung("Wird übernommen …");
+        try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, stammkundeId: d.stammkundeId, nurDaten: true }); skMeldung("✓ Die Kundendaten sind im Stammkunden gespeichert (keine Stammfahrt angelegt)."); }
+        catch (e) { skMeldung(e.message, true); }
+        finally { $("skDaten").disabled = false; }
+      });
       if ($("skAktualisieren")) $("skAktualisieren").addEventListener("click", async () => {
         $("skAktualisieren").disabled = true; skMeldung("Wird übernommen …");
-        try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, stammkundeId: d.stammkundeId }); skMeldung("✓ Kundendaten und Route sind im Stammkunden gespeichert."); }
+        try { await api("stammkundeAdmin", { aktion: "ausAuftrag", referenz: d.referenz, stammkundeId: d.stammkundeId }); skMeldung("✓ Kundendaten und Route (als Stammfahrt) sind im Stammkunden gespeichert."); }
         catch (e) { skMeldung(e.message, true); }
         finally { $("skAktualisieren").disabled = false; }
       });

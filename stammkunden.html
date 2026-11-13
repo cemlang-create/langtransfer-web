@@ -44,7 +44,7 @@
 <script>if (new URLSearchParams(location.search).has("embedded")) document.documentElement.classList.add("embedded");</script>
 <div class="card">
   <h1 class="embedded-aus">Stammkunden</h1>
-  <p class="sub">Kunden mit festen Fahrten und digitaler Zehnerkarte. Einen Stammkunden legst du aus einem bestehenden Auftrag an; in „Neuer Auftrag“ wählst du ihn dann aus und musst nur noch Datum und Uhrzeit eingeben.</p>
+  <p class="sub">Stammkunden mit gespeicherten Kundendaten, auf Wunsch mit festen Fahrten und mit digitaler Zehnerkarte. Die Zehnerkarte schaltest du gezielt ein, sie gibt es nie automatisch. Einen Stammkunden legst du aus einem bestehenden Auftrag an (oder in „Neuer Auftrag“ über „Bekannten Gast suchen“); dort wählst du ihn dann aus.</p>
 
   <div id="listeBereich">
     <div class="box" style="margin-bottom:16px;">
@@ -53,6 +53,7 @@
         <div><label for="neuReferenz">Referenz des Auftrags</label><input type="text" id="neuReferenz" style="text-transform:uppercase;" placeholder="z. B. AVJV74"></div>
         <div><label for="neuName">Name des Stammkunden (optional)</label><input type="text" id="neuName" maxlength="80" placeholder="wird sonst aus dem Auftrag übernommen"></div>
       </div>
+      <p class="hint" style="margin:8px 0 0;">Übernimmt nur die Kundendaten (Name, Kontakt, Rechnungsanschrift), ohne Stammfahrt und ohne Zehnerkarte. Beides schaltest du danach beim Stammkunden bewusst ein.</p>
       <button type="button" class="primary" id="anlegenBtn" onclick="ausAuftragAnlegen()">Als Stammkunde speichern</button>
       <div class="status" id="statusNeu"></div>
     </div>
@@ -83,8 +84,12 @@
     <p class="hint">Dabei werden auch die Kundendaten aus diesem Auftrag in den Stammkunden übernommen.</p>
     <div class="status" id="statusFahrt"></div>
 
-    <h2>Digitale Zehnerkarte</h2>
+    <h2>Digitale Zehnerkarte (optional)</h2>
     <label class="check"><input type="checkbox" id="karteAktiv"> Zehnerkarte aktiv (Link, Hinweis in Bestätigung und Rechnung)</label>
+    <div id="karteAbZeile" style="display:none;margin-top:10px;max-width:300px;">
+      <label for="karteAb">Zählt Fahrten ab</label><input type="date" id="karteAb">
+      <div class="hint">Nur Fahrten ab diesem Tag zählen als Stempel. Leer lassen, wenn alle bisherigen Fahrten dieses Kunden zählen sollen (dann kann sofort eine Freifahrt verfügbar sein).</div>
+    </div>
     <div id="karteBereich" style="margin-top:12px;"></div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;">
@@ -119,7 +124,7 @@ async function listeLaden(){
   try {
     const d = await api({ aktion: "liste" });
     $("liste").innerHTML = d.liste.length ? d.liste.map((k) => `<tr class="zeile" data-id="${esc(k.id)}"><td><strong>${esc(k.name)}</strong></td><td>${esc(k.typ)}</td><td>${k.fahrten}</td>` +
-      `<td>${k.karteAktiv ? `${k.verfuegbar > 0 ? `<span class="badge ok">Freifahrt verfügbar · ${esc(eur(k.freifahrtWert))}</span>` : `<span class="badge gold">${k.stempel} von ${k.von}</span>`}` : '<span class="badge">aus</span>'}</td></tr>`).join("")
+      `<td>${k.karteAktiv ? `${k.verfuegbar > 0 ? `<span class="badge ok">Freifahrt verfügbar · ${esc(eur(k.freifahrtWert))}</span>` : `<span class="badge gold">${k.stempel} von ${k.von}</span>`}` : '<span class="badge">ohne Karte</span>'}</td></tr>`).join("")
       : `<tr><td colspan="4" style="color:var(--muted);">Noch keine Stammkunden. Lege oben den ersten aus einem Auftrag an.</td></tr>`;
     document.querySelectorAll("tr.zeile").forEach((z) => z.addEventListener("click", () => oeffnen(z.dataset.id)));
     setStatus("statusListe", "");
@@ -154,7 +159,15 @@ function fahrtenRendern(){
     $("fahrten").appendChild(tr);
   });
 }
+/** Startdatum der Karte nur zeigen, wenn die Karte eingeschaltet ist; beim erstmaligen Einschalten mit heute vorbelegen (kein Sofort-Gratis wegen früherer Fahrten). */
+function karteAbAnzeigen(vorbelegen){
+  const an = $("karteAktiv").checked;
+  $("karteAbZeile").style.display = an ? "block" : "none";
+  if (an && vorbelegen && !$("karteAb").value && aktuell && aktuell.stammkunde.karteAb === undefined && !aktuell.stammkunde.karteAktiv) $("karteAb").value = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+}
+$("karteAktiv").addEventListener("change", () => karteAbAnzeigen(true));
 function karteRendern(){
+  if (!aktuell.stammkunde.karteAktiv) { $("karteBereich").innerHTML = `<div class="hint">Dieser Stammkunde hat keine Zehnerkarte. Setze oben den Haken „Zehnerkarte aktiv“ und speichere, wenn er eine bekommen soll.</div>`; return; }
   const s = aktuell.stand;
   const punkte = Array.from({ length: s.von }, (_, i) => `<div class="punkt ${i < s.stempel ? "voll" : ""}">${i < s.stempel ? "✓" : i + 1}</div>`).join("");
   $("karteBereich").innerHTML = `<div class="stempel">${punkte}</div>` +
@@ -171,7 +184,7 @@ async function oeffnen(id){
     fahrten = JSON.parse(JSON.stringify(d.stammkunde.fahrten || []));
     $("listeBereich").style.display = "none"; $("detail").style.display = "block";
     $("detailTitel").textContent = d.stammkunde.name;
-    $("name").value = d.stammkunde.name; $("notiz").value = d.stammkunde.notiz || ""; $("karteAktiv").checked = !!d.stammkunde.karteAktiv;
+    $("name").value = d.stammkunde.name; $("notiz").value = d.stammkunde.notiz || ""; $("karteAktiv").checked = !!d.stammkunde.karteAktiv; $("karteAb").value = d.stammkunde.karteAb || ""; karteAbAnzeigen();
     $("kundenBox").innerHTML = kundenText(d.stammkunde.kunde);
     fahrtenRendern(); karteRendern(); window.scrollTo(0, 0);
   } catch (e) { setStatus("statusListe", e.message, "error"); }
@@ -181,7 +194,7 @@ async function speichern(){
   if (!$("name").value.trim()) return setStatus("statusDetail", "Bitte einen Namen angeben.", "error");
   $("speichernBtn").disabled = true; setStatus("statusDetail", "Wird gespeichert …", "");
   try {
-    await api({ aktion: "speichern", id: aktuell.id, name: $("name").value.trim(), notiz: $("notiz").value.trim(), karteAktiv: $("karteAktiv").checked, fahrten });
+    await api(Object.assign({ aktion: "speichern", id: aktuell.id, name: $("name").value.trim(), notiz: $("notiz").value.trim(), karteAktiv: $("karteAktiv").checked, fahrten }, $("karteAktiv").checked ? { karteAb: $("karteAb").value } : {}));
     await oeffnen(aktuell.id); setStatus("statusDetail", "✓ Gespeichert.", "ok");
   } catch (e) { setStatus("statusDetail", e.message, "error"); }
   finally { $("speichernBtn").disabled = false; }

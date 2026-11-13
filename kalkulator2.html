@@ -89,6 +89,14 @@
     <div class="status" id="stammStatus"></div>
   </div>
 
+  <div class="field" id="gastBlock" style="background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:18px;">
+    <label for="gastSuche">Bekannten Gast suchen</label>
+    <input type="text" id="gastSuche" placeholder="Name, Telefon oder E-Mail" autocomplete="off">
+    <div class="hint" style="margin-top:6px;">Findet Gäste aus früheren Aufträgen. „Daten übernehmen“ füllt nur Name, Kontakt und Rechnungsanschrift, nie die Fahrt. Mit „Zum Stammkunden machen“ speicherst du den Gast als Stammkunden (ohne Zehnerkarte).</div>
+    <div id="gastTreffer"></div>
+    <div class="status" id="gastStatus"></div>
+  </div>
+
   <div class="toggle">
     <button id="fahrtartEinfach" class="active" onclick="setFahrtart('einfach')">Einfache Fahrt</button>
     <button id="fahrtartHinRueck" onclick="setFahrtart('hinrueck')">Hin- und Rückfahrt</button>
@@ -184,6 +192,9 @@
       </div>
 
       <h2>Kunde &amp; Angebot</h2>
+      <div id="gastHinweis" style="display:none;background:#f6f2e8;border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:14px;">
+        <div id="gastHinweisTreffer"></div><div class="status" id="gastHinweisStatus"></div>
+      </div>
       <div class="toggle" id="typToggle">
         <button id="typPrivat" class="active" onclick="setKundentyp('privat')">Privat</button>
         <button id="typFirma" onclick="setKundentyp('firma')">Firma</button>
@@ -338,7 +349,10 @@
         <label for="agSprache">Sprache von Angebot, Bestätigung und Rechnung</label>
         <select id="agSprache"><option value="de">Deutsch</option><option value="en">English</option></select>
       </div>
-      <label class="check" id="alsStammkundeZeile" style="margin-bottom:12px;"><input type="checkbox" id="alsStammkunde"> Kunde und Route als Stammkunde speichern (mit digitaler Zehnerkarte)</label>
+      <div id="alsStammkundeZeile" style="margin-bottom:12px;">
+        <label class="check"><input type="checkbox" id="alsStammkunde" onchange="alsStammkundeGeaendert()"> Gast als Stammkunde speichern (nur Kundendaten, ohne Zehnerkarte)</label>
+        <label class="check" id="alsStammkundeKarteZeile" style="margin:4px 0 0 24px;display:none;"><input type="checkbox" id="alsStammkundeKarte"> zusätzlich mit digitaler Zehnerkarte (zählt Fahrten ab heute)</label>
+      </div>
       <div class="toggle" id="modusToggle">
         <button id="modusAngebot" class="active" onclick="setModus('angebot')">Angebot senden</button>
         <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
@@ -1043,6 +1057,10 @@ async function stammkundeLaden(id, optionen = {}){
   el("stammFahrt").style.display = sichtbar ? "" : "none"; el("stammBtn").style.display = sichtbar ? "" : "none";
   el("alsStammkundeZeile").style.display = "none";
   stammAktualisieren();
+  if (!optionen.nurVerknuepfen && !optionen.ohneDaten && fahrten.length === 0 && d.stammkunde.kunde) {   // Stammkunde ohne Stammfahrt: Kundendaten gleich übernehmen
+    const anschrift = kundeInFormular(d.stammkunde.kunde, { sprache: d.stammkunde.sprache });
+    setStatus("stammStatus", `✓ Kundendaten von ${d.stammkunde.name} übernommen (keine Stammfahrt gespeichert). Rechnungsanschrift${anschrift ? `: ${anschrift}` : " nicht gespeichert"}, bitte prüfen. Route, Datum und Uhrzeit gibst du ein.` + kundenfelderHinweis(), "ok");
+  }
 }
 function stammAktualisieren(){
   const info = el("stammInfo"), zeile = el("freifahrtZeile");
@@ -1057,6 +1075,119 @@ function stammAktualisieren(){
     const vorschau = el("freifahrtCheck").checked && preis != null ? ` → Preis nach Gutschrift: ${fmt(Math.max(0, preis - wert))} €` : "";
     el("freifahrtText").textContent = `Freifahrt einlösen (Gutschrift Ø ${fmt(wert)} € auf den Fahrpreis)${vorschau}`;
   } else el("freifahrtCheck").checked = false;
+}
+// ---------- Bekannte Gäste: suchen, Daten übernehmen, zum Stammkunden machen ----------
+/** Die Kundenfelder liegen im Bereich, der erst nach "Preis berechnen" erscheint: Dann in der Meldung darauf hinweisen. */
+const kundenfelderHinweis = () => (getComputedStyle(el("ergebnis")).display === "none" ? " Die Kundendaten siehst du unten, sobald du „Preis berechnen“ geklickt hast." : "");
+const gEsc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+/** Füllt NUR die Kundendaten (Stammdaten) in die Maske: nie Abhol-, Ziel- oder Wohnadresse aus einer Fahrt, keine Zimmernummer, keine Bemerkungen. Gibt die übernommene Rechnungsanschrift als Text zurück. */
+function kundeInFormular(k, optionen = {}){
+  k = k || {};
+  if (k.typ === "firma") {
+    setKundentyp(k.kategorie === "hotel" ? "hotel" : "firma");
+    setzeWert("gName", k.firmenname);
+    const bp = k.buchendePerson || {};
+    setzeWert("gAnrede", bp.anrede); setzeWert("gTitel", bp.titel); setzeWert("gVorname", bp.vorname); setzeWert("gNachname", bp.nachname); setzeWert("gTelefon", bp.telefon); setzeWert("gEmail", bp.email);
+    const zahlerRadio = document.querySelector(`input[name="zahler"][value="${k.zahler === "fahrgast" ? "fahrgast" : "firma"}"]`); if (zahlerRadio) zahlerRadio.checked = true;
+    zahlerGeaendert();
+    const fg = k.fahrgast || {};
+    setzeWert("fgAnrede", fg.anrede); setzeWert("fgAkadTitel", fg.titel); setzeWert("fgVorname", fg.vorname); setzeWert("fgNachname", fg.nachname); setzeWert("fgTelefon", fg.telefon); setzeWert("fgEmail", fg.email);
+    setzeWert("gZimmer", "");
+    if (k.zahler === "fahrgast") { el("rcCheck").checked = !!k.rechnungFirma; el("rcCheck").dataset.gesetzt = "1"; }
+    rechnungsblockAktualisieren();
+    if (k.rechnungFirma) {
+      setzeWert("rcFirma", k.rechnungFirma.name); setzeWert("rcAnsprech", k.rechnungFirma.ansprechpartner); setzeWert("rcAbteilung", k.rechnungFirma.abteilung); setzeWert("rcKostenstelle", k.rechnungFirma.kostenstelle);
+      ["rcFirma", "rcAnsprech"].forEach((id) => { el(id).dataset.touched = "1"; delete el(id).dataset.auto; });
+    }
+  } else {
+    setKundentyp("privat");
+    setzeWert("pAnrede", k.anrede); setzeWert("pTitel", k.titel); setzeWert("pVorname", k.vorname); setzeWert("pNachname", k.nachname); setzeWert("pTelefon", k.mobil); setzeWert("pEmail", k.email);
+  }
+  // Rechnungsanschrift: die frühere Anschrift des Gastes bleibt stehen und ist sichtbar (nicht automatisch die neue Abholadresse)
+  const ra = k.rechnungsadresse || {};
+  let anschrift = "";
+  if (ra.strasse || ra.ort) {
+    el("raGleich").checked = false; rechnungsadresseStatus();
+    setzeWert("raStrasse", ra.strasse); setzeWert("raPlz", ra.plz); setzeWert("raOrt", ra.ort); setzeWert("raLand", ra.land || "Deutschland");
+    anschrift = `${ra.strasse || ""}, ${ra.plz || ""} ${ra.ort || ""}`.replace(/^, /, "").trim();
+  }
+  if (optionen.sprache) setzeWert("agSprache", optionen.sprache);
+  return anschrift;
+}
+/** Treffer der Gastsuche anzeigen (Suchfeld oder Hinweis beim Eintippen). */
+function gastTrefferRendern(container, liste, statusId){
+  container.innerHTML = liste.map((g, i) => `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding:8px 0;">
+      <div style="flex:1;min-width:190px;"><strong>${gEsc(g.name)}</strong> <span class="hint" style="display:inline;">${gEsc(g.typ)}</span>${g.stammkundeId ? ' <span style="color:var(--moss-dark);font-weight:600;">★ Stammkunde</span>' : ""}
+        <div class="hint">${[g.email, g.telefon].filter(Boolean).map(gEsc).join(" · ")}${g.email || g.telefon ? " · " : ""}${g.anzahl} ${g.anzahl === 1 ? "Auftrag" : "Aufträge"}, zuletzt ${g.letzteZeit ? new Date(g.letzteZeit).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : "–"} (${gEsc(g.letzteReferenz)})</div></div>
+      <button type="button" class="link-btn" style="margin:0;" data-gast="daten" data-i="${i}">Daten übernehmen</button>
+      ${g.stammkundeId ? "" : `<button type="button" class="link-btn" style="margin:0;" data-gast="stamm" data-i="${i}">Zum Stammkunden machen</button>`}
+    </div>`).join("");
+  container.querySelectorAll("[data-gast]").forEach((btn) => btn.addEventListener("click", () => gastAktion(btn.dataset.gast, liste[Number(btn.dataset.i)], statusId)));
+}
+async function gastAktion(art, g, statusId){
+  setStatus(statusId, "Wird übernommen …", "");
+  try {
+    let text;
+    if (art === "stamm") {
+      const r = await stammApi({ aktion: "ausAuftrag", referenz: g.letzteReferenz });
+      await stammListeLaden(); await stammkundeLaden(r.stammkundeId, { ohneDaten: true });
+      text = r.bereitsVorhanden ? `★ ${g.name} ist schon Stammkunde („${r.name}“), er ist jetzt gewählt.` : `★ ${g.name} ist jetzt Stammkunde (ohne Zehnerkarte).`;
+    } else if (g.stammkundeId) { await stammkundeLaden(g.stammkundeId, { ohneDaten: true }); text = `★ Stammkunde „${g.stammkundeName || g.name}“ gewählt.`; }
+    else text = `✓ Daten von ${g.name} übernommen.`;
+    const anschrift = kundeInFormular(g.kunde, { sprache: g.sprache });
+    text += ` Rechnungsanschrift aus dem früheren Auftrag${anschrift ? `: ${anschrift}` : " (keine gespeichert)"}. Bitte prüfen. Abhol- und Zieladresse gibst du wie gewohnt ein.` + kundenfelderHinweis();
+    el("gastHinweis").style.display = "none"; gastHinweisSchluessel = gastFormularSchluessel();
+    setStatus(statusId === "gastHinweisStatus" ? "gastStatus" : statusId, text, "ok");
+    if (statusId === "gastHinweisStatus") el("gastTreffer").innerHTML = "";
+  } catch (e) { setStatus(statusId, e.message || "Die Daten konnten nicht übernommen werden.", "error"); }
+}
+let gastSuchTimer = null;
+el("gastSuche").addEventListener("input", () => {
+  clearTimeout(gastSuchTimer);
+  const q = el("gastSuche").value.trim();
+  if (q.length < 2) { el("gastTreffer").innerHTML = ""; setStatus("gastStatus", "", ""); return; }
+  gastSuchTimer = setTimeout(async () => {
+    try {
+      const d = await stammApi({ aktion: "gastSuche", suche: q });
+      if (el("gastSuche").value.trim() !== q) return;   // inzwischen wurde weitergetippt
+      if (!d.liste.length) { el("gastTreffer").innerHTML = ""; setStatus("gastStatus", "Kein bekannter Gast gefunden.", ""); return; }
+      setStatus("gastStatus", "", ""); gastTrefferRendern(el("gastTreffer"), d.liste, "gastStatus");
+    } catch (e) { setStatus("gastStatus", e.message, "error"); }
+  }, 350);
+});
+// Hinweis beim Eintippen: Passen Telefon, E-Mail oder Name zu einem früheren Gast?
+let gastHinweisSchluessel = "";
+const gastFormularFelder = () => kundentyp === "privat"
+  ? { email: el("pEmail").value.trim(), telefon: el("pTelefon").value.trim(), vorname: el("pVorname").value.trim(), nachname: el("pNachname").value.trim() }
+  : { email: el("gEmail").value.trim(), telefon: el("gTelefon").value.trim(), vorname: el("gVorname").value.trim(), nachname: el("gNachname").value.trim() };
+const gastFormularSchluessel = () => JSON.stringify(gastFormularFelder());
+async function gastHinweisPruefen(){
+  if (kundentyp === "vermittlung" || !adminKeyLesen()) { el("gastHinweis").style.display = "none"; return; }
+  const felder = gastFormularFelder(), schluessel = JSON.stringify(felder);
+  if (schluessel === gastHinweisSchluessel) return;
+  gastHinweisSchluessel = schluessel;
+  try {
+    const d = await stammApi(Object.assign({ aktion: "gastSuche", ausserReferenz: el("agReferenz").value.trim() }, felder));
+    const liste = (d.liste || []).filter((g) => !(stammkundeAktuell && g.stammkundeId === stammkundeAktuell.id));
+    if (!liste.length) { el("gastHinweis").style.display = "none"; return; }
+    el("gastHinweis").style.display = ""; setStatus("gastHinweisStatus", "", "");
+    gastTrefferRendern(el("gastHinweisTreffer"), liste, "gastHinweisStatus");
+    el("gastHinweisTreffer").insertAdjacentHTML("afterbegin", `<div style="font-weight:600;">Bekannter Gast?</div>`);
+  } catch (e) { /* der Hinweis ist nur eine Hilfe: Fehler still ignorieren */ }
+}
+["pEmail", "pTelefon", "pNachname", "gEmail", "gTelefon"].forEach((id) => el(id).addEventListener("blur", gastHinweisPruefen));
+/** Gast des gerade gesendeten Auftrags als Stammkunde speichern (nur Kundendaten; Zehnerkarte nur mit Haken). Gibt den Text für die Statusmeldung zurück. */
+async function alsStammkundeSpeichern(referenz){
+  const mitKarte = el("alsStammkundeKarte").checked;
+  const sk = await stammApi({ aktion: "ausAuftrag", referenz, karte: mitKarte });
+  el("alsStammkunde").checked = false; el("alsStammkundeKarte").checked = false; alsStammkundeGeaendert();
+  stammListeLaden();
+  return sk.bereitsVorhanden ? ` ★ Der Gast war schon Stammkunde („${sk.name}“), der Auftrag wurde dort verknüpft.` : ` ★ Als Stammkunde gespeichert${mitKarte ? " (mit Zehnerkarte ab heute)" : " (ohne Zehnerkarte)"}. Verwaltung im Menü „Stammkunden“.`;
+}
+function alsStammkundeGeaendert(){
+  const an = el("alsStammkunde").checked;
+  el("alsStammkundeKarteZeile").style.display = an ? "" : "none";
+  if (!an) el("alsStammkundeKarte").checked = false;
 }
 /** Gewählte Stammfahrt in die Maske übernehmen: nur Datum und Uhrzeit fehlen noch. */
 async function stammfahrtUebernehmen(){
@@ -1352,13 +1483,10 @@ async function angebotSenden(){
         ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
-    // Kunde und Route gleich als Stammkunde speichern (der Auftrag ist dann verknüpft, die Zehnerkarte läuft)
+    // Gast gleich als Stammkunde speichern (nur Kundendaten; Zehnerkarte nur auf ausdrücklichen Wunsch). Der Auftrag ist dann verknüpft.
     if (el("alsStammkunde").checked && !stammkundeAktuell && !istVermittlung) {
       try {
-        const sk = await stammApi({ aktion: "ausAuftrag", referenz: daten.referenz });
-        el("alsStammkunde").checked = false;
-        stammListeLaden();
-        setAngebotStatus(el("angebotStatus").textContent + " ★ Als Stammkunde gespeichert (Verwaltung im Menü „Stammkunden“).", "ok");
+        setAngebotStatus(el("angebotStatus").textContent + await alsStammkundeSpeichern(daten.referenz), "ok");
       } catch (e) { setAngebotStatus(el("angebotStatus").textContent + ` (Der Stammkunde konnte nicht gespeichert werden: ${e.message})`, "ok"); }
     }
   } catch (err) {

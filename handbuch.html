@@ -62,7 +62,7 @@
     <tr><td>Aufträge</td><td>Alle Aufträge mit Suche und Filtern. Ein Klick öffnet den Auftrag.</td></tr>
     <tr><td>Neuer Auftrag</td><td>Preis berechnen, Angebot oder Auftrag anlegen, bestehenden Auftrag laden und ändern, Stammkunden nutzen.</td></tr>
     <tr><td>Krankenfahrten</td><td>Terminserien (z. B. Dialyse) für gesetzliche Krankenkassen.</td></tr>
-    <tr><td>Stammkunden</td><td>Kunden mit festen Fahrten und digitaler Zehnerkarte.</td></tr>
+    <tr><td>Stammkunden</td><td>Stammkunden mit gespeicherten Kundendaten, auf Wunsch mit festen Fahrten und digitaler Zehnerkarte.</td></tr>
     <tr><td>Handbuch</td><td>Diese Seite.</td></tr>
   </table>
   <h3>Wichtige Begriffe</h3>
@@ -313,23 +313,31 @@
 
 <section class="thema" id="stammkunden" data-gruppe="Stammkunden" data-titel="Stammkunden und Stammfahrten">
   <h2>Stammkunden und Stammfahrten</h2>
-  <p>Ein Stammkunde speichert Kundendaten und <strong>Stammfahrten</strong> (Route plus Festpreis). So gibst du bei wiederkehrenden Fahrten nur noch Datum und Uhrzeit ein.</p>
-  <h3>Stammkunde anlegen</h3>
+  <p>Ein Stammkunde speichert die <strong>Kundendaten</strong> (Name, Kontakt, Rechnungsanschrift) und auf Wunsch <strong>Stammfahrten</strong> (Route plus Festpreis). Die <strong>Zehnerkarte</strong> ist ein eigener Schalter, den du nur bei Kunden einschaltest, denen du sie gezielt geben willst.</p>
+  <h3>Stammkunde anlegen (ohne Zehnerkarte, ohne Stammfahrt)</h3>
   <ul>
-    <li><strong>Aus einem Auftrag:</strong> Im Auftrag im Bereich „Stammkunde“ auf <strong>Als Stammkunde speichern</strong> klicken und den Namen bestätigen. Kunde, Rechnungsdaten, Sprache, Zahlungsart und die Route mit ihrem Preis werden übernommen.</li>
-    <li><strong>Direkt beim Anlegen:</strong> In „Neuer Auftrag“ vor dem Senden „Kunde und Route als Stammkunde speichern“ anhaken.</li>
+    <li><strong>Aus einem Auftrag:</strong> Im Auftrag im Bereich „Stammkunde“ auf <strong>Als Stammkunde speichern</strong> klicken und den Namen bestätigen. Übernommen werden nur die Kundendaten, Sprache und Zahlungsart. Gibt es schon einen Stammkunden mit derselben E-Mail-Adresse, wird der Auftrag dort zugeordnet statt einen zweiten anzulegen.</li>
+    <li><strong>Direkt beim Anlegen:</strong> In „Neuer Auftrag“ vor dem Senden „Gast als Stammkunde speichern“ anhaken. Nur wenn du zusätzlich „mit digitaler Zehnerkarte“ anhakst, bekommt er eine (sie zählt ab heute).</li>
     <li><strong>Menü Stammkunden:</strong> Referenz eingeben und „Als Stammkunde speichern“.</li>
+    <li><strong>Aus „Neuer Auftrag“ heraus (Zweitbuchung):</strong> Siehe „Bekannten Gast übernehmen“.</li>
   </ul>
+  <h3>Bekannten Gast übernehmen (z. B. bei Zweitbuchung per Telefon oder WhatsApp)</h3>
+  <ol>
+    <li>In „Neuer Auftrag“ oben unter <strong>Bekannten Gast suchen</strong> Name, Telefonnummer oder E-Mail eintippen. Gefunden werden Gäste aus früheren Aufträgen (ohne Plattformfahrten und stornierte Aufträge).</li>
+    <li><strong>Daten übernehmen</strong> füllt nur Name, Kontakt und Rechnungsanschrift. Abhol-, Ziel- und Wohnadresse aus einer früheren Fahrt werden <strong>nie</strong> übernommen, denn das System weiß nicht, welche Adresse die Wohnadresse ist und welche Fahrt jetzt gebucht wird. Die frühere Rechnungsanschrift steht sichtbar im Formular (nicht gekoppelt an die neue Abholadresse), bitte prüfen. Die Felder siehst du, sobald du „Preis berechnen“ geklickt hast.</li>
+    <li><strong>Zum Stammkunden machen</strong> speichert den Gast zusätzlich als Stammkunden (ohne Zehnerkarte) und verknüpft den neuen Auftrag mit ihm.</li>
+  </ol>
+  <p>Trägst du Telefonnummer, E-Mail oder Namen unten im Formular selbst ein, erscheint nach dem Verlassen des Feldes der Hinweis <strong>„Bekannter Gast?“</strong>, wenn sie zu einem früheren Gast passen. Im Auftrag zeigt der Bereich „Stammkunde“ den Hinweis „Bekannter Gast: … hat schon … weitere Aufträge“.</p>
   <h3>Verwalten (Menü „Stammkunden“)</h3>
   <ul>
     <li>Name und interne Notiz ändern, Stammfahrten umbenennen, Preise anpassen (leer = wird berechnet), Stammfahrten entfernen.</li>
     <li>Weitere Route hinzufügen: Referenz eines passenden Auftrags eingeben. Dabei werden auch die Kundendaten aus diesem Auftrag übernommen.</li>
-    <li>Im Auftrag aktualisiert „Daten und Route in den Stammkunden übernehmen“ den Stammkunden.</li>
+    <li>Im Auftrag frischt <strong>Nur Kundendaten übernehmen</strong> die Kundendaten des Stammkunden auf, <strong>Daten und Route als Stammfahrt übernehmen</strong> speichert zusätzlich die Route als feste Stammfahrt.</li>
     <li>Archivieren deaktiviert die Zehnerkarte und ihren Link. Aufträge bleiben unverändert.</li>
   </ul>
   <h3>Fahrt für einen Stammkunden anlegen</h3>
   <ol>
-    <li>In „Neuer Auftrag“ bei <strong>Stammkunde wählen</strong> den Kunden auswählen, dann die Stammfahrt.</li>
+    <li>In „Neuer Auftrag“ bei <strong>Stammkunde wählen</strong> den Kunden auswählen, dann die Stammfahrt. Hat der Stammkunde <strong>keine Stammfahrt</strong>, werden seine Kundendaten sofort übernommen, Route, Datum und Uhrzeit gibst du ein.</li>
     <li><strong>Übernehmen</strong> füllt die Maske mit Kunde, Route, Festpreis, Zahlungsart und Sprache.</li>
     <li>Datum und Uhrzeit (bei Hin-/Rückfahrt auch die Rückfahrt) eingeben, <strong>Preis berechnen</strong>, senden. Der Festpreis bleibt, bis du ihn änderst.</li>
   </ol>
@@ -338,9 +346,11 @@
 
 <section class="thema" id="zehnerkarte" data-gruppe="Stammkunden" data-titel="Digitale Zehnerkarte und Freifahrt">
   <h2>Digitale Zehnerkarte und Freifahrt</h2>
-  <p>Stammkunden sammeln Stempel. <strong>Nach 10 Fahrten ist die nächste Fahrt kostenfrei.</strong></p>
+  <p>Die Zehnerkarte ist ein <strong>besonderes Mittel, das du gezielt einsetzt</strong>: Sie gibt es nur, wenn du sie bei einem Stammkunden einschaltest. Karteninhaber sammeln Stempel, <strong>nach 10 Fahrten ist die nächste Fahrt kostenfrei.</strong></p>
   <h3>Die Regeln</h3>
   <ul>
+    <li><strong>Ohne eingeschaltete Karte</strong> gibt es keine Stempel, keinen Kartenlink, keinen Karten-Hinweis in Bestätigung und Rechnung und keine Freifahrt (das prüft auch das System beim Senden).</li>
+    <li><strong>Zählt Fahrten ab:</strong> Beim Einschalten legst du fest, ab welchem Tag Fahrten zählen. Vorgeschlagen ist <strong>heute</strong>, damit ein Gast mit vielen früheren Fahrten nicht sofort eine Freifahrt hat. Lässt du das Datum leer, zählen alle bisherigen Fahrten des Kunden. Bei Karten, die es schon vor dieser Änderung gab, ist es leer (es zählen wie bisher alle Fahrten).</li>
     <li><strong>Ein Stempel</strong> ist ein gefahrener, nicht stornierter Auftrag des Stammkunden. Eine Hin- und Rückfahrt ist <strong>eine</strong> Fahrt. Ein Auftrag zählt, sobald auch seine letzte Fahrt vorbei ist.</li>
     <li><strong>Der Wert der Freifahrt</strong> ist der Mittelwert der 10 Fahrten, die sie verdient haben (Rechnungsbetrag, sonst bezahlter Betrag, sonst Auftragspreis). Er wird als Gutschrift vom Fahrpreis abgezogen. Kostet die Fahrt weniger, ist sie komplett kostenlos (Gutschrift nur in Höhe des Fahrpreises).</li>
     <li>Der Stempelstand wird aus den Aufträgen berechnet, du pflegst nichts doppelt. Zählen nur Aufträge, die einem Stammkunden zugeordnet sind (siehe „Stammkunden“).</li>
@@ -356,7 +366,7 @@
   <ul>
     <li>Einen <strong>persönlichen Link</strong> (Seite „karte.html“) mit Stempelstand, verfügbarer Freifahrt, den gesammelten Fahrten (Datum und Strecke, keine Preise) und den Regeln, auf Deutsch und Englisch.</li>
     <li>Der Link und der Stempelstand stehen in der <strong>Bestätigung</strong> und in der <strong>Rechnung</strong> (Mail und PDF).</li>
-    <li>Den Link findest du im Menü „Stammkunden“ beim Kunden. Dort kannst du ihn kopieren oder mit „Neuer Link“ ersetzen (der alte funktioniert dann nicht mehr). Mit dem Haken „Zehnerkarte aktiv“ schaltest du die Karte je Kunde ein oder aus.</li>
+    <li>Den Link findest du im Menü „Stammkunden“ beim Kunden. Dort kannst du ihn kopieren oder mit „Neuer Link“ ersetzen (der alte funktioniert dann nicht mehr). Mit dem Haken „Zehnerkarte aktiv“ schaltest du die Karte je Kunde ein oder aus; beim Einschalten erscheint das Feld „Zählt Fahrten ab“.</li>
   </ul>
   <div class="wichtig"><strong>Steuern</strong>Eine Freifahrt gilt steuerlich meist als Rabatt auf die zehn vorherigen Fahrten. Wie du sie buchst (z. B. Beleg über 0 €), klärst du mit deinem Steuerberater.</div>
 </section>
