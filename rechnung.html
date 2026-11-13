@@ -100,7 +100,7 @@
       <h2 class="erste" id="entwurfTitel">Neue Rechnung</h2>
       <div class="field" id="dokTypBox" style="display:none;">
         <label>Dokument</label>
-        <label class="check" id="dokBelegZeile"><input type="radio" name="dokTyp" value="beleg" onchange="dokTypGeaendert()"> <strong>Beleg für die Buchhaltung</strong> (Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)</label>
+        <label class="check" id="dokBelegZeile"><input type="radio" name="dokTyp" value="beleg" onchange="dokTypGeaendert()"> <strong>Beleg für die Buchhaltung</strong> <span id="dokBelegText">(Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)</span></label>
         <label class="check"><input type="radio" name="dokTyp" value="rechnung" onchange="dokTypGeaendert()"> <span id="dokRechnungText">Rechnung</span></label>
         <label class="check" id="dokNoShowZeile"><input type="radio" name="dokTyp" value="noshow" onchange="dokTypGeaendert()"> <strong>No-Show-Rechnung</strong> (Fahrgast nicht angetroffen, Fahrt nicht angetreten)</label>
       </div>
@@ -119,6 +119,13 @@
         <div class="field" id="spracheBox"><label for="sprache">Sprache der Rechnung</label>
           <select id="sprache" onchange="spracheGeaendert()"><option value="de">Deutsch</option><option value="en">English</option></select></div>
         <div class="field"><label for="leistungsdatum">Leistungsdatum</label><input type="date" id="leistungsdatum"></div>
+      </div>
+      <div class="box" id="belegDirektBox" style="display:none;">
+        <strong>Beleg für eine Barfahrt (nur für deine Buchhaltung)</strong>
+        <div class="row" style="margin-top:8px;">
+          <div class="field"><label for="belegDirektArt">Wie hat der Fahrgast bezahlt?</label><select id="belegDirektArt"><option value="bar">bar im Fahrzeug</option><option value="karte">per Karte im Fahrzeug</option></select></div>
+        </div>
+        <div class="hint" style="margin:0;">Der Beleg bekommt eine Nummer aus dem normalen Rechnungsnummernkreis, braucht keinen Empfänger (Name und Anschrift des Fahrgasts sind nicht nötig), wird nie verschickt und ist danach unveränderlich. Die Fahrt gilt als bezahlt (bar bzw. Karte) und steht so in der Umsatzliste. Brauchst du etwas für den Fahrgast, wähle oben „Quittung“.</div>
       </div>
       <div class="box" id="belegBox" style="display:none;">
         <strong>Abrechnung mit der Plattform <span id="belegPlattform"></span></strong>
@@ -231,6 +238,12 @@ async function laden(nachAktion){
 }
 
 function empfaengerRendern(){
+  if (istBelegModus() && daten.belegDirekt) {   // Barfahrt-Beleg: kein Rechnungsempfänger
+    const gname = daten.empfaenger && daten.empfaenger.name && !["Fahrgast", "Gast"].includes(daten.empfaenger.name) ? daten.empfaenger.name : "Fahrgast (Barfahrt)";
+    $("empfaengerBox").innerHTML = `<strong>Beleg für:</strong> ${esc(gname)}<br><span class="grau">Für einen Beleg brauchst du keine Adresse und keine E-Mail des Fahrgastes. Er ist für deine Buchhaltung und wird nicht verschickt.</span>`;
+    versandZustand();
+    return;
+  }
   if (istBelegModus()) {   // Beleg: kein Rechnungsempfänger, Auftraggeber ist die Plattform
     $("empfaengerBox").innerHTML = `<strong>Beleg für:</strong> ${esc((daten.belegVorschlag && daten.belegVorschlag.plattform) || "die Plattform")}<br><span class="grau">Für einen Beleg brauchst du keine Adresse und keine E-Mail des Gastes. Er ist für deine Buchhaltung und wird nicht verschickt.</span>`;
     versandZustand();
@@ -366,25 +379,30 @@ function dokTypGeaendert(aufbau){
     $("dokTypBox").style.display = daten.belegMoeglich || daten.noShowMoeglich ? "block" : "none";
     $("dokBelegZeile").style.display = daten.belegMoeglich ? "" : "none";
     $("dokNoShowZeile").style.display = daten.noShowMoeglich ? "" : "none";
-    $("dokRechnungText").textContent = daten.belegMoeglich ? "Rechnung (wenn du den Gast mit Adresse kennst)" : "Normale Rechnung";
+    $("dokRechnungText").textContent = daten.belegDirekt ? "Quittung für den Fahrgast (Kleinbetragsrechnung, bis 250 € ohne Anschrift)" : daten.belegMoeglich ? "Rechnung (wenn du den Gast mit Adresse kennst)" : "Normale Rechnung";
+    $("dokBelegText").textContent = daten.belegDirekt ? "(Barfahrt: nur für dich, ohne Empfänger, nicht für den Fahrgast)" : "(Plattformfahrt: keine Empfängeradresse nötig, keine Rechnung an den Fahrgast)";
   }
   $("noShowBox").style.display = ns ? "block" : "none";
   if (daten) empfaengerRendern();
-  $("belegBox").style.display = beleg ? "block" : "none";
+  const belegDirekt = beleg && !!daten.belegDirekt;
+  $("belegBox").style.display = beleg && !belegDirekt ? "block" : "none";
+  $("belegDirektBox").style.display = belegDirekt ? "block" : "none";
   $("zahlungsartBox").style.display = beleg ? "none" : "";
   $("spracheBox").style.display = beleg ? "none" : "";
   $("sendenBox").style.display = beleg ? "none" : "";
-  $("belegPositionHinweis").style.display = beleg ? "block" : "none";
+  $("belegPositionHinweis").style.display = beleg && !belegDirekt ? "block" : "none";
   $("preisHinweis").style.display = !beleg && !ns && daten && daten.preisOffen ? "block" : "none";
   $("kleinbetragHinweis").style.display = "none";
-  $("erzeugenBtn").textContent = beleg ? "Beleg erzeugen" : ns ? "No-Show-Rechnung erzeugen" : "Rechnung erzeugen";
+  $("erzeugenBtn").textContent = beleg ? "Beleg erzeugen" : ns ? "No-Show-Rechnung erzeugen" : daten && daten.belegDirekt ? "Quittung erzeugen" : "Rechnung erzeugen";
   const hinweisLabel = document.querySelector("label[for=hinweis]"); if (hinweisLabel) hinweisLabel.textContent = beleg ? "Hinweis auf dem Beleg (optional)" : "Hinweis auf der Rechnung (optional)";
   const v = (daten && daten.verlauf) || [];
   $("entwurfTitel").textContent = beleg
     ? (daten.vorlageNummer ? `Neuer Beleg (vorbelegt mit dem stornierten Beleg ${daten.vorlageNummer})` : "Beleg erstellen")
+    : daten && daten.belegDirekt && !ns ? (daten.vorlageNummer ? `Neue Quittung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : "Quittung für den Fahrgast erstellen")
     : ns ? (daten.vorlageNummer ? `Neue No-Show-Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : "No-Show-Rechnung erstellen")
     : (daten && daten.vorlageNummer ? `Neue Rechnung (vorbelegt mit der stornierten Rechnung ${daten.vorlageNummer})` : (v.length ? "Neue Rechnung" : "Rechnung erstellen"));
-  if (beleg) { $("belegPlattform").textContent = daten.belegVorschlag && daten.belegVorschlag.plattform ? `(${daten.belegVorschlag.plattform})` : ""; provisionVorschlagen(); }
+  if (belegDirekt) { if (!$("belegDirektArt").dataset.gesetzt) { $("belegDirektArt").value = (daten.belegVorschlag && daten.belegVorschlag.art) || "bar"; $("belegDirektArt").dataset.gesetzt = daten.referenz; } }
+  else if (beleg) { $("belegPlattform").textContent = daten.belegVorschlag && daten.belegVorschlag.plattform ? `(${daten.belegVorschlag.plattform})` : ""; provisionVorschlagen(); }
   if (ns) noShowRendern();
   if (!aufbau && daten && modus !== letzterModus) {   // beim Wechsel des Dokumenttyps: Positionen und Zahlungsart passend setzen
     if (ns) { noShowPositionenSetzen(); const z = document.querySelector("input[name=zahlungsart][value=ueberweisung]"); if (z) { z.checked = true; zahlungsartGeaendert(); } }
@@ -456,6 +474,8 @@ function zahlungsartGeaendert(){
 
 // ---------- Aktionen ----------
 function entwurfAuslesen(){
+  if (istBelegModus() && daten.belegDirekt) return { typ: "beleg", bezahltArt: $("belegDirektArt").value, leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(),
+    positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
   if (istBelegModus()) return { typ: "beleg", leistungsdatum: $("leistungsdatum").value, hinweis: $("hinweis").value.trim(), provision: $("belegProvision").value === "" ? null : Number($("belegProvision").value),
     positionen: positionen.map((p) => ({ text: String(p.text || "").trim(), menge: Number(p.menge), einzelBrutto: Number(p.einzelBrutto), ust: Number(p.ust) })) };
   const zahlungsart = (document.querySelector("input[name=zahlungsart]:checked") || {}).value || "bezahlt";
@@ -495,7 +515,9 @@ async function erzeugen(){
   const e = entwurfAuslesen(), fehler = entwurfPruefen(e);
   if (fehler) return setStatus("statusEntwurf", fehler, "error");
   const senden = e.typ === "beleg" ? false : $("senden").checked, c = berechnen(e.positionen);
-  const frage = e.typ === "beleg"
+  const frage = e.typ === "beleg" && daten.belegDirekt
+    ? `Beleg über ${eur(c.gesamtBrutto)} (${e.bezahltArt === "karte" ? "per Karte" : "bar"} bezahlt) erzeugen?\n\nEr bekommt sofort eine Nummer aus dem Rechnungsnummernkreis, wird nicht verschickt und ist danach unveränderlich. Die Fahrt gilt als ${e.bezahltArt === "karte" ? "per Karte" : "bar"} bezahlt. Änderungen sind nur per Stornobeleg möglich.`
+    : e.typ === "beleg"
     ? `Beleg über den Gästebetrag ${eur(c.gesamtBrutto)} erzeugen${e.provision != null ? ` (Provision ${eur(e.provision)}, erwartete Auszahlung ${eur(rund2(c.gesamtBrutto - e.provision))})` : ""}?\n\nEr bekommt sofort eine Nummer aus dem Rechnungsnummernkreis, wird nicht verschickt und ist danach unveränderlich. Änderungen sind nur per Stornobeleg möglich.`
     : `${e.noShow ? "No-Show-" : ""}Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
   if (!confirm(frage)) return;

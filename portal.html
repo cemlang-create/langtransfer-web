@@ -227,6 +227,7 @@ function alleAngabenHtml(a){
     feld(add, "Preis offen", "preisOffen"); feld(add, "Trinkgeld (brutto)", "trinkgeldBrutto");
     feld(add, "Zahlungsart", "zahlungsart", (v) => esc({ link: "Zahlungslink (online im Voraus)", fahrzeug: "Im Fahrzeug per Karte", rechnung: "Auf Rechnung (Überweisung)", vermittlung: "Vermittlung" }[v] || v));
     feld(add, "Zahlung laut Formular", "kunde.zahlung"); feld(add, "Zahlungslink", "zahlungslink");
+    if (a.taxifahrt) { markiere("taxifahrt"); add("Fahrtart", "Taxifahrt (Direktfahrt, bar oder Karte direkt im Fahrzeug)"); }
     if (a.noShow) { markiere("noShow"); add("No-Show", esc(`Fahrt nicht angetreten (${a.noShow.abschnitt === "rueck" ? "Rückfahrt" : "Hinfahrt"}), Rechnung mit Sachverhalt erstellt`)); }
     if (a.wartezeit) { markiere("wartezeit"); const w = a.wartezeit; add("Wartezeit", esc(`${w.minuten} Min.${w.minRueck ? ` (Hinfahrt ${w.minHin}, Rückfahrt ${w.minRueck})` : ""}${w.brutto > 0 ? ` · ${eur(w.brutto)} (19 % USt)` : " · ohne Aufpreis"}`)); }
     if (a.ausland) { markiere("ausland"); const x = a.ausland; add("Wegstrecke im Ausland (ohne deutsche USt)", esc(`${x.land}: ${x.kmAusland} von ${x.kmGesamt} km · Ausland ${eur(x.bruttoAusland)}, Inland ${eur(x.bruttoInland)} (19 % USt)`)); }
@@ -652,7 +653,7 @@ async function ansichtAuftraege(params, noch){
       $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr>${aufraeumen ? '<th style="width:30px;"><input type="checkbox" id="alleWaehlen" title="Alle sichtbaren auswählen"></th>' : ""}<th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
         fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; const klasse = f.zeit && new Date(f.zeit).getTime() < jetztMs ? "vergangen" : (f === naechste ? "naechste" : ""); return `<tr${klasse ? ` class="${klasse}"` : ""} data-ref="${esc(r.referenz)}" data-id="${esc(r.id)}"${zweite ? ' data-fahrt="rueck"' : ""}>
           ${aufraeumen ? `<td>${zweite ? "" : `<input type="checkbox" class="auswahl" data-id="${esc(r.id)}" ${auswahl.has(r.id) ? "checked" : ""}>`}</td>` : ""}<td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
-          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
+          <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "taxi" ? "Taxifahrt" : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
           <td class="strecke"><div>${esc(f.von)}</div><div>→ ${esc(f.nach)}</div>${f.ueber ? `<div class="klein">über ${esc(f.ueber)}</div>` : ""}</td>
           <td>${zweite ? '<span class="klein">inkl.</span>' : r.preisBrutto == null ? "–" : esc(eur(r.preisBrutto))}</td>
@@ -717,7 +718,7 @@ async function ansichtAuftrag(referenz, noch, params){
       const name = k.typ === "firma" ? `${k.firmenname || ""}` : `${k.anrede || ""} ${k.name || ""}`.trim();
       const hatRechnung = d.status === "bestaetigt" || !!d.rechnungsnummer;
       // Route und Zeit eines Pauschal- oder Vermittlungsauftrags ändert man über "Neuer Auftrag" (bestehende Buchung überschreiben)
-      const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
+      const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung" || d.quelle === "taxi") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
         ? `Route und Zeit ändern: im Menü „Neuer Auftrag“ bei „Bestehende Buchung überschreiben“ die Referenz <strong>${esc(d.referenz)}</strong> eintragen. Den Preis änderst du im Reiter „Rechnung“.` : "";
       // Zahlung: "bezahlt" markieren (Karte, bar, Überweisung, Zahlungslink, Plattform) – mit oder ohne Rechnung
       const ab = d.abrechnung || { status: "offen" };
@@ -740,13 +741,14 @@ async function ansichtAuftrag(referenz, noch, params){
       const nachtragKarte = `<div class="klein" style="margin:8px 0 4px;">Diese Rechnung wurde als bezahlt ausgestellt, aber ohne Zahlungsart. Trag sie nach, damit die Zahlung in der Umsatzliste erscheint.</div>` + markierFormular(["karte", "bar", "ueberweisung", "link"].includes(ab.art) ? ab.art : "karte", d.rechnungBrutto != null ? d.rechnungBrutto : d.preisBrutto, "Zahlungsart nachtragen", { datum: fahrtTag <= heuteDatum ? fahrtTag : heuteDatum });
       const zahlungInhalt = ab.status === "bezahlt"
         ? `<p style="margin:8px 0 4px;"><strong>${ab.auszahlungOffen ? "Abgerechnet, Auszahlung offen:" : "✓ Bezahlt:"}</strong> ${esc(abgText || ZAHLUNG_ART[ab.art] || "")}${d.rechnungsnummer ? ` · ${ab.beleg ? "Beleg" : "Rechnung"} ${esc(d.rechnungsnummer)}` : ""}</p>
-           <div class="klein">${d.rechnungsnummer ? "" : (d.vermittlung ? "Für die Buchhaltung erzeugst du im Reiter „Beleg / Rechnung“ einen Beleg (keine Adresse nötig)." : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).")}${ab.auszahlungOffen ? ' Sobald die Plattform das Geld überwiesen hat, erfasst du die Auszahlung im Menü <a href="#/umsatz">Umsatz</a>. Dann gilt die Fahrt als bezahlt.' : ""}</div>
+           <div class="klein">${d.rechnungsnummer ? "" : (d.vermittlung ? "Für die Buchhaltung erzeugst du im Reiter „Beleg / Rechnung“ einen Beleg (keine Adresse nötig)." : d.taxifahrt ? "Im Reiter „Beleg / Rechnung“ erzeugst du je Fahrt einen Beleg (nur für deine Buchhaltung, ohne Empfänger) oder eine Quittung für den Fahrgast." : "Eine Rechnung ist dafür nicht nötig. Wünscht der Gast oder das Hotel eine, erzeugst du sie im Reiter „Rechnung“ (Betrag und Zahlungsart sind übernommen).")}${ab.auszahlungOffen ? ' Sobald die Plattform das Geld überwiesen hat, erfasst du die Auszahlung im Menü <a href="#/umsatz">Umsatz</a>. Dann gilt die Fahrt als bezahlt.' : ""}</div>
+           ${ab.beleg && !ab.belegDirekt && abg && abg.art !== "plattform" ? `<div class="klein" style="margin:8px 0;color:var(--err);">⚠ Der Beleg ${esc(d.rechnungsnummer)} gehört zu einer Plattformfahrt, die Zahlung ist aber als „${esc(ZAHLUNG_ART_LANG[abg.art] || abg.art)}“ markiert. Hat der Gast direkt bezahlt, ist der Beleg überflüssig und wird storniert. Danach gilt die Fahrt als bezahlt.</div><div class="zeile"><button type="button" class="knopf gold" id="abBelegStorno">Beleg stornieren, Fahrt gilt als bezahlt (${esc(ZAHLUNG_ART[abg.art] || abg.art)})</button></div>` : ""}
            ${!abg && d.rechnungsnummer ? nachtragKarte : ""}
            ${abg && !["freifahrt", "gutschein"].includes(abg.art) ? `<div class="zeile" id="abKnoepfe"><button type="button" class="knopf" id="abBearbeiten">Bearbeiten</button>${kannEntfernen ? `<button type="button" class="knopf" id="abAufheben">Markierung entfernen</button>` : ""}</div><div id="abBearbeitenFeld"></div>` : (kannEntfernen ? `<div class="zeile"><button type="button" class="knopf" id="abAufheben">Markierung entfernen</button></div>` : "")}${abg || !d.rechnungsnummer ? '<div class="klein" id="abMeldung" style="margin-top:6px;"></div>' : ""}`
         : ab.status === "rechnung_offen"
         ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
-        : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.${d.vermittlung ? " Bei Plattformfahrten erzeugst du stattdessen im Reiter „Beleg / Rechnung“ einen Beleg: Er setzt Gästebetrag und Provision und wartet auf die Auszahlung der Plattform." : ""}</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
+        : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.${d.vermittlung ? " Bei Plattformfahrten erzeugst du stattdessen im Reiter „Beleg / Rechnung“ einen Beleg: Er setzt Gästebetrag und Provision und wartet auf die Auszahlung der Plattform." : ""}${d.taxifahrt ? " Bei Barfahrten erzeugst du im Reiter „Beleg / Rechnung“ je Fahrt einen Beleg (nur für deine Buchhaltung, ohne Empfänger) oder eine Quittung für den Fahrgast. Der Beleg markiert die Fahrt zugleich als bezahlt." : ""}</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? (ab.auszahlungOffen ? `<span class="badge warn">Auszahlung offen · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>`) : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
@@ -779,7 +781,7 @@ async function ansichtAuftrag(referenz, noch, params){
       if (d.status === "angebot") { knoepfe.push(["ablehnen", "Angebot stornieren", "rot"]); }
       $("main").innerHTML = `<a class="zurueck" href="#/auftraege">← Zurück zu den Aufträgen</a>
         <h2 class="seite">${esc(d.referenz)} – ${esc(name || "Auftrag")}</h2>
-        <div class="kopfkarte">${statusBadge(d.status)}${d.noShow ? ' <span class="badge warn">No-Show</span>' : ""} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
+        <div class="kopfkarte">${statusBadge(d.status)}${d.noShow ? ' <span class="badge warn">No-Show</span>' : ""}${d.taxifahrt ? ' <span class="badge">Taxifahrt</span>' : ""} ${d.rechnungsnummer ? `<span class="badge ok">Rechnung ${esc(d.rechnungsnummer)}</span>` : ""} ${zahlBadge}<br>
           ${f.rueckfahrt ? "<strong>Hinfahrt</strong> · " : ""}${esc(f.abholadresse || f.von)} → ${esc(f.zieladresse || f.nach)}${f.zwischenziel ? ` <span class="klein">(über ${esc(f.zwischenziel)})</span>` : ""}<br>
           ${esc(zeitText(f.zeitpunktISO, true))}${d.preisBrutto != null ? " · " + esc(eur(d.preisBrutto)) + (f.rueckfahrt ? " (inkl. Rückfahrt)" : "") : ""}
           ${f.rueckfahrt ? `<br><strong>Rückfahrt</strong> · ${esc(f.rueckfahrt.abholadresse || f.rueckfahrt.von)} → ${esc(f.rueckfahrt.zieladresse || f.rueckfahrt.nach)}<br>${esc(zeitText(f.rueckfahrt.zeitpunktISO, true))}` : ""}${d.freifahrt ? `<br><span class="klein">Freifahrt (Zehnerkarte): Gutschrift ${esc(eur(d.freifahrt.abgezogen))} auf ${esc(eur(d.freifahrt.bruttoVorher))}</span>` : ""}${f.beschreibung ? `<br><span class="klein">${esc(f.beschreibung)}</span>` : ""}</div>
@@ -790,7 +792,7 @@ async function ansichtAuftrag(referenz, noch, params){
         ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
-        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">${d.vermittlung ? "Beleg / Rechnung" : "Rechnung"}${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
+        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">${d.vermittlung || d.taxifahrt ? "Beleg / Rechnung" : "Rechnung"}${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
         <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
           ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
           <div class="platz"></div></div>
@@ -833,15 +835,36 @@ async function ansichtAuftrag(referenz, noch, params){
         const g = $("abGebuehr"), gText = $("abGebuehrFeld").style.display !== "none" ? g.value.trim() : "";
         if (gText !== "") { abgerechnet.gebuehr = Number(gText.replace(",", ".")); abgerechnet.gebuehrQuelle = g.dataset.auto === "1" ? "satz" : (g.value === g.dataset.orig && g.dataset.quelle ? g.dataset.quelle : "manuell"); }
         if (abgerechnet.art === "link" && $("abAuszahlung").value) abgerechnet.auszahlungDatum = $("abAuszahlung").value;
+        const body = { aktion: "abrechnen", referenz: d.referenz, abgerechnet };
+        if (ab.beleg && !ab.belegDirekt && abgerechnet.art !== "plattform") {   // Plattformfahrt mit Beleg, aber direkt bezahlt: der Beleg wird storniert
+          if (!confirm(`Zu diesem Auftrag gibt es den Beleg ${d.rechnungsnummer} (Plattformfahrt).\n\nWurde der Gast direkt bezahlt (${ZAHLUNG_ART_LANG[abgerechnet.art] || abgerechnet.art}), ist der Beleg überflüssig. Er wird storniert (Stornobeleg mit neuer Nummer), danach gilt die Fahrt als bezahlt: ${eur(betrag)}.\n\nFortfahren?`)) return;
+          body.belegStornieren = true;
+        }
         $("abBtn").disabled = true; abMeldung("Wird gespeichert …");
-        try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet }); await laden(); }
+        try { await api("rechnungAdmin", body); await laden(); }
         catch (e) { abMeldung(e.message, true); $("abBtn").disabled = false; }
+      };
+      const abBelegHinweis = () => {   // Plattformfahrt mit Beleg: bei direkter Zahlung wird der Beleg beim Speichern storniert
+        if (!ab.beleg || ab.belegDirekt || !$("abArt") || !$("abBtn")) return;
+        if (!$("abBtn").dataset.text) $("abBtn").dataset.text = $("abBtn").textContent;
+        const direkt = $("abArt").value !== "plattform";
+        $("abBtn").textContent = direkt ? "Beleg stornieren und als bezahlt speichern" : $("abBtn").dataset.text;
+        if (direkt) $("abHinweis").textContent = `Der Beleg ${d.rechnungsnummer} gehört zu einer Plattformfahrt und wird beim Speichern storniert, weil der Gast direkt bezahlt hat.`;
+        else if ($("abHinweis").textContent.startsWith("Der Beleg")) $("abHinweis").textContent = "";
       };
       const abFormularAnbinden = () => {
         if ($("abBtn")) $("abBtn").addEventListener("click", abSpeichern);
-        if ($("abArt")) { $("abArt").addEventListener("change", () => { const g = $("abGebuehr"); if ($("abArt").value !== "karte") g.dataset.auto = ""; abFelder(); }); $("abBetrag").addEventListener("input", () => { if ($("abGebuehr").dataset.auto === "1") abFelder(); }); $("abGebuehr").addEventListener("input", () => { $("abGebuehr").dataset.auto = ""; }); abFelder(); }
+        if ($("abArt")) { $("abArt").addEventListener("change", () => { const g = $("abGebuehr"); if ($("abArt").value !== "karte") g.dataset.auto = ""; abFelder(); abBelegHinweis(); }); $("abBetrag").addEventListener("input", () => { if ($("abGebuehr").dataset.auto === "1") abFelder(); }); $("abGebuehr").addEventListener("input", () => { $("abGebuehr").dataset.auto = ""; }); abFelder(); abBelegHinweis(); }
       };
       abFormularAnbinden();
+      if ($("abBelegStorno")) $("abBelegStorno").addEventListener("click", async () => {   // schon gespeicherter Widerspruch: Beleg stornieren, die gespeicherte Zahlung (bar/Karte …) bleibt
+        if (!confirm(`Der Beleg ${d.rechnungsnummer} wird storniert (Stornobeleg mit neuer Nummer). Danach gilt die Fahrt als bezahlt: ${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}.\n\nFortfahren?`)) return;
+        $("abBelegStorno").disabled = true;
+        const a = { art: abg.art, betragBrutto: abg.betragBrutto, datum: abg.datum, notiz: abg.notiz || "" };
+        if (abg.gebuehr != null) { a.gebuehr = abg.gebuehr; a.gebuehrQuelle = abg.gebuehrQuelle; }
+        try { await api("rechnungAdmin", { aktion: "abrechnen", referenz: d.referenz, abgerechnet: a, belegStornieren: true }); await laden(); }
+        catch (e) { $("abBelegStorno").disabled = false; const m = $("abMeldung"); if (m) { m.textContent = e.message; m.style.color = "var(--err)"; } else alert(e.message); }
+      });
       if ($("abBearbeiten")) $("abBearbeiten").addEventListener("click", () => {   // eine bereits als bezahlt markierte Zahlung ändern
         $("abBearbeitenFeld").innerHTML = `<div style="margin-top:10px;">` + markierFormular(abg.art, abg.betragBrutto, "Änderungen speichern", abg) + `<div class="zeile"><button type="button" class="knopf" id="abAbbrechen">Abbrechen</button></div></div>`;
         $("abKnoepfe").style.display = "none"; abFormularAnbinden();

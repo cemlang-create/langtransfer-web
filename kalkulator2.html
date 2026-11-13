@@ -200,6 +200,7 @@
         <button id="typFirma" onclick="setKundentyp('firma')">Firma</button>
         <button id="typHotel" onclick="setKundentyp('hotel')">Hotel</button>
         <button id="typVermittlung" onclick="setKundentyp('vermittlung')">Vermittlung</button>
+        <button id="typTaxi" onclick="setKundentyp('taxi')">Taxifahrt</button>
       </div>
 
       <!-- PRIVAT -->
@@ -301,6 +302,27 @@
           <div id="vmBetragZeile" style="display:none;margin-top:6px;"><label for="vmBetrag">Bezahlter Betrag (€)</label><input type="number" step="0.01" min="0" id="vmBetrag"></div>
         </div>
         <p class="hint" style="margin-top:-6px;">Der Auftrag ist sofort bestätigt und blockt den Kalender (Anfahrt, Fahrt, Rückkehr). Der Gast bekommt <strong>keine Mail</strong>, du bekommst eine Kopie. Eine Rechnung erzeugst du nur bei Bedarf im Portal.</p>
+      </div>
+
+      <!-- TAXIFAHRT: Direktfahrt, alles optional, gleich bar oder per Karte bezahlt -->
+      <div id="formTaxi" style="display:none;">
+        <div class="row4">
+          <div class="field"><label for="tAnrede">Anrede (optional)</label>
+            <select id="tAnrede"><option value="">–</option><option value="Frau">Frau</option><option value="Herr">Herr</option><option value="divers">Divers</option></select></div>
+          <div class="field"><label for="tVorname">Vorname (optional)</label><input type="text" id="tVorname" autocomplete="off"></div>
+          <div class="field"><label for="tNachname">Nachname (optional)</label><input type="text" id="tNachname" autocomplete="off"></div>
+          <div class="field"><label for="tTelefon">Telefon (optional)</label><input type="text" id="tTelefon" autocomplete="off"></div>
+        </div>
+        <p class="hint" style="margin-top:-6px;">Alle Angaben sind optional. Ohne Namen heißt der Auftrag „Fahrgast“. Es sind keine E-Mail und keine Anschrift nötig.</p>
+        <div class="field">
+          <label>Bezahlung</label>
+          <label class="check"><input type="radio" name="taxiAbr" value="bar" checked onchange="taxiAktualisieren()"> Bar im Fahrzeug bezahlt</label>
+          <label class="check"><input type="radio" name="taxiAbr" value="karte" onchange="taxiAktualisieren()"> Per Karte im Fahrzeug bezahlt</label>
+          <label class="check"><input type="radio" name="taxiAbr" value="" onchange="taxiAktualisieren()"> Noch offen (später im Auftrag als bezahlt markieren)</label>
+          <div id="taxiBetragZeile" style="margin-top:6px;"><label for="taxiBetrag">Bezahlter Betrag (€)</label><input type="number" step="0.01" min="0" id="taxiBetrag" style="max-width:200px;" oninput="this.dataset.manuell = '1'">
+            <div class="hint">Vorgeschlagen ist der berechnete Preis: <strong id="taxiPreisInfo">–</strong>. Den Betrag kannst du ändern (z. B. gerundet oder mit Trinkgeld).</div></div>
+        </div>
+        <p class="hint" style="margin-top:-6px;">Der Auftrag ist sofort bestätigt und blockt den Kalender. Der Fahrgast bekommt <strong>keine Mail</strong>, du bekommst eine Kopie. Danach erzeugst du im Auftrag je Fahrt einen <strong>Beleg</strong> (nur für deine Buchhaltung) oder eine <strong>Quittung für den Fahrgast</strong>.</p>
       </div>
 
       <!-- RECHNUNGSADRESSE (gemeinsam) -->
@@ -579,26 +601,37 @@ function vermittlungAktualisieren(){
   const fest = (document.querySelector("input[name=vmPreis]:checked") || {}).value === "fest";
   if (art && fest && preis != null && !el("vmBetrag").value) el("vmBetrag").value = preis.toFixed(2);
 }
+/** Taxifahrt: Betrag folgt dem berechneten Preis, bis er von Hand geändert wird; Betragsfeld nur sichtbar, wenn schon bezahlt. */
+function taxiAktualisieren(){
+  const preis = letztesErgebnis ? letztesErgebnis.gesamtBrutto : null;
+  const art = (document.querySelector("input[name=taxiAbr]:checked") || {}).value || "";
+  el("taxiBetragZeile").style.display = art ? "block" : "none";
+  el("taxiPreisInfo").textContent = preis == null ? "– (erst Preis berechnen)" : `${fmt(preis)} €`;
+  if (art && preis != null && !el("taxiBetrag").dataset.manuell) el("taxiBetrag").value = preis.toFixed(2);
+}
 function setKundentyp(t){
   kundentyp = t;
   delete el("rcCheck").dataset.gesetzt; // Standardwert des Firmen-Hakens für die neue Kundenart neu setzen
-  ["privat", "firma", "hotel", "vermittlung"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
-  const vm = t === "vermittlung";
+  ["privat", "firma", "hotel", "vermittlung", "taxi"].forEach(x => el("typ" + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle("active", x === t));
+  const vm = t === "vermittlung", taxi = t === "taxi", direkt = vm || taxi;
   el("formPrivat").style.display = t === "privat" ? "block" : "none";
   el("formGeschaeft").style.display = (t === "firma" || t === "hotel") ? "block" : "none";
   el("formVermittlung").style.display = vm ? "block" : "none";
-  // Vermittlungsfahrt: keine Rechnungsadresse, keine Zahlungsart, kein Angebot/Auftrag-Schalter (immer sofort bestätigt)
-  el("raBlock").style.display = vm ? "none" : "block";
-  el("zahlungsartBlock").style.display = vm ? "none" : "block";
-  el("modusToggle").style.display = vm ? "none" : "";
-  el("modusHinweis").style.display = vm ? "none" : "";
+  el("formTaxi").style.display = taxi ? "block" : "none";
+  // Vermittlungs- und Taxifahrt: keine Rechnungsadresse, keine Zahlungsart, kein Angebot/Auftrag-Schalter (immer sofort bestätigt)
+  el("raBlock").style.display = direkt ? "none" : "block";
+  el("zahlungsartBlock").style.display = direkt ? "none" : "block";
+  el("modusToggle").style.display = direkt ? "none" : "";
+  el("modusHinweis").style.display = direkt ? "none" : "";
   const hotel = t === "hotel";
   el("gNameLabel").textContent = hotel ? "Hotelname" : "Firmenname";
   el("zahlerFirmaText").textContent = hotel ? "Hotel" : "Firma";
   el("zimmerFeld").style.display = hotel ? "block" : "none";
   el("fgTitel").textContent = hotel ? "Fahrgast (Hotelgast)" : "Fahrgast";
   zahlerGeaendert();
-  if (vm) { el("angebotBtn").textContent = "Fahrt anlegen (ohne Mail an den Gast)"; vermittlungAktualisieren(); } else setModus(modus);
+  if (vm) { el("angebotBtn").textContent = "Fahrt anlegen (ohne Mail an den Gast)"; vermittlungAktualisieren(); }
+  else if (taxi) { el("angebotBtn").textContent = "Taxifahrt anlegen (ohne Mail an den Fahrgast)"; taxiAktualisieren(); }
+  else setModus(modus);
   empfaengerAktualisieren();
 }
 
@@ -609,7 +642,7 @@ function setKundentyp(t){
  *  "firma"     - Fahrgast bekommt die Rechnung, aber auf eine (andere) Firma ausgestellt
  */
 function rechnungsmodus(){
-  if (kundentyp === "privat" || kundentyp === "vermittlung") return "keine";
+  if (kundentyp === "privat" || kundentyp === "vermittlung" || kundentyp === "taxi") return "keine";
   if (aktuellerZahler() === "fahrgast") return el("rcCheck").checked ? "firma" : "keine";
   return kundentyp === "firma" ? "vorbelegt" : "keine";
 }
@@ -639,7 +672,7 @@ function rechnungsblockAktualisieren(){
     letzterRechnungsKontext = kontext;
   }
   const m = rechnungsmodus();
-  el("rechnungsBlock").style.display = (kundentyp === "privat" || kundentyp === "vermittlung") ? "none" : "block";
+  el("rechnungsBlock").style.display = (kundentyp === "privat" || kundentyp === "vermittlung" || kundentyp === "taxi") ? "none" : "block";
   el("rcCheckZeile").style.display = (kundentyp !== "privat" && fg) ? "flex" : "none";
   el("rcFelder").style.display = m === "keine" ? "none" : "block";
   el("rcHinweis").textContent = m === "vorbelegt"
@@ -708,6 +741,10 @@ function empfaengerAktualisieren(){
   let text = "";
   if (kundentyp === "vermittlung") {
     el("empfaengerVorschau").textContent = "Es geht keine Mail an den Gast. Die E-Mail ergänzt du nach der Fahrt im Portal.";
+    return;
+  }
+  if (kundentyp === "taxi") {
+    el("empfaengerVorschau").textContent = "Es geht keine Mail an den Fahrgast. Einen Beleg oder eine Quittung erzeugst du bei Bedarf im Portal.";
     return;
   }
   if (kundentyp === "privat") {
@@ -978,6 +1015,7 @@ async function preisBerechnen(){
     // ---------- Angebots-Vorbelegung ----------
     letztesErgebnis = { gesamtBrutto, hinPlan, ruckPlan, fahrgaeste, ab12, unter12, gutscheinCode: gutscheinProzent > 0 ? String(gutscheinCode).trim().toUpperCase() : "", ausland: auslandAnteil > 0 ? { land: auslandLand, kmHin: auslandHin, kmRueck: auslandRueck, kmGesamt } : null, wartezeit: wzMinHin + wzMinRueck > 0 ? { minHin: wzMinHin, minRueck: wzMinRueck, brutto: wzPreis } : null };
     vermittlungAktualisieren();
+    if (kundentyp === "taxi") taxiAktualisieren();
     flugfelderAktualisieren(hinPlan, ruckPlan);
     const kurz = document.getElementById("agKurz");
     if (!kurz.value.trim() || kurz.dataset.auto === "1") {
@@ -1064,11 +1102,11 @@ async function stammkundeLaden(id, optionen = {}){
 }
 function stammAktualisieren(){
   const info = el("stammInfo"), zeile = el("freifahrtZeile");
-  if (!stammkundeAktuell) { info.textContent = "Übernimmt Kundendaten, Route und Festpreis einer Stammfahrt. Danach nur noch Datum und Uhrzeit eingeben."; zeile.style.display = "none"; el("alsStammkundeZeile").style.display = ""; return; }
+  if (!stammkundeAktuell) { info.textContent = "Übernimmt Kundendaten, Route und Festpreis einer Stammfahrt. Danach nur noch Datum und Uhrzeit eingeben."; zeile.style.display = "none"; el("alsStammkundeZeile").style.display = (kundentyp === "vermittlung" || kundentyp === "taxi") ? "none" : ""; return; }
   const s = stammkundeAktuell.stand, aktiv = !!stammkundeAktuell.sk.karteAktiv;
   const frei = stammkundeAktuell.freifahrtBestehend, wert = frei ? frei.wert : s.freifahrtWert;
   info.textContent = `★ ${stammkundeAktuell.name}` + (aktiv ? ` · Zehnerkarte: ${s.stempel} von ${s.von} Fahrten${s.verfuegbar > 0 ? " · Freifahrt verfügbar" : ` · noch ${s.naechste}`}` : " · Zehnerkarte aus");
-  const anzeigen = aktiv && (s.verfuegbar > 0 || !!frei) && kundentyp !== "vermittlung";
+  const anzeigen = aktiv && (s.verfuegbar > 0 || !!frei) && kundentyp !== "vermittlung" && kundentyp !== "taxi";
   zeile.style.display = anzeigen ? "flex" : "none";
   if (anzeigen) {
     const preis = letztesErgebnis ? letztesErgebnis.gesamtBrutto : null;
@@ -1162,7 +1200,7 @@ const gastFormularFelder = () => kundentyp === "privat"
   : { email: el("gEmail").value.trim(), telefon: el("gTelefon").value.trim(), vorname: el("gVorname").value.trim(), nachname: el("gNachname").value.trim() };
 const gastFormularSchluessel = () => JSON.stringify(gastFormularFelder());
 async function gastHinweisPruefen(){
-  if (kundentyp === "vermittlung" || !adminKeyLesen()) { el("gastHinweis").style.display = "none"; return; }
+  if (kundentyp === "vermittlung" || kundentyp === "taxi" || !adminKeyLesen()) { el("gastHinweis").style.display = "none"; return; }
   const felder = gastFormularFelder(), schluessel = JSON.stringify(felder);
   if (schluessel === gastHinweisSchluessel) return;
   gastHinweisSchluessel = schluessel;
@@ -1255,6 +1293,13 @@ async function auftragInFormular(d, optionen = {}){
     const abg = d.abgerechnet && (d.abgerechnet.art === "karte" || d.abgerechnet.art === "bar") ? d.abgerechnet : null;
     document.querySelector(`input[name="vmAbr"][value="${abg ? abg.art : ""}"]`).checked = true;
     setzeWert("vmBetrag", abg ? abg.betragBrutto : "");
+  } else if (d.taxifahrt) {   // Taxifahrt: Name und Bezahlung wiederherstellen
+    setKundentyp("taxi");
+    setzeWert("tAnrede", k.anrede); setzeWert("tVorname", k.vorname); setzeWert("tNachname", k.nachname); setzeWert("tTelefon", k.mobil);
+    const abgT = d.abgerechnet && (d.abgerechnet.art === "karte" || d.abgerechnet.art === "bar") ? d.abgerechnet : null;
+    document.querySelector(`input[name="taxiAbr"][value="${abgT ? abgT.art : ""}"]`).checked = true;
+    setzeWert("taxiBetrag", abgT ? abgT.betragBrutto : ""); el("taxiBetrag").dataset.manuell = abgT ? "1" : "";
+    taxiAktualisieren();
   } else if (k.typ === "firma") {
     setKundentyp(k.kategorie === "hotel" ? "hotel" : "firma");
     setzeWert("gName", k.firmenname);
@@ -1276,7 +1321,7 @@ async function auftragInFormular(d, optionen = {}){
     setKundentyp("privat");
     setzeWert("pAnrede", k.anrede); setzeWert("pTitel", k.titel); setzeWert("pVorname", k.vorname); setzeWert("pNachname", k.nachname); setzeWert("pTelefon", k.mobil); setzeWert("pEmail", k.email);
   }
-  if (!d.vermittlung) {
+  if (!d.vermittlung && !d.taxifahrt) {
     // Ist die gespeicherte Rechnungsadresse die Abholadresse, bleibt der Haken "= Abholadresse" gesetzt; sonst bleibt die gespeicherte Adresse stehen (z. B. Firmenadresse)
     const ausAbholung = adresseAusPlace(places.abhol);
     const gleich = (ausAbholung.strasse || "") === (ra.strasse || "") && (ausAbholung.plz || "") === (ra.plz || "") && (ausAbholung.ort || "") === (ra.ort || "");
@@ -1288,7 +1333,7 @@ async function auftragInFormular(d, optionen = {}){
   setzeWert("agKurz", f.beschreibung); el("agKurz").dataset.auto = "0";
   setzeWert("agGepaeck", f.sonstigesGepaeck); setzeWert("agBemerkungen", bemerkungen);
   setzeWert("agReferenz", d.referenz); setzeWert("agSprache", d.sprache || "de");
-  if (!d.vermittlung) {
+  if (!d.vermittlung && !d.taxifahrt) {
     const zRadio = document.querySelector(`input[name="zahlungsart"][value="${["link", "fahrzeug", "rechnung"].includes(d.zahlungsart) ? d.zahlungsart : "link"}"]`); if (zRadio) zRadio.checked = true;
     setModus(d.status === "bestaetigt" ? "auftrag" : "angebot");   // ein bereits bestätigter Auftrag bleibt ein Auftrag
   }
@@ -1336,20 +1381,26 @@ async function angebotSenden(){
   const { gesamtBrutto, hinPlan, ruckPlan, ab12, unter12 } = letztesErgebnis;
 
   const v = (id) => document.getElementById(id).value.trim();
-  const istVermittlung = kundentyp === "vermittlung";
+  const istVermittlung = kundentyp === "vermittlung", istTaxi = kundentyp === "taxi";
   const rechnungsadresse = { strasse: v("raStrasse"), plz: v("raPlz"), ort: v("raOrt"), land: v("raLand") };
-  if (!istVermittlung && (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land)) {
+  if (!istVermittlung && !istTaxi && (!rechnungsadresse.strasse || !rechnungsadresse.plz || !rechnungsadresse.ort || !rechnungsadresse.land)) {
     return setAngebotStatus("Bitte vollständige Rechnungsadresse angeben.", "error");
   }
   // Vermittlungsfahrt: Ohne eigene Kurzbeschreibung wird "Ort → Ort" verwendet (z. B. "Stuttgart → Neckartenzlingen")
   const kurzOrt = (p) => ((p.formatted_address || "").split(",").slice(-2, -1)[0] || p.formatted_address || "").replace(/^\s*\d{5}\s*/, "").trim();
-  const kurzbeschreibung = v("agKurz") || (istVermittlung ? `${kurzOrt(hinPlan.abhol)} → ${kurzOrt(hinPlan.ziel)}` : "");
+  const kurzbeschreibung = v("agKurz") || (istVermittlung ? `${kurzOrt(hinPlan.abhol)} → ${kurzOrt(hinPlan.ziel)}` : istTaxi ? `Taxifahrt ${kurzOrt(hinPlan.abhol)} → ${kurzOrt(hinPlan.ziel)}` : "");
   if (!kurzbeschreibung) return setAngebotStatus("Bitte eine Kurzbeschreibung angeben.", "error");
   if (!v("agBlockStart") || !v("agBlockEnde")) return setAngebotStatus("Bitte den Kalender-Block der Hinfahrt angeben.", "error");
   if (ruckPlan && (!v("agRueckBlockStart") || !v("agRueckBlockEnde"))) return setAngebotStatus("Bitte den Kalender-Block der Rückfahrt angeben.", "error");
 
-  let kunde, gastname = "", vermittlungDaten = null;
-  if (istVermittlung) {
+  let kunde, gastname = "", vermittlungDaten = null, taxiDaten = null;
+  if (istTaxi) {   // Taxifahrt: alles optional, direkt bezahlt (bar oder Karte) oder noch offen
+    const abrArt = (document.querySelector("input[name=taxiAbr]:checked") || {}).value || "";
+    const abrBetrag = Number(v("taxiBetrag").replace(",", "."));
+    if (abrArt && !(abrBetrag > 0)) return setAngebotStatus("Bitte den bezahlten Betrag eingeben.", "error");
+    taxiDaten = { abgerechnet: abrArt ? { art: abrArt, betragBrutto: abrBetrag } : null };
+    kunde = { typ: "taxi", anrede: v("tAnrede"), vorname: v("tVorname"), nachname: v("tNachname"), name: `${v("tVorname")} ${v("tNachname")}`.trim(), telefon: v("tTelefon") };
+  } else if (istVermittlung) {
     if (v("vmEmail") && !gueltigeEmail(v("vmEmail"))) return setAngebotStatus("Die E-Mail-Adresse ist ungültig (oder leer lassen).", "error");
     const preisFest = (document.querySelector("input[name=vmPreis]:checked") || {}).value === "fest";
     const abrArt = (document.querySelector("input[name=vmAbr]:checked") || {}).value || "";
@@ -1418,15 +1469,15 @@ async function angebotSenden(){
   const flugRueck = ruckPlan && el("flugRueckFeld").style.display !== "none" ? v("flugRueck") : "";
 
   const body = {
-    modus: istVermittlung ? "auftrag" : modus,
-    zahlungsart: istVermittlung ? "vermittlung" : aktuelleZahlungsart(),
+    modus: istVermittlung || istTaxi ? "auftrag" : modus,
+    zahlungsart: istVermittlung ? "vermittlung" : istTaxi ? "direkt" : aktuelleZahlungsart(),
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
     ...(letztesErgebnis.gutscheinCode ? { gutscheinCode: letztesErgebnis.gutscheinCode } : {}),
     ...(letztesErgebnis.ausland ? { ausland: letztesErgebnis.ausland } : {}),
     ...(letztesErgebnis.wartezeit ? { wartezeit: letztesErgebnis.wartezeit } : {}),
-    ...(stammkundeAktuell ? { stammkundeId: stammkundeAktuell.id } : {}),
-    ...(stammkundeAktuell && !istVermittlung && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
+    ...(stammkundeAktuell && !istTaxi ? { stammkundeId: stammkundeAktuell.id } : {}),
+    ...(stammkundeAktuell && !istVermittlung && !istTaxi && el("freifahrtCheck").checked ? { freifahrt: true } : {}),
     kunde,
     fahrt: {
       beschreibung: kurzbeschreibung,
@@ -1449,6 +1500,7 @@ async function angebotSenden(){
     },
     preis: { gesamtBrutto: istVermittlung && !vermittlungDaten.preisFest ? 0 : gesamtBrutto },   // Vermittlung: Preis offen bis nach der Fahrt, außer Festpreis
     ...(istVermittlung && vermittlungDaten.abgerechnet ? { abgerechnet: vermittlungDaten.abgerechnet } : {}),
+    ...(istTaxi && taxiDaten.abgerechnet ? { abgerechnet: taxiDaten.abgerechnet } : {}),
     kalender: {
       blockStartISO: new Date(v("agBlockStart")).toISOString(),
       blockEndeISO: new Date(v("agBlockEnde")).toISOString(),
@@ -1459,22 +1511,26 @@ async function angebotSenden(){
     }
   };
 
-  const istAuftrag = istVermittlung || modus === "auftrag";
+  const istAuftrag = istVermittlung || istTaxi || modus === "auftrag";
   const ueberschreiben = body.referenz ? `Der bestehende Auftrag ${body.referenz} wird ersetzt: Die Kalendereinträge werden neu angelegt.\n\n` : "";
   if (!istAuftrag && body.referenz && !confirm(ueberschreiben + "Angebot jetzt neu an den Kunden senden?")) return;
   if (istVermittlung && !confirm(ueberschreiben + "Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast." + (vermittlungDaten.abgerechnet ? `\nSie wird als abgerechnet markiert (${vermittlungDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €).` : ""))) return;
-  if (istAuftrag && !istVermittlung && !confirm(ueberschreiben + "Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
+  if (istTaxi && !confirm(ueberschreiben + "Taxifahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Fahrgast." + (taxiDaten.abgerechnet ? `\nSie wird als bezahlt markiert (${taxiDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(taxiDaten.abgerechnet.betragBrutto)} €).` : "\nSie bleibt als noch nicht bezahlt offen."))) return;
+  if (istAuftrag && !istVermittlung && !istTaxi && !confirm(ueberschreiben + "Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
   btn.disabled = true;
-  setAngebotStatus(istVermittlung ? "Fahrt wird angelegt …" : istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
+  setAngebotStatus(istVermittlung || istTaxi ? "Fahrt wird angelegt …" : istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
   try {
     const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     setAngebotStatus(
-      istVermittlung
+      istTaxi
+        ? `✓ Taxifahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Fahrgast bekommt keine Mail.` + (taxiDaten.abgerechnet
+            ? ` Bezahlt: ${taxiDaten.abgerechnet.art === "karte" ? "per Karte" : "bar"}, ${fmt(taxiDaten.abgerechnet.betragBrutto)} €.` : ` Noch nicht als bezahlt markiert (im Auftrag nachholen).`) + ` Im Portal (Auftrag öffnen, Reiter „Beleg / Rechnung“) erzeugst du bei Bedarf einen Beleg oder eine Quittung.`
+      : istVermittlung
         ? `✓ Fahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Gast bekommt keine Mail.` + (vermittlungDaten.abgerechnet
             ? ` Abgerechnet: ${vermittlungDaten.abgerechnet.art === "karte" ? "per Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €. Eine Rechnung erzeugst du nur bei Bedarf im Portal (Auftrag öffnen, Reiter „Rechnung“).`
             : vermittlungDaten.preisFest ? ` Festpreis ${fmt(gesamtBrutto)} €. Nach der Fahrt im Portal als abgerechnet markieren oder eine Rechnung erzeugen.`
@@ -1484,7 +1540,7 @@ async function angebotSenden(){
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
     // Gast gleich als Stammkunde speichern (nur Kundendaten; Zehnerkarte nur auf ausdrücklichen Wunsch). Der Auftrag ist dann verknüpft.
-    if (el("alsStammkunde").checked && !stammkundeAktuell && !istVermittlung) {
+    if (el("alsStammkunde").checked && !stammkundeAktuell && !istVermittlung && !istTaxi) {
       try {
         setAngebotStatus(el("angebotStatus").textContent + await alsStammkundeSpeichern(daten.referenz), "ok");
       } catch (e) { setAngebotStatus(el("angebotStatus").textContent + ` (Der Stammkunde konnte nicht gespeichert werden: ${e.message})`, "ok"); }
