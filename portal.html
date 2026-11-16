@@ -326,6 +326,7 @@ const MENUE = [
   { pfad: "krankenfahrten", text: "Krankenfahrten", modul: "krankenfahrten" },
   { pfad: "stammkunden", text: "Stammkunden", modul: "stammkunden" },
   { pfad: "umsatz", text: "Umsatz", modul: "umsatz" },
+  { pfad: "reports", text: "Reports", modul: "reports" },
   { pfad: "handbuch", text: "Handbuch", modul: "handbuch" },
   { pfad: "einstellungen", text: "Einstellungen", modul: "einstellungen" }
 ];
@@ -358,6 +359,7 @@ function route(){
   if (abschnitt === "krankenfahrten" && sichtbar("krankenfahrten")) return ansichtRahmen("Krankenfahrten", "Terminserien anlegen, Bestätigung senden, Zuzahlungsrechnungen je Fahrt.", "krankenfahrt.html?embedded=1", true);
   if (abschnitt === "stammkunden" && sichtbar("stammkunden")) return ansichtRahmen("Stammkunden", "Kunden mit festen Fahrten und digitaler Zehnerkarte.", "stammkunden.html?embedded=1" + (params.get("id") ? "&id=" + encodeURIComponent(params.get("id")) : ""), true);
   if (abschnitt === "umsatz" && sichtbar("umsatz")) return ansichtUmsatz(params, noch);
+  if (abschnitt === "reports" && sichtbar("reports")) return ansichtReports(params, noch);
   if (abschnitt === "handbuch" && sichtbar("handbuch")) return ansichtRahmen("Handbuch", "Anleitungen zu allen Funktionen des Portals.", "handbuch.html?embedded=1" + (params.get("thema") ? "#" + encodeURIComponent(params.get("thema")) : ""), true);
   return ansichtUebersicht(noch);
 }
@@ -368,6 +370,128 @@ window.addEventListener("message", (ev) => {
   if (!ev.data || ev.data.type !== "lt-hoehe") return;
   document.querySelectorAll("iframe.maske").forEach((f) => { if (f.contentWindow === ev.source) f.style.height = Math.max(300, ev.data.hoehe + 8) + "px"; });
 });
+
+// ===================== ANSICHT: REPORTS =====================
+const tagPlusC = (iso, n) => new Date(new Date(iso + "T12:00:00Z").getTime() + n * 86400000).toISOString().slice(0, 10);
+function reportSchnellwahl(art){
+  const heute = new Date().toLocaleDateString("sv-SE"), [j, m] = heute.split("-").map(Number);
+  const z2 = (n) => String(n).padStart(2, "0");
+  const ende = (jj, mm) => `${jj}-${z2(mm)}-${z2(new Date(Date.UTC(jj, mm, 0)).getUTCDate())}`, anfang = (jj, mm) => `${jj}-${z2(mm)}-01`;
+  const montag = tagPlusC(heute, -((new Date(heute + "T12:00:00Z").getUTCDay() + 6) % 7));
+  const qm = Math.floor((m - 1) / 3) * 3 + 1;
+  if (art === "dieseWoche") return [montag, heute];
+  if (art === "vorwoche") return [tagPlusC(montag, -7), tagPlusC(montag, -1)];
+  if (art === "monat") return [anfang(j, m), heute];
+  if (art === "vormonat") { const pj = m === 1 ? j - 1 : j, pm = m === 1 ? 12 : m - 1; return [anfang(pj, pm), ende(pj, pm)]; }
+  if (art === "quartal") return [anfang(j, qm), heute];
+  if (art === "vorquartal") { let pm = qm - 3, pj = j; if (pm < 1) { pm += 12; pj -= 1; } return [anfang(pj, pm), ende(pj, pm + 2)]; }
+  if (art === "jahr") return [`${j}-01-01`, heute];
+  return [`${j - 1}-01-01`, `${j - 1}-12-31`];   // vorjahr
+}
+function reportHtml(r){
+  const u = r.umsatz, f = r.fahrten, v = r.vorher || {};
+  const vgl = (neu, alt) => (alt > 0 ? `${neu >= alt ? "+" : "−"}${Math.abs(Math.round((neu - alt) / alt * 100))} % ggü. Vorzeitraum` : "kein Vergleichswert");
+  const karte = (zahl, text, sub) => `<div class="karte"><div class="zahl" style="font-size:22px;">${esc(zahl)}</div><div class="text">${esc(text)}${sub ? `<br><span class="klein">${esc(sub)}</span>` : ""}</div></div>`;
+  const tab = (kopf, zeilen, summe) => `<div class="tabellenrahmen"><table><thead><tr>${kopf.map((k) => `<th class="${k[1] === "r" ? "re" : ""}">${esc(k[0])}</th>`).join("")}</tr></thead><tbody>${zeilen.map((z) => `<tr style="cursor:default;">${z.map((t, i) => `<td class="${kopf[i][1] === "r" ? "re" : ""}">${esc(t)}</td>`).join("")}</tr>`).join("")}${summe ? `<tr style="cursor:default;font-weight:700;">${summe.map((t, i) => `<td class="${kopf[i][1] === "r" ? "re" : ""}">${esc(t)}</td>`).join("")}</tr>` : ""}</tbody></table></div>`;
+  const balken = (liste) => { const max = Math.max(1, ...liste.map((x) => x.anzahl)); return `<div class="rahmenkarte" style="padding:10px 14px;">${liste.map((x) => `<div style="display:flex;align-items:center;gap:10px;margin:4px 0;font-size:13.5px;"><div style="flex:0 0 170px;">${esc(x.name)}</div><div style="flex:1;"><div style="background:var(--moss);height:12px;border-radius:2px;width:${Math.round(x.anzahl / max * 100)}%;min-width:${x.anzahl ? 3 : 0}px;"></div></div><div style="flex:0 0 36px;text-align:right;">${x.anzahl}</div></div>`).join("")}</div>`; };
+  const h3 = (t) => `<h3 style="margin:24px 0 8px;font-size:1.05rem;">${esc(t)}</h3>`;
+  const pro = (n) => (f.auftraege ? Math.round(n / f.auftraege * 100) + " %" : "–");
+  const h = r.hinweise, punkte = [];
+  if (h.rechnungOffen.anzahl) punkte.push(`${h.rechnungOffen.anzahl} offene Rechnung(en) über ${zahlDe(h.rechnungOffen.betrag)} € (Stand heute)`);
+  if (h.auszahlungOffen.anzahl) punkte.push(`${h.auszahlungOffen.anzahl} Plattformfahrt(en) mit ${zahlDe(h.auszahlungOffen.betrag)} € Auszahlung noch offen (Stand heute)`);
+  if (h.gebuehrFehlt) punkte.push(`${h.gebuehrFehlt} Zahlung(en) im Zeitraum ohne Gebühr bzw. Provision`);
+  if (h.auszahlungsdatumUnbekannt) punkte.push(`${h.auszahlungsdatumUnbekannt} Stripe-Zahlung(en) ohne Auszahlungsdatum`);
+  if (h.ohneZahlungsart) punkte.push(`${h.ohneZahlungsart} als bezahlt ausgestellte Rechnung(en) ohne Zahlungsart (zählen nicht im Umsatz, siehe Menü „Umsatz“)`);
+  return `<div class="karten" style="margin:6px 0 4px;">${karte(zahlDe(u.brutto) + " €", "Umsatz (Zahlungseingang)", vgl(u.brutto, v.umsatzBrutto))}${karte(zahlDe(u.netto) + " €", "Netto-Umsatz", vgl(u.netto, v.umsatzNetto))}${karte(String(f.auftraege), "Fahrten", vgl(f.auftraege, v.fahrten))}${karte(zahlDe(f.durchschnitt) + " €", "Ø Fahrtwert", "Auftragswert " + zahlDe(f.wert) + " €")}</div>
+    ${v.von ? `<div class="klein">Vergleichszeitraum: ${datumDe(v.von)} – ${datumDe(v.bis)}</div>` : ""}
+    ${punkte.length ? `<div class="rahmenkarte" style="padding:8px 12px;margin-top:12px;">${punkte.map((p) => `• ${esc(p)}`).join("<br>")}</div>` : ""}
+    ${h3("1. Umsatz und Zahlungsarten")}
+    ${u.anzahl ? tab([["Zahlungsart"], ["Zahlungen", "r"], ["Brutto", "r"], ["Gebühr / Provision", "r"], ["Auszahlung", "r"]], r.nachArt.map((a) => [a.artText, a.anzahl, zahlDe(a.brutto), zahlDe(a.gebuehr), zahlDe(a.auszahlung)]), ["Summe", u.anzahl, zahlDe(u.brutto), zahlDe(u.gebuehr), zahlDe(u.auszahlung)]) + `<div class="klein" style="margin-top:6px;">Geldtransfergebühren der Plattformen: ${zahlDe(u.transfergebuehr)} € · Auszahlung insgesamt: ${zahlDe(u.auszahlungGesamt)} €. Zuordnung nach Zahlungseingang (Ist-Versteuerung), wie in der Umsatzliste.</div>` : `<div class="klein">Keine Zahlungseingänge in diesem Zeitraum.</div>`}
+    ${h3("2. Fahrten und Kunden")}
+    ${f.auftraege ? tab([["Kundentyp"], ["Fahrten", "r"], ["Anteil", "r"], ["Auftragswert", "r"]], r.nachTyp.map((t) => [t.text, t.anzahl, pro(t.anzahl), zahlDe(t.wert)]), ["Summe", f.auftraege, "100 %", zahlDe(f.wert)])
+      + `<div style="height:14px;"></div>` + tab([["Wichtigste Kunden (" + r.kundenGesamt + " insgesamt)"], ["Typ"], ["Fahrten", "r"], ["Wert", "r"]], r.topKunden.map((k) => [k.name, k.text, k.anzahl, zahlDe(k.wert)])) : `<div class="klein">Keine bestätigten Fahrten in diesem Zeitraum.</div>`}
+    <div class="klein" style="margin-top:6px;">Mit Rückfahrt: ${f.mitRueckfahrt} · Stammkunden: ${f.stammkunden} · Freifahrten: ${f.freifahrten} · Gutscheine: ${f.gutscheine} · Nicht angetreten (No-Show): ${f.noShow} · Storniert: ${f.storniert}${f.unbestaetigt ? ` · Noch nicht bestätigt: ${f.unbestaetigt}` : ""}. Stornierte und nicht angetretene Fahrten zählen nicht in den Fahrten oben.</div>
+    ${h3("3. Buchungsquellen und Auslastung")}
+    ${f.auftraege ? tab([["Quelle"], ["Fahrten", "r"], ["Anteil", "r"], ["Auftragswert", "r"]], r.nachQuelle.map((q) => [q.text, q.anzahl, pro(q.anzahl), zahlDe(q.wert)]))
+      + `<div class="klein" style="margin:14px 0 4px;font-weight:700;">Fahrten nach Wochentag</div>` + balken(r.wochentag) + `<div class="klein" style="margin:14px 0 4px;font-weight:700;">Fahrten nach Tageszeit (Abholung)</div>` + balken(r.tageszeit) : `<div class="klein">Keine Fahrten in diesem Zeitraum.</div>`}
+    ${h3("4. Umsatzsteuer")}
+    ${u.anzahl ? tab([["Steuersatz"], ["Netto", "r"], ["USt", "r"], ["Brutto", "r"]], r.ustSaetze.map((s) => [s.satz === 0 ? "0 % (Ausland, ohne deutsche USt)" : s.satz + " %", zahlDe(s.netto), zahlDe(s.ust), zahlDe(s.brutto)]), ["Summe", zahlDe(u.netto), zahlDe(u.ust), zahlDe(u.brutto)]) + `<div class="klein" style="margin-top:6px;">Nach vereinnahmten Entgelten (Ist-Versteuerung). Die Aufteilung folgt den Rechnungen bzw. Belegen; ohne Rechnung wird der Inlandsanteil mit 19 % gerechnet. Zur Abstimmung mit dem Steuerberater bitte gegen die Umsatzliste prüfen.</div>` : `<div class="klein">Keine Zahlungseingänge in diesem Zeitraum.</div>`}`;
+}
+
+async function ansichtReports(params, noch){
+  const kopf = `<h2 class="seite">Reports</h2><p class="unter">Auswertungen über beliebige Zeiträume. Jeden Montag um 6 Uhr entstehen automatisch Wochen-, Monats-, Quartals- und Jahresreports, als PDF per Mail und hier im Archiv.</p>`;
+  $("main").innerHTML = kopf + `<div class="laden">Wird geladen …</div>`;
+  let arch, einst;
+  try { [arch, einst] = await Promise.all([api("reportAdmin", { aktion: "archiv" }), api("reportAdmin", { aktion: "einstellungenLaden" })]); }
+  catch (err) { if (!noch()) return; $("main").innerHTML = kopf + `<div class="rahmenkarte" style="color:var(--err);">${esc(err.message)}</div>`; return; }
+  if (!noch()) return;
+  const heute = new Date().toLocaleDateString("sv-SE"), [v0, b0] = reportSchnellwahl("vorwoche");
+  const wahl = [["dieseWoche", "Diese Woche"], ["vorwoche", "Letzte Woche"], ["monat", "Dieser Monat"], ["vormonat", "Letzter Monat"], ["quartal", "Dieses Quartal"], ["vorquartal", "Letztes Quartal"], ["jahr", "Dieses Jahr"], ["vorjahr", "Letztes Jahr"]];
+  const archivZeilen = arch.liste.map((a) => `<tr data-id="${esc(a.id)}" style="cursor:default;"><td><strong>${esc(a.titel)}</strong></td><td>${datumDe(a.von)} – ${datumDe(a.bis)}</td><td class="re">${zahlDe(a.umsatzBrutto)}</td><td class="re">${a.fahrten}</td><td>${a.mailGesendet ? `<span class="badge ok">gesendet</span>` : `<span class="badge warn">nicht gesendet</span>`}</td><td style="white-space:nowrap;"><button type="button" class="knopf rpAnsehen">Ansehen</button> <button type="button" class="knopf rpArchivPdf">PDF</button></td></tr>`).join("");
+  $("main").innerHTML = kopf + `
+    <div class="rahmenkarte" style="margin-bottom:16px;"><div style="font-weight:700;margin-bottom:8px;">Zeitraum auswerten</div>
+      <div class="leiste" style="align-items:flex-end;"><div><label for="rpVon">Von</label><input type="date" id="rpVon" value="${v0}" max="${heute}" style="width:160px;"></div><div><label for="rpBis">Bis</label><input type="date" id="rpBis" value="${b0}" style="width:160px;"></div><button type="button" class="knopf gold" id="rpGo">Auswerten</button></div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">${wahl.map(([k, t]) => `<button type="button" class="knopf rpWahl" data-art="${k}" style="padding:6px 10px;font-size:13px;">${t}</button>`).join("")}</div>
+      <div class="klein" id="rpMeldung" style="min-height:18px;margin-top:8px;"></div></div>
+    <div id="rpErgebnis"></div>
+    <h3 style="margin:28px 0 8px;font-size:1.05rem;">Automatische Reports (Archiv)</h3>
+    ${arch.liste.length ? `<div class="tabellenrahmen"><table><thead><tr><th>Report</th><th>Zeitraum</th><th class="re">Umsatz €</th><th class="re">Fahrten</th><th>Mail</th><th></th></tr></thead><tbody>${archivZeilen}</tbody></table></div>` : `<div class="rahmenkarte klein">Noch keine automatischen Reports. Der erste entsteht am nächsten Montag um 6 Uhr, oder du erzeugst ihn unten sofort.</div>`}
+    <details class="rahmenkarte" style="margin-top:16px;"><summary style="cursor:pointer;font-weight:700;">Einstellungen für automatische Reports</summary>
+      <div class="leiste" style="margin-top:10px;align-items:flex-end;"><div><label><input type="checkbox" id="rpAktiv" ${einst.einstellungen.aktiv ? "checked" : ""} style="width:auto;"> Automatisch jeden Montag erzeugen und mailen</label></div></div>
+      <div class="leiste" style="margin-top:8px;align-items:flex-end;"><div style="flex:1;min-width:240px;"><label for="rpMail">Empfänger (mehrere mit Komma trennen)</label><input type="text" id="rpMail" value="${esc(einst.einstellungen.empfaenger)}"></div><button type="button" class="knopf gold" id="rpSpeichern">Speichern</button></div>
+      <div class="klein" id="rpEsMeldung" style="margin-top:6px;min-height:18px;"></div>
+      <div style="margin-top:10px;"><button type="button" class="knopf" id="rpJetzt">Reports dieser Woche jetzt erzeugen und senden</button></div>
+      <p class="klein" style="margin:8px 0 0;">Montags: Vorwoche. Am ersten Montag im Monat zusätzlich der Vormonat, im Januar/April/Juli/Oktober zusätzlich das Vorquartal, im Januar zusätzlich das Vorjahr. Ein Report wird nur einmal gemailt; Zahlungen, die später nachgetragen werden, erscheinen im Archiv-Report nicht mehr. Für aktuelle Zahlen werte den Zeitraum oben neu aus.</p></details>`;
+
+  const meldung = (t, fehler) => { const m = $("rpMeldung"); m.textContent = t || ""; m.style.color = fehler ? "var(--err)" : ""; };
+  let aktuell = null;   // { von, bis, archivId? }
+  const zeigen = (titel, r, a) => {
+    aktuell = a;
+    $("rpErgebnis").innerHTML = `<div class="rahmenkarte"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;"><div><strong>${esc(titel)}</strong><div class="klein">${datumDe(r.von)} – ${datumDe(r.bis)} · Stand ${datumDe((r.erstelltAm || "").slice(0, 10))}</div></div><div><button type="button" class="knopf" id="rpCsv" title="Zahlungseingänge des Zeitraums (aktueller Stand)">CSV</button> <button type="button" class="knopf gold" id="rpPdf">PDF</button></div></div>${reportHtml(r)}</div>`;
+    $("rpCsv").addEventListener("click", () => laden("export", { von: r.von, bis: r.bis, format: "csv" }, "rpCsv"));
+    $("rpPdf").addEventListener("click", () => (a && a.archivId ? laden("archivPdf", { id: a.archivId }, "rpPdf") : laden("export", { von: r.von, bis: r.bis, format: "pdf" }, "rpPdf")));
+    $("rpErgebnis").scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const laden = async (aktion, daten, knopf) => {
+    const k = $(knopf); k.disabled = true; meldung("Datei wird erstellt …");
+    try { const x = await api("reportAdmin", Object.assign({ aktion }, daten)); dateiSpeichern(x.dateiname, x.mime, x.base64); meldung(`${x.dateiname} heruntergeladen.`); }
+    catch (err) { meldung(err.message, true); } finally { k.disabled = false; }
+  };
+  const auswerten = async () => {
+    const von = $("rpVon").value, bis = $("rpBis").value;
+    if (!von || !bis) { meldung("Bitte Von und Bis wählen.", true); return; }
+    $("rpGo").disabled = true; meldung("Wird ausgewertet …");
+    try { const x = await api("reportAdmin", { aktion: "auswerten", von, bis }); meldung(""); zeigen("Auswertung", x.report, null); }
+    catch (err) { meldung(err.message, true); } finally { $("rpGo").disabled = false; }
+  };
+  $("rpGo").addEventListener("click", auswerten);
+  document.querySelectorAll(".rpWahl").forEach((b) => b.addEventListener("click", () => { const [v, e] = reportSchnellwahl(b.dataset.art); $("rpVon").value = v; $("rpBis").value = e; auswerten(); }));
+  document.querySelectorAll("#main tr[data-id]").forEach((tr) => {
+    tr.querySelector(".rpAnsehen").addEventListener("click", async () => {
+      meldung("Report wird geladen …");
+      try { const x = await api("reportAdmin", { aktion: "archivLaden", id: tr.dataset.id }); meldung(""); zeigen(x.titel + " (Stand der Erstellung)", x.report, { archivId: tr.dataset.id }); } catch (err) { meldung(err.message, true); }
+    });
+    tr.querySelector(".rpArchivPdf").addEventListener("click", async (ev) => {
+      const b = ev.currentTarget; b.disabled = true;
+      try { const x = await api("reportAdmin", { aktion: "archivPdf", id: tr.dataset.id }); dateiSpeichern(x.dateiname, x.mime, x.base64); } catch (err) { meldung(err.message, true); } finally { b.disabled = false; }
+    });
+  });
+  $("rpSpeichern").addEventListener("click", async () => {
+    const m = $("rpEsMeldung"); m.style.color = ""; m.textContent = "Wird gespeichert …";
+    try { await api("reportAdmin", { aktion: "einstellungenSpeichern", einstellungen: { aktiv: $("rpAktiv").checked, empfaenger: $("rpMail").value } }); m.textContent = "Gespeichert."; }
+    catch (err) { m.style.color = "var(--err)"; m.textContent = err.message; }
+  });
+  $("rpJetzt").addEventListener("click", async () => {
+    const m = $("rpEsMeldung"); m.style.color = ""; $("rpJetzt").disabled = true; m.textContent = "Reports werden erzeugt und gesendet …";
+    try {
+      let x = await api("reportAdmin", { aktion: "jetztErzeugen" });
+      if (!x.erzeugt && confirm("Die Reports dieser Woche sind schon erzeugt und gemailt. Neu berechnen und noch einmal senden?")) x = await api("reportAdmin", { aktion: "jetztErzeugen", erneut: true });
+      if (x.erzeugt) { sessionStorage.setItem("rpMeldung", `Gesendet an ${x.an.join(", ")}: ${x.reports.join(", ")}.`); route(); } else m.textContent = "Nichts zu tun.";
+    } catch (err) { m.style.color = "var(--err)"; m.textContent = err.message; } finally { if ($("rpJetzt")) $("rpJetzt").disabled = false; }
+  });
+  let vorMeldung = ""; try { vorMeldung = sessionStorage.getItem("rpMeldung") || ""; sessionStorage.removeItem("rpMeldung"); } catch (e) {}
+  if (vorMeldung) meldung(vorMeldung);
+}
 
 // ===================== ANSICHT: UMSATZ =====================
 function dateiSpeichern(name, mime, base64){
