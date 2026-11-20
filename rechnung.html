@@ -80,6 +80,8 @@
   <div id="inhalt" style="display:none;">
     <div class="box" id="empfaengerBox"></div>
 
+    <div class="box" id="erfolgBox" style="display:none;"><div class="status" id="erfolgText" style="margin:0 0 10px;"></div><div id="nachErstellen"></div></div>
+
     <div id="verlaufBereich" style="display:none;">
       <h2>Rechnungen zu diesem Auftrag</h2>
       <div class="tabellenrahmen"><table>
@@ -274,9 +276,10 @@ function aufbauen(){
     const status = h.typ === "storno" ? `<span class="badge">Storno</span>` : h.storniert ? `<span class="badge err">storniert (${esc(h.stornoNummer)})</span>` : `<span class="badge ok">gültig</span>${zahlBadge}`;
     return `<tr><td style="white-space:nowrap;"><strong>${esc(h.nummer)}</strong>${h.aeltere ? ' <span class="grau">(ältere Rechnung)</span>' : ""}</td><td>${art}</td><td>${h.datumISO ? new Date(h.datumISO).toLocaleDateString("de-DE") : "–"}</td>` +
       `<td class="zahl">${h.gesamtBrutto == null ? "–" : eur(h.gesamtBrutto)}</td><td>${status}</td>` +
-      `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">PDF</button> ${h.istBeleg ? "" : `<button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button>`}</td></tr>`;
+      `<td class="zahl"><button type="button" class="sekundaer" data-pdf="${esc(h.nummer)}">Ansehen</button> <button type="button" class="sekundaer" data-pdfladen="${esc(h.nummer)}">PDF laden</button> ${h.istBeleg ? "" : `<button type="button" class="sekundaer" data-senden="${esc(h.nummer)}">Erneut senden</button>`}</td></tr>`;
   }).join("");
   document.querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", () => pdfOeffnen(b.dataset.pdf)));
+  document.querySelectorAll("[data-pdfladen]").forEach((b) => b.addEventListener("click", () => pdfLaden(b.dataset.pdfladen, "statusVerlauf")));
   document.querySelectorAll("[data-senden]").forEach((b) => b.addEventListener("click", () => erneutSenden(b.dataset.senden)));
   // Aktuelle Rechnung -> nur Storno möglich; sonst Entwurf
   const hatAktuelle = !!daten.aktuelleNummer;
@@ -521,12 +524,12 @@ async function erzeugen(){
     ? `Beleg über den Gästebetrag ${eur(c.gesamtBrutto)} erzeugen${e.provision != null ? ` (Provision ${eur(e.provision)}, erwartete Auszahlung ${eur(rund2(c.gesamtBrutto - e.provision))})` : ""}?\n\nEr bekommt sofort eine Nummer aus dem Rechnungsnummernkreis, wird nicht verschickt und ist danach unveränderlich. Änderungen sind nur per Stornobeleg möglich.`
     : `${e.noShow ? "No-Show-" : ""}Rechnung über ${eur(c.gesamtBrutto)} erzeugen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nSie bekommt sofort eine Rechnungsnummer und ist danach unveränderlich. Änderungen sind nur per Stornorechnung möglich.`;
   if (!confirm(frage)) return;
-  $("erzeugenBtn").disabled = true; setStatus("statusEntwurf", "Rechnung wird erzeugt …", "");
+  $("erzeugenBtn").disabled = true; setStatus("statusEntwurf", "Rechnung wird erzeugt …", ""); $("erfolgBox").style.display = "none";
   try {
     const d = await api("erstellen", { rechnung: e, senden });
     await laden(true);
-    if (d.beleg) return setStatus("statusEntwurf", `✓ Beleg ${d.nummer} erzeugt (Auszahlung offen). Die PDF findest du im Verlauf. Sobald die Plattform auszahlt, erfasst du die Auszahlung im Menü „Umsatz“.`, "ok");
-    setStatus("statusEntwurf", `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : d.keineEmail ? " (nicht verschickt: keine E-Mail-Adresse hinterlegt, die PDF findest du im Verlauf)" : " (nicht verschickt)"}.`, "ok");
+    if (d.beleg) { nachErstellenZeigen(d.nummer, `✓ Beleg ${d.nummer} erzeugt.${daten.belegDirekt ? "" : " Sobald die Plattform auszahlt, erfasst du die Auszahlung im Menü „Umsatz“."}`); return; }
+    nachErstellenZeigen(d.nummer, `✓ Rechnung ${d.nummer} erzeugt${d.versendet ? " und per E-Mail verschickt" : d.keineEmail ? " (nicht verschickt: keine E-Mail-Adresse hinterlegt)" : " (nicht verschickt)"}.`);
   } catch (err) { setStatus("statusEntwurf", err.message, "error"); await laden(true).catch(() => {}); }
   finally { $("erzeugenBtn").disabled = false; }
 }
@@ -535,18 +538,37 @@ async function stornoErstellen(){
   const istB = !!(daten.abrechnung && daten.abrechnung.beleg);
   if (istB && !confirm(`Stornobeleg zu ${daten.aktuelleNummer} erstellen?\n\nDer Stornobeleg bekommt eine eigene Nummer und hebt den Beleg auf. Danach kannst du einen neuen Beleg erstellen.`)) return;
   if (!istB && !confirm(`Stornorechnung zu ${daten.aktuelleNummer} erstellen${senden ? ` und an ${daten.empfaengerEmail || "den Kunden"} senden` : ""}?\n\nDie Stornorechnung bekommt eine eigene Nummer und hebt die Rechnung auf. Danach kannst du eine neue Rechnung erstellen.`)) return;
-  $("stornoBtn").disabled = true; setStatus("statusStorno", "Stornorechnung wird erzeugt …", "");
+  $("stornoBtn").disabled = true; setStatus("statusStorno", "Stornorechnung wird erzeugt …", ""); $("erfolgBox").style.display = "none";
   try {
     const d = await api("stornieren", { senden });
     await laden(true);
-    setStatus("statusEntwurf", d.beleg ? `✓ Stornobeleg ${d.nummer} zu ${d.bezugNummer} erstellt. Jetzt kannst du einen neuen Beleg erstellen.` : `✓ Stornorechnung ${d.nummer} zu ${d.bezugNummer} erstellt${d.versendet ? " und verschickt" : ""}. Jetzt kannst du die neue Rechnung erstellen.`, "ok");
+    nachErstellenZeigen(d.nummer, d.beleg ? `✓ Stornobeleg ${d.nummer} zu ${d.bezugNummer} erstellt. Jetzt kannst du einen neuen Beleg erstellen.` : `✓ Stornorechnung ${d.nummer} zu ${d.bezugNummer} erstellt${d.versendet ? " und verschickt" : ""}. Jetzt kannst du die neue Rechnung erstellen.`);
   } catch (err) { setStatus("statusStorno", err.message, "error"); }
   finally { $("stornoBtn").disabled = false; }
 }
-async function pdfOeffnen(nummer){
+function pdfHerunterladen(base64, dateiname){
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  const a = document.createElement("a"); a.href = url; a.download = dateiname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+async function pdfLaden(nummer, statusId){
+  try { const d = await api("pdf", { nummer }); pdfHerunterladen(d.pdfBase64, d.dateiname || `${nummer}.pdf`); setStatus(statusId, `✓ ${nummer}.pdf heruntergeladen.`, "ok"); }
+  catch (err) { setStatus(statusId, err.message, "error"); }
+}
+// Nach dem Erstellen: Meldung samt Buttons zum Ansehen und Herunterladen (außerhalb des Entwurfs, der danach ausgeblendet ist)
+function nachErstellenZeigen(nummer, text, art){
+  setStatus("erfolgText", text, "ok");
+  $("nachErstellen").innerHTML = `<button type="button" class="sekundaer" id="neAnsehen">${esc(nummer)} ansehen</button> <button type="button" class="sekundaer" id="neLaden">PDF herunterladen</button>`;
+  $("neAnsehen").addEventListener("click", () => pdfOeffnen(nummer, "erfolgText"));
+  $("neLaden").addEventListener("click", () => pdfLaden(nummer, "erfolgText"));
+  $("erfolgBox").style.display = "block";
+  $("erfolgBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+async function pdfOeffnen(nummer, statusId){
   const fenster = window.open("", "_blank");
   try { const d = await api("pdf", { nummer }); pdfAnzeigen(d.pdfBase64, fenster); }
-  catch (err) { if (fenster) fenster.close(); setStatus("statusVerlauf", err.message, "error"); }
+  catch (err) { if (fenster) fenster.close(); setStatus(statusId || "statusVerlauf", err.message, "error"); }
 }
 async function erneutSenden(nummer){
   if (!confirm(`${nummer} noch einmal an ${daten.empfaengerEmail || "den Kunden"} senden?\n\nDer Inhalt bleibt unverändert, es wird keine neue Nummer vergeben.`)) return;
