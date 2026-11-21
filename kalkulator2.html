@@ -380,6 +380,7 @@
         <button id="modusAuftrag" onclick="setModus('auftrag')">Auftrag senden</button>
       </div>
       <p class="hint" id="modusHinweis" style="margin:-6px 0 8px;"></p>
+      <label class="check" id="keineKundenmailZeile" style="display:none;margin:0 0 8px;"><input type="checkbox" id="keineKundenmail"> Kunden nicht per Mail informieren (gilt für „Auftrag senden“; Kalender und Zahlungslink werden trotzdem neu angelegt)</label>
       <p class="hint" id="empfaengerVorschau" style="margin:0 0 6px;color:var(--ink);"></p>
 
       <button class="primary" id="angebotBtn" onclick="angebotSenden()">Angebot senden</button>
@@ -1365,12 +1366,25 @@ async function bestehendeBuchungLaden(){
     if (d.rechnungsnummer) throw new Error(`Zu ${referenz} gibt es bereits die Rechnung ${d.rechnungsnummer}. Zum Ändern im Portal (Reiter „Rechnung“) zuerst eine Stornorechnung erstellen.`);
     if (d.quelle !== "kalkulator" && d.quelle !== "vermittlung") throw new Error(`${referenz} stammt aus dem Online-Formular. Solche Aufträge ändert man im Portal (Kontaktdaten, Rechnung). Hier lassen sich nur Aufträge laden, die mit „Neuer Auftrag“ angelegt wurden.`);
     await auftragInFormular(d);
+    el("keineKundenmailZeile").style.display = "";
+    el("keineKundenmail").checked = !!(d.fahrt && d.fahrt.zeitpunktISO && new Date(d.fahrt.zeitpunktISO) < new Date());   // Fahrt schon gefahren: keine zweite Bestätigung
     const preisText = d.preisOffen ? "Preis offen" : `Preis bisher ${fmt((d.preis || {}).gesamtBrutto)} €`;
     meldung(`✓ ${referenz} geladen (${d.status === "bestaetigt" ? "bestätigter Auftrag" : "Angebot"}, ${preisText}). Passe an, was sich ändert, und sende neu: Der bisherige Auftrag wird ersetzt.`, "ok");
     el("ergebnis").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { meldung(e.message || "Der Auftrag konnte nicht geladen werden.", "error"); }
   finally { el("ladenBtn").disabled = false; }
 }
+
+// Bestehende Aufträge ändert man im Portal im Auftrag selbst (Reiter "Auftrag ändern"), nicht hier: Die Maske wird dort mit ?bearbeiten=REFERENZ geöffnet.
+(function bearbeitenStart(){
+  const ref = (new URLSearchParams(location.search).get("bearbeiten") || "").trim().toUpperCase();
+  const block = el("ladenBlock"), agRef = el("agReferenz");
+  if (agRef && agRef.parentElement) agRef.parentElement.style.display = "none";
+  if (!ref) { if (block) block.style.display = "none"; return; }
+  if (block) { const l = block.querySelector("label"), z = block.querySelector("div"), h = block.querySelector(".hint"); if (l) l.style.display = "none"; if (z) z.style.display = "none"; if (h) h.style.display = "none"; }
+  el("ladeReferenz").value = ref;
+  window.addEventListener("load", () => setTimeout(bestehendeBuchungLaden, 300));
+})();
 
 function setAngebotStatus(msg, cls){ setStatus("angebotStatus", msg, cls); }
 function gueltigeEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
@@ -1473,6 +1487,7 @@ async function angebotSenden(){
     zahlungsart: istVermittlung ? "vermittlung" : istTaxi ? "direkt" : aktuelleZahlungsart(),
     sprache: v("agSprache"),
     referenz: v("agReferenz").toUpperCase() || null,
+    ...(v("agReferenz") && el("keineKundenmail").checked ? { keineKundenmail: true } : {}),
     ...(letztesErgebnis.gutscheinCode ? { gutscheinCode: letztesErgebnis.gutscheinCode } : {}),
     ...(letztesErgebnis.ausland ? { ausland: letztesErgebnis.ausland } : {}),
     ...(letztesErgebnis.wartezeit ? { wartezeit: letztesErgebnis.wartezeit } : {}),
@@ -1526,6 +1541,7 @@ async function angebotSenden(){
     const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
+    if (body.referenz) { try { window.parent.postMessage({ type: "lt-auftrag-geaendert", referenz: body.referenz }, "*"); } catch (e) { /* nicht eingebettet */ } }
     setAngebotStatus(
       istTaxi
         ? `✓ Taxifahrt angelegt! Referenz: ${daten.referenz}. Der Kalender ist geblockt, der Fahrgast bekommt keine Mail.` + (taxiDaten.abgerechnet

@@ -367,6 +367,7 @@ window.addEventListener("hashchange", route);
 
 // Eingebettete Masken melden ihre Höhe, damit der Rahmen mitwächst.
 window.addEventListener("message", (ev) => {
+  if (ev.data && ev.data.type === "lt-auftrag-geaendert") { setTimeout(route, 2500); return; }   // Auftrag wurde ersetzt: Ansicht mit den neuen Daten laden
   if (!ev.data || ev.data.type !== "lt-hoehe") return;
   document.querySelectorAll("iframe.maske").forEach((f) => { if (f.contentWindow === ev.source) f.style.height = Math.max(300, ev.data.hoehe + 8) + "px"; });
 });
@@ -841,9 +842,9 @@ async function ansichtAuftrag(referenz, noch, params){
       const k = d.kunde || {}, f = d.fahrt || {};
       const name = k.typ === "firma" ? `${k.firmenname || ""}` : `${k.anrede || ""} ${k.name || ""}`.trim();
       const hatRechnung = d.status === "bestaetigt" || !!d.rechnungsnummer;
-      // Route und Zeit eines Pauschal- oder Vermittlungsauftrags ändert man über "Neuer Auftrag" (bestehende Buchung überschreiben)
-      const fahrtHinweis = (d.quelle === "kalkulator" || d.quelle === "vermittlung" || d.quelle === "taxi") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt")
-        ? `Route und Zeit ändern: im Menü „Neuer Auftrag“ bei „Bestehende Buchung überschreiben“ die Referenz <strong>${esc(d.referenz)}</strong> eintragen. Den Preis änderst du im Reiter „Rechnung“.` : "";
+      // Route, Zeit, Preis und Kunde eines Pauschal- oder Vermittlungsauftrags ändert man im Reiter "Auftrag ändern" (ersetzt den Auftrag)
+      const kannBearbeiten = (d.quelle === "kalkulator" || d.quelle === "vermittlung") && !d.rechnungsnummer && (d.status === "angebot" || d.status === "bestaetigt");
+      const hatReiter = hatRechnung || kannBearbeiten;
       // Zahlung: "bezahlt" markieren (Karte, bar, Überweisung, Zahlungslink, Plattform) – mit oder ohne Rechnung
       const ab = d.abrechnung || { status: "offen" };
       const abg = d.abgerechnet;
@@ -873,7 +874,11 @@ async function ansichtAuftrag(referenz, noch, params){
         ? `<p style="margin:8px 0 4px;"><span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span> Rechnung ${esc(d.rechnungsnummer)}${d.rechnungBrutto != null ? " über " + esc(eur(d.rechnungBrutto)) : ""} per Überweisung, seit ${ab.tage} ${ab.tage === 1 ? "Tag" : "Tagen"} offen.</p>
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.${d.vermittlung ? " Bei Plattformfahrten erzeugst du stattdessen im Reiter „Beleg / Rechnung“ einen Beleg: Er setzt Gästebetrag und Provision und wartet auf die Auszahlung der Plattform." : ""}${d.taxifahrt ? " Bei Barfahrten erzeugst du im Reiter „Beleg / Rechnung“ je Fahrt einen Beleg (nur für deine Buchhaltung, ohne Empfänger) oder eine Quittung für den Fahrgast. Der Beleg markiert die Fahrt zugleich als bezahlt." : ""}</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
-      const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}</div>` : "";
+      // Nachträglich kostenlos abrechnen (Freifahrt der Zehnerkarte oder Gutschein/Kulanz): nur ohne Rechnung und ohne bezahlt-Markierung
+      const kannKostenlos = d.status === "bestaetigt" && !d.rechnungsnummer && !d.vermittlung && !d.taxifahrt && !d.freifahrt && !abg && !d.preisOffen && Number(d.preisBrutto) > 0;
+      const kostenlosKarte = kannKostenlos ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);"><div class="klein" style="margin-bottom:6px;"><strong>Kostenlos abrechnen (0 €)</strong>: für eine Freifahrt der Zehnerkarte oder aus Kulanz. Der Preis wird auf 0 € gesetzt, es geht keine Mail an den Kunden, der Kalender bleibt unverändert.</div>
+          <div class="zeile">${d.stammkundeId ? `<button type="button" class="knopf" id="kfFrei">Als Freifahrt (Zehnerkarte)</button>` : ""}<button type="button" class="knopf" id="kfGutschein">Als Gutschein / Kulanz</button></div><div class="klein" id="kfMeldung" style="margin-top:6px;"></div></div>` : "";
+      const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}${kostenlosKarte}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? (ab.auszahlungOffen ? `<span class="badge warn">Auszahlung offen · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>`) : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
       const kontaktMail = d.kunde ? (d.kunde.typ === "firma" ? (d.kunde.buchendePerson || {}).email : d.kunde.email) : "";
@@ -916,25 +921,28 @@ async function ansichtAuftrag(referenz, noch, params){
         ${benachrichtigungKarte}
         ${abrechnungKarte}
         ${stammkundeKarte}
-        ${hatRechnung ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Auftrag ändern</button><button type="button" data-tab="rechnung">${d.vermittlung || d.taxifahrt ? "Beleg / Rechnung" : "Rechnung"}${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button></div>` : ""}
+        ${hatReiter ? `<div class="reiter" id="reiter"><button type="button" data-tab="auftrag">Kontakt &amp; Adresse</button>${kannBearbeiten ? `<button type="button" data-tab="bearbeiten">Auftrag ändern</button>` : ""}${hatRechnung ? `<button type="button" data-tab="rechnung">${d.vermittlung || d.taxifahrt ? "Beleg / Rechnung" : "Rechnung"}${d.rechnungsnummer ? " " + esc(d.rechnungsnummer) : ""}</button>` : ""}</div>` : ""}
         <div class="rahmenkarte" id="tabAuftrag"><h3>Kontaktdaten, Rechnungsadresse, „Rechnung auf Firma“ und Sprache ändern</h3>
-          ${fahrtHinweis ? `<div class="klein" style="margin:6px 0 10px;">${fahrtHinweis}</div>` : ""}
+          ${kannBearbeiten ? `<div class="klein" style="margin:6px 0 10px;">Route, Zeit, Preis oder Kunde ändern: Reiter „Auftrag ändern“.</div>` : ""}
           <div class="platz"></div></div>
+        ${kannBearbeiten ? `<div class="rahmenkarte" id="tabBearbeiten" style="display:none;"><h3>Auftrag ändern</h3><div class="klein" style="margin:6px 0 10px;">Route, Zeit, Gäste, Preis oder Kunde ändern und neu senden: Der bisherige Auftrag wird ersetzt (Kalendereinträge werden neu angelegt).${d.rechnungsnummer ? "" : " Bei schon gefahrenen Fahrten ist „Kunden nicht per Mail informieren“ vorbelegt."}</div><div class="platz"></div></div>` : ""}
         ${hatRechnung ? `<div class="rahmenkarte" id="tabRechnung" style="display:none;"><div class="platz"></div></div>` : ""}`;
       // Reiter: Der Inhalt wird beim ersten Öffnen geladen und bleibt danach erhalten
-      const rahmenAdresse = { auftrag: `auftrag.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}`, rechnung: `rechnung.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}` };
+      const rahmenAdresse = { auftrag: `auftrag.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}`, bearbeiten: `kalkulator2.html?embedded=1&bearbeiten=${encodeURIComponent(d.referenz)}`, rechnung: `rechnung.html?embedded=1&referenz=${encodeURIComponent(d.referenz)}` };
+      const tabKarten = { auftrag: "tabAuftrag", bearbeiten: "tabBearbeiten", rechnung: "tabRechnung" }, tabTitel = { auftrag: "Kontakt und Adresse", bearbeiten: "Auftrag ändern", rechnung: "Rechnung" };
       const zeigeTab = (tab) => {
-        ["auftrag", "rechnung"].forEach((t) => {
-          const karte = $(t === "auftrag" ? "tabAuftrag" : "tabRechnung"); if (!karte) return;
+        Object.keys(tabKarten).forEach((t) => {
+          const karte = $(tabKarten[t]); if (!karte) return;
           karte.style.display = t === tab ? "" : "none";
-          if (t === tab && !karte.querySelector("iframe")) karte.querySelector(".platz").innerHTML = `<iframe class="maske" src="${rahmenAdresse[t]}" title="${t === "auftrag" ? "Auftrag ändern" : "Rechnung"}"></iframe>`;
+          if (t === tab && !karte.querySelector("iframe")) karte.querySelector(".platz").innerHTML = `<iframe class="maske" src="${rahmenAdresse[t]}" title="${tabTitel[t]}"></iframe>`;
           else if (t === tab && t === "rechnung") { const f = karte.querySelector("iframe"); try { f.contentWindow.postMessage({ type: "lt-aktualisieren" }, "*"); } catch (e) { /* nicht erreichbar */ } }
         });
         document.querySelectorAll("#reiter button").forEach((b) => b.classList.toggle("aktiv", b.dataset.tab === tab));
-        history.replaceState(null, "", `#/auftrag/${encodeURIComponent(d.referenz)}${hatRechnung ? "?tab=" + tab : ""}`);
+        history.replaceState(null, "", `#/auftrag/${encodeURIComponent(d.referenz)}${hatReiter ? "?tab=" + tab : ""}`);
       };
       document.querySelectorAll("#reiter button").forEach((b) => b.addEventListener("click", () => zeigeTab(b.dataset.tab)));
-      zeigeTab(hatRechnung && hashLesen().params.get("tab") === "rechnung" ? "rechnung" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
+      const wunschTab = hashLesen().params.get("tab");
+      zeigeTab(wunschTab === "rechnung" && hatRechnung ? "rechnung" : wunschTab === "bearbeiten" && kannBearbeiten ? "bearbeiten" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
       document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
       const abMeldung = (t, fehler) => { const e = $("abMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
       // Zahlung speichern bzw. ändern: Gebühr (SumUp/Stripe/Provision) und Auszahlungsdatum je nach Zahlungsart
@@ -1063,6 +1071,16 @@ async function ansichtAuftrag(referenz, noch, params){
         catch (e) { skMeldung(e.message, true); }
         finally { $("skAktualisieren").disabled = false; }
       });
+      const kostenlosAbrechnen = async (modus) => {
+        const m = $("kfMeldung"), text = modus === "freifahrt" ? "Diesen Auftrag als Freifahrt der Zehnerkarte abrechnen? Der Fahrpreis wird gutgeschrieben, die Fahrt zählt als eingelöste Freifahrt." : "Diesen Auftrag als Gutschein bzw. Kulanz abrechnen? Der Preis wird auf 0 € gesetzt.";
+        if (!confirm(text + "\n\nEs geht keine Mail an den Kunden.")) return;
+        ["kfFrei", "kfGutschein"].forEach((id) => { if ($(id)) $(id).disabled = true; });
+        m.style.color = ""; m.textContent = "Wird gespeichert …";
+        try { const x = await api("rechnungAdmin", { aktion: "kostenlosAbrechnen", referenz: d.referenz, modus }); await laden(); if (x.restOffen) { const e2 = $("abMeldung") || $("kfMeldung"); if (e2) e2.textContent = `Gutgeschrieben: ${eur(x.abgezogen)}. Es bleiben ${eur(x.preisNeu)} zu zahlen (z. B. Wartezeit).`; } }
+        catch (e) { m.style.color = "var(--err)"; m.textContent = e.message; ["kfFrei", "kfGutschein"].forEach((id) => { if ($(id)) $(id).disabled = false; }); }
+      };
+      if ($("kfFrei")) $("kfFrei").addEventListener("click", () => kostenlosAbrechnen("freifahrt"));
+      if ($("kfGutschein")) $("kfGutschein").addEventListener("click", () => kostenlosAbrechnen("gutschein"));
       if ($("abAufheben")) $("abAufheben").addEventListener("click", async () => {
         if (!confirm("Die Markierung „bezahlt“ entfernen? Der Auftrag gilt danach wieder als offen.")) return;
         $("abAufheben").disabled = true;

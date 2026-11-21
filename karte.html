@@ -24,6 +24,9 @@
   .punkt{aspect-ratio:1/1;border-radius:50%;border:2px dashed #cfc9b8;display:flex;align-items:center;justify-content:center;font-weight:700;color:#cfc9b8;font-size:15px;}
   .punkt.voll{background:var(--moss);border:2px solid var(--moss);color:#fff;}
   .stand{font-size:1.1rem;font-weight:600;margin:0;}
+  .box.alt{opacity:.5;padding:14px 20px;} .box.alt .stempel{gap:8px;margin:8px 0 2px;} .box.alt .punkt.voll{background:#b9b5a6;border-color:#b9b5a6;}
+  .kopf{font-weight:700;font-size:1.05rem;margin:0 0 10px;} .kopf span{font-weight:400;color:var(--muted);font-size:.92rem;}
+  .aeltere{text-align:center;color:var(--muted);font-size:14px;margin:0 0 12px;}
   .frei{background:#e8f3ec;border:1px solid #b9dcc6;color:#1f5133;border-radius:8px;padding:14px 16px;margin-bottom:16px;}
   .frei strong{font-size:1.05rem;}
   table{width:100%;border-collapse:collapse;font-size:15px;} td{padding:7px 4px;border-bottom:1px solid var(--line);} td.datum{color:var(--muted);white-space:nowrap;width:1%;padding-right:12px;}
@@ -47,14 +50,18 @@ const TEXTE = {
     freiTitel: "Sie haben eine Freifahrt!", freiText: (w) => `Wert: ${w} €. Sie wird bei Ihrer nächsten Buchung vom Fahrpreis abgezogen. Sagen Sie uns bei der Buchung einfach Bescheid.`,
     wertHinweis: (w) => `Wert der Freifahrt: derzeit Ø ${w} € Ihrer bisherigen Fahrten.`, eingeloest: (n) => n === 1 ? "Bereits 1 Freifahrt eingelöst." : `Bereits ${n} Freifahrten eingelöst.`,
     fahrten: "Gesammelte Fahrten dieser Karte", keine: "Noch keine Fahrten auf dieser Karte.",
-    regelnTitel: "So funktioniert es", regeln: ["Jede gefahrene Buchung ist ein Stempel (Hin- und Rückfahrt zählen als eine Fahrt).", "Nach 10 Fahrten ist Ihre nächste Fahrt kostenfrei.", "Der Wert der Freifahrt ist der Durchschnitt Ihrer 10 Fahrten und wird auf den Fahrpreis angerechnet."],
+    karte: (n) => `Karte ${n}`, kEingeloest: (d) => d ? `Freifahrt eingelöst am ${d}` : "Freifahrt eingelöst", kVoll: "Voll: Freifahrt verfügbar", kOffen: (s, v) => `${s} von ${v} Fahrten`,
+    aeltere: (n) => n === 1 ? "1 ältere Karte, Freifahrt eingelöst" : `${n} ältere Karten, Freifahrten eingelöst`, freiMehr: (n) => `Sie haben ${n} Freifahrten!`,
+    regelnTitel: "So funktioniert es", regeln: ["Jede gefahrene Buchung ist ein Stempel (Hin- und Rückfahrt zählen als eine Fahrt).", "Nach 10 Fahrten ist Ihre nächste Fahrt kostenfrei.", "Der Wert der Freifahrt ist der Durchschnitt Ihrer 10 Fahrten und wird auf den Fahrpreis angerechnet.", "Danach beginnt automatisch die nächste Karte. Weitere Fahrten zählen dort."],
     fehler: "Diese Zehnerkarte wurde nicht gefunden. Bitte nutzen Sie den Link aus Ihrer Buchungsbestätigung oder fragen Sie uns.", kontakt: "Fragen? Rufen Sie uns an:", fehlerLaden: "Die Zehnerkarte konnte gerade nicht geladen werden. Bitte versuchen Sie es später erneut." },
   en: { titel: "Your digital ten-ride card", hallo: (n) => `Hello ${n}, here is your stamp card.`, stand: (s, v) => `${s} of ${v} rides`,
     noch: (n) => n === 1 ? "1 more ride until your free ride." : `${n} more rides until your free ride.`,
     freiTitel: "You have a free ride!", freiText: (w) => `Value: ${w} €. It will be deducted from the fare of your next booking. Just let us know when you book.`,
     wertHinweis: (w) => `Value of your free ride: currently an average of ${w} € of your rides so far.`, eingeloest: (n) => n === 1 ? "1 free ride redeemed so far." : `${n} free rides redeemed so far.`,
     fahrten: "Rides collected on this card", keine: "No rides on this card yet.",
-    regelnTitel: "How it works", regeln: ["Every completed booking is one stamp (a round trip counts as one ride).", "After 10 rides your next ride is free.", "The value of the free ride is the average of your 10 rides and is deducted from the fare."],
+    karte: (n) => `Card ${n}`, kEingeloest: (d) => d ? `Free ride redeemed on ${d}` : "Free ride redeemed", kVoll: "Full: free ride available", kOffen: (s, v) => `${s} of ${v} rides`,
+    aeltere: (n) => n === 1 ? "1 earlier card, free ride redeemed" : `${n} earlier cards, free rides redeemed`, freiMehr: (n) => `You have ${n} free rides!`,
+    regelnTitel: "How it works", regeln: ["Every completed booking is one stamp (a round trip counts as one ride).", "After 10 rides your next ride is free.", "The value of the free ride is the average of your 10 rides and is deducted from the fare.", "Afterwards the next card starts automatically. Further rides count there."],
     fehler: "This ride card could not be found. Please use the link from your booking confirmation or contact us.", kontakt: "Questions? Call us:", fehlerLaden: "The ride card could not be loaded right now. Please try again later." }
 };
 let sprache = (new URLSearchParams(location.search).get("l") || (navigator.language || "de")).toLowerCase().startsWith("en") ? "en" : "de";
@@ -71,13 +78,23 @@ function zeichnen(){
   if (fehlerArt) { box.innerHTML = `<div class="box fehler">${esc(fehlerArt === "nicht" ? t.fehler : t.fehlerLaden)}</div>`; return; }
   if (!daten) return;
   const d = daten, voll = d.verfuegbar > 0;
-  const punkte = Array.from({ length: d.von }, (_, i) => `<div class="punkt ${i < d.stempel ? "voll" : ""}">${i < d.stempel ? "✓" : i + 1}</div>`).join("");
-  let html = `<div class="box"><h1>${esc(t.titel)}</h1><p class="sub">${esc(t.hallo(d.name))}</p><div class="stempel">${punkte}</div><p class="stand">${esc(t.stand(d.stempel, d.von))}</p>` +
-    (!voll ? `<p class="sub" style="margin:4px 0 0;">${esc(t.noch(d.naechste))}</p>` : "") +
-    (d.eingeloest ? `<p class="sub" style="margin:8px 0 0;">${esc(t.eingeloest(d.eingeloest))}</p>` : "") + `</div>`;
-  if (voll) html += `<div class="frei"><strong>🎉 ${esc(t.freiTitel)}</strong><br>${esc(t.freiText(eur(d.freifahrtWert)))}</div>`;
-  else if (d.freifahrtWert > 0) html += `<p class="sub" style="text-align:center;">${esc(t.wertHinweis(eur(d.freifahrtWert)))}</p>`;
-  html += `<div class="box"><h1 style="font-size:1.05rem;">${esc(t.fahrten)}</h1>` + (d.fahrten.length ? `<table>${d.fahrten.map((f) => `<tr><td class="datum">${esc(datum(f.datum))}</td><td>${esc(f.von)} → ${esc(f.nach)}</td></tr>`).join("")}</table>` : `<p class="sub" style="margin:0;">${esc(t.keine)}</p>`) + `</div>`;
+  // Alle Karten: eingelöste ausgegraut (nur die letzten beiden), volle und die laufende Karte mit ihren Fahrten
+  const karten = d.karten || [{ nummer: 1, status: voll ? "voll" : "offen", stempel: d.stempel, fahrten: d.fahrten }];
+  const eingeloeste = karten.filter((k) => k.status === "eingeloest"), aktuelle = karten.filter((k) => k.status !== "eingeloest");
+  const zeigeAlt = eingeloeste.slice(-2), aeltere = eingeloeste.length - zeigeAlt.length;
+  const dots = (k) => Array.from({ length: d.von }, (_, i) => `<div class="punkt ${i < k.stempel ? "voll" : ""}">${i < k.stempel ? "✓" : i + 1}</div>`).join("");
+  const fahrtenTab = (k) => (k.fahrten && k.fahrten.length ? `<table>${k.fahrten.map((f) => `<tr><td class="datum">${esc(datum(f.datum))}</td><td>${esc(f.von)} → ${esc(f.nach)}</td></tr>`).join("")}</table>` : "");
+  let html = `<div class="box"><h1>${esc(t.titel)}</h1><p class="sub" style="margin:0;">${esc(t.hallo(d.name))}</p></div>`;
+  if (voll) html += `<div class="frei"><strong>🎉 ${esc(d.verfuegbar > 1 ? t.freiMehr(d.verfuegbar) : t.freiTitel)}</strong><br>${esc(t.freiText(eur(d.freifahrtWert)))}</div>`;
+  if (aeltere > 0) html += `<p class="aeltere">${esc(t.aeltere(aeltere))}</p>`;
+  for (const k of zeigeAlt) html += `<div class="box alt"><p class="kopf" style="margin:0;">${esc(t.karte(k.nummer))} <span>· ${esc(t.kEingeloest(k.eingeloestAm ? datum(k.eingeloestAm) : ""))}</span></p><div class="stempel">${dots(k)}</div></div>`;
+  for (const k of aktuelle) {
+    const status = k.status === "voll" ? t.kVoll : t.kOffen(k.stempel, d.von);
+    const noch = k.status === "offen" && k.stempel < d.von ? `<p class="sub" style="margin:4px 0 0;">${esc(t.noch(d.von - k.stempel))}</p>` : "";
+    html += `<div class="box"><p class="kopf">${esc(t.karte(k.nummer))} <span>· ${esc(status)}</span></p><div class="stempel">${dots(k)}</div>${noch}` +
+      (k.fahrten && k.fahrten.length ? `<h1 style="font-size:.95rem;margin:14px 0 6px;">${esc(t.fahrten)}</h1>${fahrtenTab(k)}` : (k.status === "offen" && karten.length === 1 ? `<p class="sub" style="margin:10px 0 0;">${esc(t.keine)}</p>` : "")) + `</div>`;
+  }
+  if (!voll && d.freifahrtWert > 0) html += `<p class="sub" style="text-align:center;">${esc(t.wertHinweis(eur(d.freifahrtWert)))}</p>`;
   html += `<div class="box regeln"><strong style="color:var(--ink);">${esc(t.regelnTitel)}</strong><ul style="padding-left:18px;margin:8px 0 0;">${t.regeln.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
   box.innerHTML = html;
 }

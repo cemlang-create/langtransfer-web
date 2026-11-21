@@ -60,7 +60,7 @@
     <tr><th>Menüpunkt</th><th>Wofür</th></tr>
     <tr><td>Übersicht</td><td>Was heute zu tun ist: neue Anfragen, Fahrten heute und kommende, offene Angebote, Abrechnung offen, offene und überfällige Rechnungen.</td></tr>
     <tr><td>Aufträge</td><td>Alle Aufträge mit Suche und Filtern. Ein Klick öffnet den Auftrag.</td></tr>
-    <tr><td>Neuer Auftrag</td><td>Preis berechnen, Angebot oder Auftrag anlegen, bestehenden Auftrag laden und ändern, Stammkunden nutzen.</td></tr>
+    <tr><td>Neuer Auftrag</td><td>Preis berechnen, Angebot oder Auftrag anlegen, Stammkunden nutzen. (Bestehende Aufträge änderst du im Auftrag selbst, Reiter „Auftrag ändern“.)</td></tr>
     <tr><td>Krankenfahrten</td><td>Terminserien (z. B. Dialyse) für gesetzliche Krankenkassen.</td></tr>
     <tr><td>Stammkunden</td><td>Stammkunden mit gespeicherten Kundendaten, auf Wunsch mit festen Fahrten und digitaler Zehnerkarte.</td></tr>
     <tr><td>Handbuch</td><td>Diese Seite.</td></tr>
@@ -141,7 +141,8 @@
 
 <section class="thema" id="laden" data-gruppe="Aufträge" data-titel="Bestehenden Auftrag laden und ändern">
   <h2>Bestehenden Auftrag laden und ändern</h2>
-  <p>Ganz oben in „Neuer Auftrag“ gibst du die <strong>Referenz</strong> ein und klickst <strong>Laden</strong>. Die Maske füllt sich mit Route, Zeiten, Gästen, Kundendaten, Preis und Zahlungsart. Ändere, was sich geändert hat, und sende neu: Der bisherige Auftrag wird <strong>ersetzt</strong>, die Kalendereinträge werden neu angelegt. Der Preis und der Terminblocker bleiben, bis du sie änderst.</p>
+  <p>Öffne den Auftrag im Portal (Menü „Aufträge“) und wähle den Reiter <strong>Auftrag ändern</strong>. Die Maske ist mit Route, Zeiten, Gästen, Kundendaten, Preis und Zahlungsart vorbefüllt. Ändere, was sich geändert hat, und sende neu: Der bisherige Auftrag wird <strong>ersetzt</strong>, die Kalendereinträge werden neu angelegt. Der Preis und der Terminblocker bleiben, bis du sie änderst.</p>
+  <p>Liegt die Fahrt schon in der Vergangenheit, ist der Haken <strong>„Dem Kunden keine neue Mail senden“</strong> vorgewählt. So bekommt der Kunde bei einer nachträglichen Korrektur keine verwirrende Bestätigung. Du kannst den Haken jederzeit ändern.</p>
   <ul>
     <li>Ein bestätigter Auftrag bleibt ein Auftrag, ein Angebot bleibt ein Angebot. Der Kunde bekommt nach dem Ersetzen eine neue Mail (bei Vermittlungsfahrten nicht).</li>
     <li>Rechnungsverlauf, Zahlungsmarkierung, Erstelldatum und Stammkunden-Verknüpfung bleiben erhalten.</li>
@@ -364,6 +365,8 @@
     <li><strong>Der Wert der Freifahrt</strong> ist der Mittelwert der 10 Fahrten, die sie verdient haben (Rechnungsbetrag, sonst bezahlter Betrag, sonst Auftragspreis). Er wird als Gutschrift vom Fahrpreis abgezogen. Kostet die Fahrt weniger, ist sie komplett kostenlos (Gutschrift nur in Höhe des Fahrpreises).</li>
     <li>Der Stempelstand wird aus den Aufträgen berechnet, du pflegst nichts doppelt. Zählen nur Aufträge, die einem Stammkunden zugeordnet sind (siehe „Stammkunden“).</li>
   </ul>
+  <h3>Mehrere Karten</h3>
+  <p>Ist eine Karte voll, beginnt automatisch die nächste Reihe, die Fahrten werden weiter gezählt. Die Anzeige (beim Kunden und bei dir unter „Stammkunden“) zeigt <strong>jede Karte als eigene Reihe</strong>. Eine Karte, deren Freifahrt eingelöst ist, wird <strong>ausgegraut</strong>; die aktuelle Karte bleibt farbig.</p>
   <h3>Freifahrt einlösen</h3>
   <p>Wählst du in „Neuer Auftrag“ einen Stammkunden mit voller Karte, erscheint <strong>Freifahrt einlösen (Gutschrift Ø … €)</strong>. Nach „Preis berechnen“ zeigt die Maske den Preis nach der Gutschrift. Beim Senden zieht das System die Gutschrift ab.</p>
   <ul>
@@ -371,6 +374,8 @@
     <li>Ist die Fahrt komplett kostenlos, gibt es keinen Zahlungslink, und der Auftrag gilt als „Bezahlt · Freifahrt“. Eine Rechnung ist nicht nötig.</li>
     <li>Wird der Freifahrt-Auftrag storniert, ist die Freifahrt wieder verfügbar. Danach beginnt die Karte von vorn.</li>
   </ul>
+  <h3>Freifahrt nachträglich abrechnen</h3>
+  <p>Wurde eine Fahrt zunächst normal angelegt und soll nachträglich eine Freifahrt oder ein Gutschein sein: Öffne den Auftrag, Reiter <strong>Rechnung</strong>, Karte <strong>„Kostenlos abrechnen (0 €)“</strong>. Wähle „Freifahrt (Zehnerkarte)“ oder „Gutschein“. Der Auftrag wird auf 0 € gesetzt und als bezahlt markiert; es geht <strong>keine Mail</strong> an den Kunden, der Kalender bleibt unverändert, und die Zehnerkarte zählt die Freifahrt korrekt. Das geht nur ohne bestehende Rechnung. Ein alter Stripe-Zahlungslink bleibt technisch gültig, bitte den Kunden nicht darauf verweisen.</p>
   <h3>Was der Kunde sieht</h3>
   <ul>
     <li>Einen <strong>persönlichen Link</strong> (Seite „karte.html“) mit Stempelstand, verfügbarer Freifahrt, den gesammelten Fahrten (Datum und Strecke, keine Preise) und den Regeln, auf Deutsch und Englisch.</li>
