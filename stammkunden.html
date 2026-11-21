@@ -69,7 +69,9 @@
     <button type="button" class="sekundaer" onclick="zurueck()">← Alle Stammkunden</button>
     <h2 style="border-top:none;margin-top:14px;padding-top:0;" id="detailTitel">Stammkunde</h2>
     <div class="field"><label for="name">Name</label><input type="text" id="name" maxlength="80"></div>
-    <div class="box" id="kundenBox" style="margin-bottom:14px;"></div>
+    <h2>Stammdaten</h2>
+    <p class="hint" style="margin-top:-6px;">Diese Daten werden bei Aufträgen für diesen Kunden vorbelegt. Ergänze oder ändere sie hier und klicke unten auf „Speichern“.</p>
+    <div id="kundenForm" style="margin-bottom:14px;"></div>
     <div class="field"><label for="notiz">Notiz (nur intern)</label><textarea id="notiz" rows="2" maxlength="500"></textarea></div>
 
     <h2>Stammfahrten</h2>
@@ -140,6 +142,28 @@ async function ausAuftragAnlegen(){
   finally { $("anlegenBtn").disabled = false; }
 }
 
+function kundenFormRendern(k){
+  k = k || {}; const teile = String(k.name || "").trim().split(/\s+/), hatTeile = !!(k.vorname || k.nachname);
+  const vn = hatTeile ? k.vorname : teile.slice(0, -1).join(" ") || teile[0] || "", nn = hatTeile ? k.nachname : (teile.length > 1 ? teile[teile.length - 1] : "");
+  const firma = k.typ === "firma", ra = k.rechnungsadresse || {}, bp = k.buchendePerson || {};
+  const f = (id, label, wert, extra) => `<div class="field"><label for="kf_${id}">${label}</label><input type="${(extra && extra.type) || "text"}" id="kf_${id}" maxlength="${(extra && extra.max) || 80}" value="${esc(wert || "")}"></div>`;
+  const anrede = (id, w) => `<div class="field"><label for="kf_${id}">Anrede</label><select id="kf_${id}"><option value="">–</option>${["Frau", "Herr", "Divers"].map((a) => `<option ${a === w ? "selected" : ""}>${a}</option>`).join("")}</select></div>`;
+  const adr = f("strasse", "Straße und Hausnummer", ra.strasse, { max: 100 }) + `<div class="row">${f("plz", "PLZ", ra.plz, { max: 10 })}${f("ort", "Ort", ra.ort, { max: 60 })}</div>`;
+  $("kundenForm").innerHTML = firma
+    ? `<div class="row"><div class="field"><label for="kf_kategorie">Art</label><select id="kf_kategorie"><option value="firma" ${k.kategorie !== "hotel" ? "selected" : ""}>Firma</option><option value="hotel" ${k.kategorie === "hotel" ? "selected" : ""}>Hotel</option></select></div>${f("firmenname", "Firmenname", k.firmenname, { max: 100 })}</div>
+       <div class="row">${anrede("bp_anrede", bp.anrede)}${f("bp_titel", "Titel", bp.titel, { max: 30 })}</div>
+       <div class="row">${f("bp_vorname", "Vorname Ansprechpartner", bp.vorname, { max: 40 })}${f("bp_nachname", "Nachname Ansprechpartner", bp.nachname, { max: 40 })}</div>
+       <div class="row">${f("bp_email", "E-Mail", bp.email, { type: "email" })}${f("bp_telefon", "Telefon", bp.telefon, { max: 40 })}</div>${adr}`
+    : `<div class="row">${anrede("anrede", k.anrede)}${f("titel", "Titel", k.titel, { max: 30 })}</div>
+       <div class="row">${f("vorname", "Vorname", vn, { max: 40 })}${f("nachname", "Nachname", nn, { max: 40 })}</div>
+       <div class="row">${f("email", "E-Mail", k.email, { type: "email" })}${f("mobil", "Telefon / Mobil", k.mobil, { max: 40 })}</div>${adr}`;
+}
+function kundenFormLesen(){
+  const g = (id) => ($("kf_" + id) ? $("kf_" + id).value.trim() : "");
+  const ra = { strasse: g("strasse"), plz: g("plz"), ort: g("ort") };
+  if ((aktuell.stammkunde.kunde || {}).typ === "firma") return { typ: "firma", kategorie: g("kategorie"), firmenname: g("firmenname"), rechnungsadresse: ra, buchendePerson: { anrede: g("bp_anrede"), titel: g("bp_titel"), vorname: g("bp_vorname"), nachname: g("bp_nachname"), email: g("bp_email"), telefon: g("bp_telefon") } };
+  return { typ: "privat", anrede: g("anrede"), titel: g("titel"), vorname: g("vorname"), nachname: g("nachname"), email: g("email"), mobil: g("mobil"), rechnungsadresse: ra };
+}
 function kundenText(k){
   if (!k) return "–";
   const ra = k.rechnungsadresse || {};
@@ -193,7 +217,7 @@ async function oeffnen(id){
     $("listeBereich").style.display = "none"; $("detail").style.display = "block";
     $("detailTitel").textContent = d.stammkunde.name;
     $("name").value = d.stammkunde.name; $("notiz").value = d.stammkunde.notiz || ""; $("karteAktiv").checked = !!d.stammkunde.karteAktiv; $("karteAb").value = d.stammkunde.karteAb || ""; karteAbAnzeigen();
-    $("kundenBox").innerHTML = kundenText(d.stammkunde.kunde);
+    kundenFormRendern(d.stammkunde.kunde);
     fahrtenRendern(); karteRendern(); window.scrollTo(0, 0);
   } catch (e) { setStatus("statusListe", e.message, "error"); }
 }
@@ -202,7 +226,7 @@ async function speichern(){
   if (!$("name").value.trim()) return setStatus("statusDetail", "Bitte einen Namen angeben.", "error");
   $("speichernBtn").disabled = true; setStatus("statusDetail", "Wird gespeichert …", "");
   try {
-    await api(Object.assign({ aktion: "speichern", id: aktuell.id, name: $("name").value.trim(), notiz: $("notiz").value.trim(), karteAktiv: $("karteAktiv").checked, fahrten }, $("karteAktiv").checked ? { karteAb: $("karteAb").value } : {}));
+    await api(Object.assign({ aktion: "speichern", id: aktuell.id, name: $("name").value.trim(), notiz: $("notiz").value.trim(), karteAktiv: $("karteAktiv").checked, fahrten, ...(() => { const k = kundenFormLesen(); return JSON.stringify(k).replace(/"(typ|kategorie)":"[^"]*"/g, "").match(/"[^"]+":"[^"]+"/) ? { kunde: k } : {}; })() }, $("karteAktiv").checked ? { karteAb: $("karteAb").value } : {}));
     await oeffnen(aktuell.id); setStatus("statusDetail", "✓ Gespeichert.", "ok");
   } catch (e) { setStatus("statusDetail", e.message, "error"); }
   finally { $("speichernBtn").disabled = false; }

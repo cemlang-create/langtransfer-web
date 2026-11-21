@@ -38,7 +38,7 @@
   .marke small{font-weight:400;color:var(--muted);margin-left:6px;}
   .abmelden{background:none;border:1px solid #cfc9b8;border-radius:6px;padding:7px 12px;font-size:14px;cursor:pointer;color:var(--ink);}
   .layout{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:calc(100vh - 57px);}
-  nav{background:var(--side);border-right:1px solid var(--line);padding:16px 10px;}
+  nav{background:var(--side);border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:57px;align-self:start;height:calc(100vh - 57px);overflow-y:auto;}
   nav a{display:block;padding:10px 12px;margin-bottom:4px;border-radius:6px;color:var(--ink);text-decoration:none;font-weight:600;font-size:14.5px;}
   nav a:hover{background:#e9e3d2;}
   nav a.aktiv{background:var(--moss);color:#fff;}
@@ -47,7 +47,7 @@
   .unter{color:var(--muted);margin:0 0 20px;font-size:14px;}
   @media (max-width:820px){
     .layout{grid-template-columns:1fr;}
-    nav{display:flex;gap:6px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line);padding:8px 10px;position:sticky;top:57px;z-index:15;}
+    nav{height:auto;align-self:auto;display:flex;gap:6px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line);padding:8px 10px;position:sticky;top:57px;z-index:15;}
     nav a{white-space:nowrap;margin:0;}
     main{padding:18px 14px 80px;}
   }
@@ -875,9 +875,9 @@ async function ansichtAuftrag(referenz, noch, params){
            <div class="klein">Ist das Geld eingegangen, markierst du die Zahlung. Die Rechnung gilt dann als bezahlt.</div>` + markierFormular("ueberweisung", d.rechnungBrutto, "Zahlung eingegangen")
         : `<div class="klein" style="margin:6px 0 4px;">Vereinbarte Zahlungsart: <strong>${esc(ZAHLUNG_ART[d.zahlungsartGeplant] || "–")}</strong>. Hat der Gast bezahlt, markierst du die Zahlung. Der Auftrag zählt dann nicht mehr unter „Abrechnung offen“.${d.vermittlung ? " Bei Plattformfahrten erzeugst du stattdessen im Reiter „Beleg / Rechnung“ einen Beleg: Er setzt Gästebetrag und Provision und wartet auf die Auszahlung der Plattform." : ""}${d.taxifahrt ? " Bei Barfahrten erzeugst du im Reiter „Beleg / Rechnung“ je Fahrt einen Beleg (nur für deine Buchhaltung, ohne Empfänger) oder eine Quittung für den Fahrgast. Der Beleg markiert die Fahrt zugleich als bezahlt." : ""}</div>` + markierFormular(d.zahlungsartGeplant === "ueberweisung" ? "karte" : (d.zahlungsartGeplant || "karte"), d.preisBrutto, "Als bezahlt markieren");
       // Nachträglich kostenlos abrechnen (Freifahrt der Zehnerkarte oder Gutschein/Kulanz): nur ohne Rechnung und ohne bezahlt-Markierung
-      const kannKostenlos = d.status === "bestaetigt" && !d.rechnungsnummer && !d.vermittlung && !d.taxifahrt && !d.freifahrt && !abg && !d.preisOffen && Number(d.preisBrutto) > 0;
+      const kannKostenlos = d.status === "bestaetigt" && !d.rechnungsnummer && !(d.vermittlung && !d.stammkundeId) && !d.taxifahrt && !d.freifahrt && !abg && !d.preisOffen && Number(d.preisBrutto) > 0;
       const kostenlosKarte = kannKostenlos ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);"><div class="klein" style="margin-bottom:6px;"><strong>Kostenlos abrechnen (0 €)</strong>: für eine Freifahrt der Zehnerkarte oder aus Kulanz. Der Preis wird auf 0 € gesetzt, es geht keine Mail an den Kunden, der Kalender bleibt unverändert.</div>
-          <div class="zeile">${d.stammkundeId ? `<button type="button" class="knopf" id="kfFrei">Als Freifahrt (Zehnerkarte)</button>` : ""}<button type="button" class="knopf" id="kfGutschein">Als Gutschein / Kulanz</button></div><div class="klein" id="kfMeldung" style="margin-top:6px;"></div></div>` : "";
+          <div class="zeile">${d.stammkundeId ? `<button type="button" class="knopf" id="kfFrei">Als Freifahrt (Zehnerkarte)</button>` : ""}<button type="button" class="knopf" id="kfGutschein">Als Gutschein / Kulanz</button></div><div class="klein" id="kfMeldung" style="margin-top:6px;"></div></div>` : (d.status === "bestaetigt" ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);" class="klein"><strong>Kostenlos abrechnen (0 €)</strong>: derzeit nicht möglich. ${d.freifahrt || (abg && ["freifahrt", "gutschein"].includes(abg.art)) ? "Dieser Auftrag ist bereits als Freifahrt bzw. Gutschein abgerechnet." : d.rechnungsnummer ? `Zu diesem Auftrag gibt es die Rechnung ${d.rechnungsnummer}. Erstelle zuerst im Reiter „Rechnung“ eine Stornorechnung, dann geht es.` : abg ? "Dieser Auftrag ist als bezahlt markiert. Entferne zuerst die Markierung („Markierung entfernen“), dann erscheint hier die Funktion." : ((d.vermittlung && !d.stammkundeId) || d.taxifahrt) ? "Bei Plattform- und Taxifahrten gibt es keine Freifahrt." : "Dieser Auftrag hat keinen Preis, den man erlassen könnte."}</div>` : "");
       const abrechnungKarte = d.status === "bestaetigt" ? `<div class="rahmenkarte abrechnung" id="abrechnung" style="padding-bottom:16px;"><h3>Zahlung</h3>${zahlungInhalt}${kostenlosKarte}</div>` : "";
       const zahlBadge = ab.status === "bezahlt" ? (ab.auszahlungOffen ? `<span class="badge warn">Auszahlung offen · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>` : `<span class="badge ok">Bezahlt · ${esc(ZAHLUNG_ART[ab.art] || "")}</span>`) : ab.status === "rechnung_offen" ? `<span class="badge ${ab.ueberfaellig ? "err" : "warn"}">${ab.ueberfaellig ? "Überfällig" : "Rechnung offen"}</span>` : "";
       // Abholzeit ändern (Eingabe und Anzeige in deutscher Ortszeit): verschiebt auch Terminblocker und Kalendertermin
