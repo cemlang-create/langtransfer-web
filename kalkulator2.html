@@ -365,6 +365,7 @@
         <label>Wie wird die Fahrt bezahlt?</label>
         <label class="check"><input type="radio" name="zahlungsart" value="link" checked onchange="modusTexteAktualisieren()"> Im Vorfeld per Zahlungslink (Stripe)</label>
         <label class="check"><input type="radio" name="zahlungsart" value="fahrzeug" onchange="modusTexteAktualisieren()"> Im Fahrzeug per Karte (SumUp)</label>
+        <label class="check"><input type="radio" name="zahlungsart" value="bar" onchange="modusTexteAktualisieren()"> Bar im Fahrzeug (Kasse, zählt automatisch am Fahrttag, keine Erfassung nötig)</label>
         <label class="check"><input type="radio" name="zahlungsart" value="rechnung" onchange="modusTexteAktualisieren()"> Auf Rechnung (nach der Fahrt, zahlbar sofort per Überweisung)</label>
       </div>
       <div class="field">
@@ -724,7 +725,8 @@ function setModus(m){
 }
 function zahlungsInfoText(){
   const art = aktuelleZahlungsart();
-  return art === "fahrzeug" ? "Es gibt keinen Zahlungslink – bezahlt wird per Karte direkt im Fahrzeug."
+  return art === "bar" ? "Es gibt keinen Zahlungslink – bezahlt wird bar im Fahrzeug. Nach der Fahrt zählt der Betrag automatisch als Bareinnahme am Fahrttag."
+    : art === "fahrzeug" ? "Es gibt keinen Zahlungslink – bezahlt wird per Karte direkt im Fahrzeug."
     : art === "rechnung" ? "Es gibt keinen Zahlungslink – der Kunde bekommt nach der Fahrt eine Rechnung (zahlbar sofort per Überweisung)."
     : "Der Kunde bekommt einen Zahlungslink.";
 }
@@ -1335,7 +1337,7 @@ async function auftragInFormular(d, optionen = {}){
   setzeWert("agGepaeck", f.sonstigesGepaeck); setzeWert("agBemerkungen", bemerkungen);
   setzeWert("agReferenz", d.referenz); setzeWert("agSprache", d.sprache || "de");
   if (!d.vermittlung && !d.taxifahrt) {
-    const zRadio = document.querySelector(`input[name="zahlungsart"][value="${["link", "fahrzeug", "rechnung"].includes(d.zahlungsart) ? d.zahlungsart : "link"}"]`); if (zRadio) zRadio.checked = true;
+    const zRadio = document.querySelector(`input[name="zahlungsart"][value="${["link", "fahrzeug", "rechnung", "bar"].includes(d.zahlungsart) ? d.zahlungsart : "link"}"]`); if (zRadio) zRadio.checked = true;
     setModus(d.status === "bestaetigt" ? "auftrag" : "angebot");   // ein bereits bestätigter Auftrag bleibt ein Auftrag
   }
   // --- Stammkunde: Verknüpfung und Freifahrt des geladenen Auftrags beibehalten ---
@@ -1531,7 +1533,7 @@ async function angebotSenden(){
   if (!istAuftrag && body.referenz && !confirm(ueberschreiben + "Angebot jetzt neu an den Kunden senden?")) return;
   if (istVermittlung && !confirm(ueberschreiben + "Vermittlungsfahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Gast." + (vermittlungDaten.abgerechnet ? `\nSie wird als abgerechnet markiert (${vermittlungDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(vermittlungDaten.abgerechnet.betragBrutto)} €).` : ""))) return;
   if (istTaxi && !confirm(ueberschreiben + "Taxifahrt jetzt anlegen?\n\nDer Kalender wird sofort geblockt. Es geht keine Mail an den Fahrgast." + (taxiDaten.abgerechnet ? `\nSie wird als bezahlt markiert (${taxiDaten.abgerechnet.art === "karte" ? "Karte" : "bar"}, ${fmt(taxiDaten.abgerechnet.betragBrutto)} €).` : "\nSie bleibt als noch nicht bezahlt offen."))) return;
-  if (istAuftrag && !istVermittlung && !istTaxi && !confirm(ueberschreiben + "Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
+  if (istAuftrag && !istVermittlung && !istTaxi && !confirm(ueberschreiben + "Auftrag jetzt verschicken?\n\nKalendereinträge werden sofort angelegt und der Empfänger bekommt direkt die Bestätigung" + (aktuelleZahlungsart() === "bar" ? " (Zahlung bar im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "fahrzeug" ? " (Zahlung per Karte im Fahrzeug, ohne Zahlungslink)." : aktuelleZahlungsart() === "rechnung" ? " (Zahlung auf Rechnung nach der Fahrt, ohne Zahlungslink)." : " mit Zahlungslink."))) return;
 
   if (!adminKeyLesen()) { setAngebotStatus("Bitte zuerst im Portal anmelden (portal.html).", "error"); return; }
   const btn = document.getElementById("angebotBtn");
@@ -1552,7 +1554,7 @@ async function angebotSenden(){
             : vermittlungDaten.preisFest ? ` Festpreis ${fmt(gesamtBrutto)} €. Nach der Fahrt im Portal als abgerechnet markieren oder eine Rechnung erzeugen.`
             : ` Nach der Fahrt: Auftrag im Portal öffnen, E-Mail ergänzen (falls vorhanden) und im Rechnungsentwurf den Preis eintragen.`)
       : istAuftrag
-        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
+        ? `✓ Auftrag verschickt! Buchungsreferenz: ${daten.referenz}. ${aktuelleZahlungsart() === "bar" ? "Bezahlt wird bar im Fahrzeug, der Betrag zählt nach der Fahrt automatisch als Bareinnahme." : aktuelleZahlungsart() === "fahrzeug" ? "Bezahlt wird im Fahrzeug per Karte." : aktuelleZahlungsart() === "rechnung" ? "Die Rechnung erzeugst du nach der Fahrt im Portal (Auftrag öffnen)." : "Zahlungslink ist beim Kunden."} Die Kalendereinträge sind angelegt.`
         : `✓ Angebot verschickt! Buchungsreferenz: ${daten.referenz}. Der Kunde entscheidet per Mail (Annehmen / Änderungen / Nicht mehr benötigt).`,
       "ok");
     // Gast gleich als Stammkunde speichern (nur Kundendaten; Zehnerkarte nur auf ausdrücklichen Wunsch). Der Auftrag ist dann verknüpft.

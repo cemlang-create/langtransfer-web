@@ -207,9 +207,14 @@
     <tr><th>Zahlungsart</th><th>Zählt im Monat von</th></tr>
     <tr><td>Karte (SumUp), bar, Überweisung</td><td>dem Datum der Zahlung (das Datum der Markierung)</td></tr>
     <tr><td>Zahlungslink (Stripe)</td><td>nach Einstellung: Auszahlung von Stripe auf dein Konto (Standard) oder Zahlung durch den Gast</td></tr>
-    <tr><td>Plattform (Welcome Pickups, Transfeero)</td><td>dem Datum der Sammelauszahlung. Bis dahin steht die Fahrt unter „Auszahlung offen“.</td></tr>
+    <tr><td>Plattform (Welcome Pickups, Transfeero)</td><td>dem Datum <strong>„Geld eingegangen am“</strong>, das du im Auftrag unter Zahlung → Bearbeiten einträgst, oder dem Datum der Sammelauszahlung. Bis dahin steht die Fahrt unter „Auszahlung offen“.</td></tr>
+    <tr><td>Bar im Fahrzeug (Neuer Auftrag)</td><td>dem Fahrttag, <strong>automatisch</strong> nach Ende der Fahrt (stündlich geprüft). Das Geld geht in die Kasse, nicht aufs Konto. Du musst nichts erfassen.</td></tr>
   </table>
   <div class="wichtig"><strong>Steuerlich bitte klären</strong>Welcher Zeitpunkt bei Stripe-Zahlungen zählt und ob bei Plattformfahrten der Gästebetrag oder die Auszahlung dein Umsatz ist, entscheidet dein Steuerberater. Die Liste zeigt beides nebeneinander (Brutto und Auszahlung), die Einstellung für Stripe findest du unter „Einstellungen für Gebühren und Monatszuordnung“.</div>
+  <h3>Beleg/Rechnung und Geldeingang sind getrennt</h3>
+  <p>Ob der Gast „bezahlt“ hat (Beleg oder Rechnung), ist unabhängig davon, wann das Geld bei dir ankommt. Der Umsatz richtet sich nur nach dem Geldeingang. Bei Plattformfahrten trägst du im Auftrag (Zahlung → Bearbeiten) <strong>Geld eingegangen am</strong> ein. Änderst du das Datum, wandert die Fahrt sofort in den passenden Monat; leerst du es, steht sie wieder unter „Auszahlung offen“. Ein Beleg ändert daran nichts. Mehrere Fahrten kannst du weiterhin gesammelt als Auszahlung erfassen (Gebühr der Überweisung inklusive).</p>
+  <h3>Barzahlung</h3>
+  <p>Wählst du bei „Neuer Auftrag“ <strong>Bar im Fahrzeug</strong>, zählt der Betrag nach der Fahrt automatisch am Fahrttag als Bareinnahme (in der Umsatzliste als „bar (Kasse)“). Im Auftrag steht „automatisch gebucht“. Gab es eine Abweichung (nicht gezahlt, anderer Betrag, Trinkgeld), korrigierst du unter Zahlung → Bearbeiten. Ein Auftrag mit No-Show wird nicht automatisch gebucht.</p>
   <h3>Export</h3>
   <p><strong>CSV</strong> öffnet sich direkt in Excel (Semikolon, deutsche Zahlen, Umlaute korrekt). <strong>PDF</strong> ist eine übersichtliche Liste mit Summen und Aufteilung nach Zahlungsart. Beide enthalten: Zahlungseingang, Fahrtdatum, Referenz, Kunde, Strecke, Zahlungsart, Rechnung, Brutto, Netto, USt, davon Ausland (ohne deutsche USt), Gebühr/Provision, Auszahlung, Auszahlungsdatum. Die Geldtransfergebühren der Plattform stehen als eigene Zeilen darin.</p>
   <h3>Stripe-Gebühren und Auszahlungsdatum</h3>

@@ -849,13 +849,14 @@ async function ansichtAuftrag(referenz, noch, params){
       const ab = d.abrechnung || { status: "offen" };
       const abg = d.abgerechnet;
       const heuteDatum = new Date().toLocaleDateString("sv-SE");   // YYYY-MM-DD in Ortszeit
-      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.notiz ? " · " + abg.notiz : ""}${abg.gebuehr != null ? (abg.art === "plattform" ? " · Provision " : " · Gebühr ") + eur(abg.gebuehr) : ""}${abg.art === "plattform" ? (abg.auszahlungId ? " · ausgezahlt am " + datumDe(abg.auszahlungDatum) : "") : (abg.auszahlungDatum ? " · Auszahlung am " + datumDe(abg.auszahlungDatum) : "")}` : "";
+      const abgText = abg ? `${ZAHLUNG_ART_LANG[abg.art] || abg.art}, ${eur(abg.betragBrutto)}${abg.datum ? " am " + new Date(abg.datum + "T12:00:00Z").toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }) : ""}${abg.automatisch ? " · automatisch am Fahrttag gebucht (bei Abweichung „Bearbeiten“)" : abg.notiz ? " · " + abg.notiz : ""}${abg.gebuehr != null ? (abg.art === "plattform" ? " · Provision " : " · Gebühr ") + eur(abg.gebuehr) : ""}${abg.art === "plattform" ? (abg.auszahlungId ? " · ausgezahlt am " + datumDe(abg.auszahlungDatum) : abg.eingangsDatum ? " · Geld eingegangen am " + datumDe(abg.eingangsDatum) : "") : (abg.auszahlungDatum ? " · Auszahlung am " + datumDe(abg.auszahlungDatum) : "")}` : "";
       const artAuswahl = (vorgabe) => ["karte", "bar", "ueberweisung", "link", "plattform"].map((a) => `<option value="${a}" ${a === vorgabe ? "selected" : ""}>${ZAHLUNG_ART[a]}</option>`).join("");
       const markierFormular = (vorgabeArt, vorgabeBetrag, knopfText, v) => `<div class="zeile">
              <div><label for="abArt">Zahlungsart</label><select id="abArt">${artAuswahl(vorgabeArt)}</select></div>
              <div><label for="abBetrag">Betrag (€)</label><input type="number" step="0.01" min="0" id="abBetrag" value="${vorgabeBetrag != null ? esc(String(vorgabeBetrag)) : ""}" style="width:110px;"></div>
              <div><label for="abDatum">Datum</label><input type="date" id="abDatum" value="${v && v.datum ? esc(v.datum) : heuteDatum}"></div>
              <div id="abGebuehrFeld" style="display:none;"><label for="abGebuehr" id="abGebuehrLabel">Gebühr (€)</label><input type="number" step="0.01" min="0" id="abGebuehr" value="${v && v.gebuehr != null ? esc(String(v.gebuehr)) : ""}" data-quelle="${v && v.gebuehrQuelle ? esc(v.gebuehrQuelle) : ""}" data-orig="${v && v.gebuehr != null ? esc(String(v.gebuehr)) : ""}" style="width:100px;"></div>
+             <div id="abEingangFeld" style="display:none;"><label for="abEingang">Geld eingegangen am</label><input type="date" id="abEingang" value="${v && v.art === "plattform" && v.eingangsDatum ? esc(v.eingangsDatum) : ""}"></div>
              <div id="abAuszFeld" style="display:none;"><label for="abAuszahlung">Auszahlung am</label><input type="date" id="abAuszahlung" value="${v && v.auszahlungDatum && v.art !== "plattform" ? esc(v.auszahlungDatum) : ""}"></div>
              <div style="flex:1;min-width:170px;"><label for="abNotiz">Notiz (optional)</label><input type="text" id="abNotiz" maxlength="200" value="${v && v.notiz ? esc(v.notiz) : ""}" placeholder="z. B. SumUp-Beleg, Überweisung vom 20.10." style="width:100%;"></div>
              <button type="button" class="knopf gold" id="abBtn">${knopfText}</button>
@@ -952,9 +953,9 @@ async function ansichtAuftrag(referenz, noch, params){
         if (!$("abArt")) return;
         const art = $("abArt").value, g = $("abGebuehr");
         const label = { karte: "SumUp-Gebühr (€)", link: "Stripe-Gebühr (€)", plattform: "Provision der Plattform (€)" }[art];
-        $("abGebuehrFeld").style.display = label ? "" : "none"; $("abAuszFeld").style.display = art === "link" ? "" : "none";
+        $("abGebuehrFeld").style.display = label ? "" : "none"; $("abAuszFeld").style.display = art === "link" ? "" : "none"; $("abEingangFeld").style.display = art === "plattform" ? "" : "none";
         if (label) $("abGebuehrLabel").textContent = label;
-        $("abHinweis").textContent = art === "plattform" ? "Die Auszahlung der Plattform erfasst du gesammelt im Menü „Umsatz“ (Geldtransfergebühr inklusive)." : art === "link" ? "Gebühr und Auszahlungsdatum holt „Stripe abrufen“ im Menü „Umsatz“ automatisch." : "";
+        $("abHinweis").textContent = art === "plattform" ? "Das Datum oben ist die Zahlung durch den Gast. Für den Umsatz zählt „Geld eingegangen am“ (leer = Auszahlung der Plattform noch offen). Alternativ erfasst du mehrere Fahrten gesammelt im Menü „Umsatz“ (Geldtransfergebühr inklusive)." : art === "link" ? "Gebühr und Auszahlungsdatum holt „Stripe abrufen“ im Menü „Umsatz“ automatisch." : "";
         if (art === "karte" && (g.value === "" || g.dataset.auto === "1")) {   // Vorschlag nach hinterlegtem SumUp-Satz
           const e = await sumupSatz(), betrag = Number($("abBetrag").value.replace(",", "."));
           if (e && e.sumupProzent !== null && betrag > 0 && $("abArt").value === "karte") { g.value = (Math.round((betrag * e.sumupProzent / 100 + e.sumupFix) * 100) / 100).toFixed(2); g.dataset.auto = "1"; $("abHinweis").textContent = `Vorschlag nach SumUp-Satz ${String(e.sumupProzent).replace(".", ",")} %, du kannst ihn ändern.`; }
@@ -967,6 +968,7 @@ async function ansichtAuftrag(referenz, noch, params){
         const g = $("abGebuehr"), gText = $("abGebuehrFeld").style.display !== "none" ? g.value.trim() : "";
         if (gText !== "") { abgerechnet.gebuehr = Number(gText.replace(",", ".")); abgerechnet.gebuehrQuelle = g.dataset.auto === "1" ? "satz" : (g.value === g.dataset.orig && g.dataset.quelle ? g.dataset.quelle : "manuell"); }
         if (abgerechnet.art === "link" && $("abAuszahlung").value) abgerechnet.auszahlungDatum = $("abAuszahlung").value;
+        if (abgerechnet.art === "plattform" && $("abEingang").value) abgerechnet.eingangsDatum = $("abEingang").value;
         const body = { aktion: "abrechnen", referenz: d.referenz, abgerechnet };
         if (ab.beleg && !ab.belegDirekt && abgerechnet.art !== "plattform") {   // Plattformfahrt mit Beleg, aber direkt bezahlt: der Beleg wird storniert
           if (!confirm(`Zu diesem Auftrag gibt es den Beleg ${d.rechnungsnummer} (Plattformfahrt).\n\nWurde der Gast direkt bezahlt (${ZAHLUNG_ART_LANG[abgerechnet.art] || abgerechnet.art}), ist der Beleg überflüssig. Er wird storniert (Stornobeleg mit neuer Nummer), danach gilt die Fahrt als bezahlt: ${eur(betrag)}.\n\nFortfahren?`)) return;
