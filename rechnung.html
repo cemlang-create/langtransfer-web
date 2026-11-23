@@ -226,7 +226,7 @@ async function laden(nachAktion){
     const entwurfWurdeFrei = !!daten && !daten.kannErstellen && j.kannErstellen;   // z. B. direkt nach einer Stornorechnung
     daten = j;
     $("referenz").value = j.referenz;
-    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`).checked = true;
+    if (ersterAufruf || !nachAktion || entwurfWurdeFrei) { positionen = j.positionen.map((p) => Object.assign({}, p)); $("sprache").value = j.sprache; vorherigeSprache = j.sprache; $("leistungsdatum").value = j.leistungsdatum; $("hinweis").value = j.hinweis || ""; $("bezahltArt").value = j.bezahltArt || "karte"; { const zr = document.querySelector(`input[name=zahlungsart][value=${j.zahlungsart}]`) || document.querySelector("input[name=zahlungsart][value=bezahlt]"); if (zr) zr.checked = true; }
       provisionBerührt = false;
       const typ = j.typVorschlag === "beleg" ? "beleg" : (j.typVorschlag === "noshow" && j.noShowMoeglich ? "noshow" : "rechnung");
       const dt = document.querySelector(`input[name=dokTyp][value=${typ}]`); if (dt) dt.checked = true;
