@@ -339,6 +339,7 @@
         </div>
       </div>
 
+      <div class="field"><label for="agNr">Nr. im Auftragseingangsbuch (optional)</label><input type="text" id="agNr" inputmode="numeric" placeholder="leer lassen = ohne Nummer" style="max-width:200px;"></div>
       <div class="field"><label for="agKurz">Kurzbeschreibung (Mail/Kalender)</label><input type="text" id="agKurz"></div>
       <div class="row">
         <div class="field"><label for="agGepaeck">Gepäck</label><input type="text" id="agGepaeck" placeholder="z. B. 2 große Koffer"></div>
@@ -1540,7 +1541,7 @@ async function angebotSenden(){
   btn.disabled = true;
   setAngebotStatus(istVermittlung || istTaxi ? "Fahrt wird angelegt …" : istAuftrag ? "Auftrag wird verschickt …" : "Angebot wird verschickt …", "");
   try {
-    const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, adminKey: adminKeyLesen() }) });
+    const antwort = await fetchMitKonflikt(PAUSCHALANGEBOT_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, auftragsNr: (document.getElementById("agNr").value || "").trim() || undefined, adminKey: adminKeyLesen() }) });
     const daten = await antwort.json();
     if (!antwort.ok) throw new Error(daten.fehler || (istAuftrag ? "Auftrag konnte nicht verschickt werden." : "Angebot konnte nicht verschickt werden."));
     if (body.referenz) { try { window.parent.postMessage({ type: "lt-auftrag-geaendert", referenz: body.referenz }, "*"); } catch (e) { /* nicht eingebettet */ } }

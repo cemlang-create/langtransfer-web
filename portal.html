@@ -282,6 +282,18 @@ const Auth = {
 let portal = { marke: "", module: {} };
 let eingeloggt = false;
 
+// Hält die wichtigsten Funktionen warm (Cloud Functions schlafen nach kurzer Pause ein und brauchen dann Sekunden zum Aufwachen).
+// Der Anruf ohne Passwort wird sofort mit 401 beantwortet, weckt aber die Instanz. Kostenlos im Rahmen des Gratis-Kontingents.
+let warmTimer = null;
+function warmHalten(){
+  const wecken = () => {
+    if (document.hidden) return;
+    ["buchungenListe", "umsatzAdmin", "buchungAdminLaden", "buchungAdminAendern", "stammkundeAdmin", "rechnungAdmin", "pauschalangebotSenden", "auftragsNrAdmin"].forEach((n) => { try { fetch(`${BASIS}/${n}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", keepalive: true }).catch(() => {}); } catch (e) {} });
+  };
+  wecken();
+  if (!warmTimer) warmTimer = setInterval(wecken, 90000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) wecken(); });
+}
 async function api(name, body){
   const antwort = await fetch(`${BASIS}/${name}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({}, body, { adminKey: Auth.lesen() })) });
   let daten = {};
@@ -314,6 +326,7 @@ async function portalStarten(){
   document.title = `${d.marke} – Betriebsportal`;
   $("markeName").textContent = d.marke; $("loginTitel").textContent = d.marke;
   eingeloggt = true;
+  warmHalten();
   $("login").style.display = "none"; $("app").style.display = "block";
   navAufbauen();
   route();
@@ -744,13 +757,19 @@ async function ansichtUebersicht(noch){
 // ===================== ANSICHT: AUFTRÄGE =====================
 let suchTimer = null;
 async function ansichtAuftraege(params, noch){
-  const status = params.get("status") || "alle", zeit = params.get("zeit") || "alle", suche = params.get("suche") || "";
+  const status = params.get("status") || "alle", zeit = params.get("zeit") || "alle", suche = params.get("suche") || "", vonP = params.get("von") || "", bisP = params.get("bis") || "", sortP = params.get("sort") || "";
   const opt = (wert, text, aktiv) => `<option value="${wert}" ${wert === aktiv ? "selected" : ""}>${esc(text)}</option>`;
   $("main").innerHTML = `<h2 class="seite">Aufträge</h2><p class="unter">Suchen, filtern und einen Auftrag öffnen.</p>
     <div class="filter">
       <input type="search" id="fSuche" placeholder="Suche: Name, Referenz, E-Mail, Adresse, Rechnungsnummer" value="${esc(suche)}">
       <select id="fStatus">${opt("alle", "Alle (ohne stornierte)", status)}${opt("angefragt", "Neue Anfragen", status)}${opt("angebot", "Offene Angebote", status)}${opt("bestaetigt", "Bestätigt", status)}${opt("heute", "Heute", status)}${opt("zu_fakturieren", "Abrechnung offen", status)}${opt("rechnung_offen", "Rechnung offen", status)}${opt("ueberfaellig", "Überfällig", status)}${opt("bezahlt", "Bezahlt", status)}${opt("storniert", "Storniert", status)}</select>
       <select id="fZeit">${opt("alle", "Alle Zeiten", zeit)}${opt("kommend", "Kommende", zeit)}${opt("vergangen", "Vergangene", zeit)}</select>
+      <select id="fSort"><option value="" ${sortP === "" ? "selected" : ""}>Sortiert nach Fahrtzeit</option><option value="nr" ${sortP === "nr" ? "selected" : ""}>Sortiert nach Nummer</option></select>
+    </div>
+    <div class="filter" style="margin-top:-4px;align-items:center;">
+      <span class="klein">Zeitraum (Fahrtdatum):</span>
+      <input type="date" id="fVon" value="${esc(vonP)}" title="von"> <span class="klein">bis</span> <input type="date" id="fBis" value="${esc(bisP)}" title="bis">
+      <button type="button" class="knopf" data-zr="woche">Diese Woche</button><button type="button" class="knopf" data-zr="vwoche">Letzte Woche</button><button type="button" class="knopf" data-zr="monat">Dieser Monat</button><button type="button" class="knopf" data-zr="vmonat">Letzter Monat</button><button type="button" class="knopf" data-zr="">Zeitraum löschen</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">
       <button type="button" class="knopf" id="aufraeumenBtn">Aufträge aufräumen</button>
@@ -772,24 +791,41 @@ async function ansichtAuftraege(params, noch){
     const alle = [...document.querySelectorAll("#listeBox .auswahl")];
     const kopf = $("alleWaehlen"); if (kopf) kopf.checked = alle.length > 0 && alle.every((c) => c.checked);
   }
-  const aktuell = () => ({ status: $("fStatus").value, zeit: $("fZeit").value, suche: $("fSuche").value.trim() });
+  const aktuell = () => ({ status: $("fStatus").value, zeit: $("fZeit").value, suche: $("fSuche").value.trim(), von: $("fVon").value, bis: $("fBis").value, sort: $("fSort").value });
   const neuLaden = () => {
     auswahl.clear(); auswahlAnzeigen();
     const a = aktuell(), p = new URLSearchParams();
     if (a.status !== "alle") p.set("status", a.status);
     if (a.zeit !== "alle") p.set("zeit", a.zeit);
     if (a.suche) p.set("suche", a.suche);
+    if (a.von) p.set("von", a.von);
+    if (a.bis) p.set("bis", a.bis);
+    if (a.sort) p.set("sort", a.sort);
     const q = p.toString();
     history.replaceState(null, "", "#/auftraege" + (q ? "?" + q : ""));   // Adresse mitführen, ohne die Ansicht neu zu bauen
     listeLaden();
   };
   $("fStatus").addEventListener("change", neuLaden);
   $("fZeit").addEventListener("change", neuLaden);
+  $("fSort").addEventListener("change", neuLaden);
+  $("fVon").addEventListener("change", neuLaden);
+  $("fBis").addEventListener("change", neuLaden);
+  document.querySelectorAll("[data-zr]").forEach((bt) => bt.addEventListener("click", () => {
+    const heute = new Date(new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }) + "T12:00:00");
+    const f = (d) => d.toLocaleDateString("sv-SE"), plus = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+    const mo = plus(heute, -((heute.getDay() + 6) % 7)), z = bt.dataset.zr;
+    let von = "", bis = "";
+    if (z === "woche") { von = f(mo); bis = f(plus(mo, 6)); }
+    else if (z === "vwoche") { von = f(plus(mo, -7)); bis = f(plus(mo, -1)); }
+    else if (z === "monat") { von = f(new Date(heute.getFullYear(), heute.getMonth(), 1)); bis = f(new Date(heute.getFullYear(), heute.getMonth() + 1, 0)); }
+    else if (z === "vmonat") { von = f(new Date(heute.getFullYear(), heute.getMonth() - 1, 1)); bis = f(new Date(heute.getFullYear(), heute.getMonth(), 0)); }
+    $("fVon").value = von; $("fBis").value = bis; neuLaden();
+  }));
   $("fSuche").addEventListener("input", () => { clearTimeout(suchTimer); suchTimer = setTimeout(neuLaden, 350); });
   async function listeLaden(){
     const nr = ++abfrageNr, a = aktuell();
     try {
-      const d = await api("buchungenListe", { status: a.status, zeit: a.zeit, suche: a.suche, limit: 100 });
+      const d = await api("buchungenListe", { status: a.status, zeit: a.zeit, suche: a.suche, von: a.von, bis: a.bis, sort: a.sort, limit: a.von || a.bis ? 300 : 100 });
       if (!noch() || nr !== abfrageNr) return;   // veraltete Antwort
       // Hinweis auf ausgeblendete stornierte Aufträge (nur bei "Alle"); der Link schaltet den Filter um
       const stornoHinweis = d.ausgeblendet ? ` ${d.ausgeblendet} stornierte${d.ausgeblendet === 1 ? "r Auftrag" : " Aufträge"} ausgeblendet · <a href="#" data-storno>anzeigen</a>` : "";
@@ -809,7 +845,8 @@ async function ansichtAuftraege(params, noch){
         if (a.status === "heute") return !!f.zeit && new Date(f.zeit).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }) === heuteStr;
         return true;
       });
-      fahrten.sort((x, y) => (d.aufsteigend ? (x.zeit || "").localeCompare(y.zeit || "") : (y.zeit || "").localeCompare(x.zeit || "")));
+      if (a.sort === "nr") fahrten.sort((x, y) => (Number(x.r.nr) || 1e12) - (Number(y.r.nr) || 1e12) || (x.zeit || "").localeCompare(y.zeit || ""));
+      else fahrten.sort((x, y) => (d.aufsteigend ? (x.zeit || "").localeCompare(y.zeit || "") : (y.zeit || "").localeCompare(x.zeit || "")));
       // Die nächste anstehende Fahrt: die früheste noch bevorstehende Fahrt eines bestätigten Auftrags (Hin- und Rückfahrt zählen einzeln)
       const naechste = fahrten.filter((f) => f.zeit && new Date(f.zeit).getTime() >= jetztMs && f.r.status === "bestaetigt")
         .reduce((m, f) => (!m || new Date(f.zeit) < new Date(m.zeit) ? f : m), null);
@@ -823,9 +860,10 @@ async function ansichtAuftraege(params, noch){
         return ab.faellig ? `<span class="badge warn">Offen</span><div class="klein">${art}</div>` : `<div class="klein">${art}</div>`;
       };
       const beinText = { hin: "Hinfahrt", rueck: "Rückfahrt" };
-      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr>${aufraeumen ? '<th style="width:30px;"><input type="checkbox" id="alleWaehlen" title="Alle sichtbaren auswählen"></th>' : ""}<th>Fahrt</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
+      $("listeBox").innerHTML = `<div class="tabellenrahmen"><table><thead><tr>${aufraeumen ? '<th style="width:30px;"><input type="checkbox" id="alleWaehlen" title="Alle sichtbaren auswählen"></th>' : ""}<th>Fahrt</th><th>Nr.</th><th>Referenz</th><th>Kunde</th><th>Strecke</th><th>Preis</th><th>Abrechnung</th><th>Status</th></tr></thead><tbody>` +
         fahrten.map((f) => { const r = f.r, zweite = f.typ === "rueck"; const klasse = f.zeit && new Date(f.zeit).getTime() < jetztMs ? "vergangen" : (f === naechste ? "naechste" : ""); return `<tr${klasse ? ` class="${klasse}"` : ""} data-ref="${esc(r.referenz)}" data-id="${esc(r.id)}"${zweite ? ' data-fahrt="rueck"' : ""}>
           ${aufraeumen ? `<td>${zweite ? "" : `<input type="checkbox" class="auswahl" data-id="${esc(r.id)}" ${auswahl.has(r.id) ? "checked" : ""}>`}</td>` : ""}<td>${esc(zeitText(f.zeit))}${beinText[f.typ] ? `<div class="klein">${beinText[f.typ]}</div>` : ""}</td>
+          <td>${zweite ? "" : esc(r.nr || "")}</td>
           <td><strong>${esc(r.referenz)}</strong><div class="klein">${r.quelle === "vermittlung" ? esc(r.plattform || "Vermittlung") : r.quelle === "taxi" ? "Taxifahrt" : r.quelle === "pauschal" ? "Pauschal" : "Online"}</div>${r.freifahrt ? '<div class="klein">Freifahrt</div>' : ""}</td>
           <td>${esc(r.name || "–")}${r.firma ? `<div class="klein">${esc(r.firma)}</div>` : ""}${r.stammkunde ? `<div class="klein">★ Stammkunde</div>` : ""}</td>
           <td class="strecke"><div>${esc(f.von)}</div><div>→ ${esc(f.nach)}</div>${f.ueber ? `<div class="klein">über ${esc(f.ueber)}</div>` : ""}</td>
@@ -966,6 +1004,8 @@ async function ansichtAuftrag(referenz, noch, params){
         ${knoepfe.length ? `<div class="werkzeuge">${knoepfe.map(([a, t, c]) => `<button class="knopf ${c}" data-aktion="${a}">${esc(t)}</button>`).join("")}</div>
           <div class="klein" id="aktionHinweis">Die Aktion öffnet sich in einem neuen Tab. Danach wird dieser Auftrag automatisch aktualisiert.</div>` : ""}
         ${d.alles ? `<details class="rahmenkarte alleangaben" id="alleAngaben" open style="padding-bottom:14px;"><summary>Alle Angaben zum Auftrag</summary>${alleAngabenHtml(d.alles)}</details>` : ""}
+        <div class="rahmenkarte" id="nrKarte" style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><strong>Nr. im Auftragseingangsbuch</strong>
+          <input type="text" id="nrFeld" inputmode="numeric" value="${esc(d.auftragsNr || "")}" placeholder="–" style="width:90px;"><button type="button" class="knopf" id="nrNaechste">Nächste freie</button><button type="button" class="knopf gold" id="nrSpeichern">Speichern</button><span class="klein" id="nrHinweis"></span></div>
         ${zeitKarte}
         ${benachrichtigungKarte}
         ${abrechnungKarte}
@@ -993,6 +1033,15 @@ async function ansichtAuftrag(referenz, noch, params){
       const wunschTab = hashLesen().params.get("tab");
       zeigeTab(wunschTab === "rechnung" && hatRechnung ? "rechnung" : wunschTab === "bearbeiten" && kannBearbeiten ? "bearbeiten" : "auftrag");   // aktuelle Adresse: ein Neuladen nach einer Aktion behält den offenen Reiter
       document.querySelectorAll("[data-aktion]").forEach((b) => b.addEventListener("click", () => aktionAusfuehren(d.referenz, b.dataset.aktion, b.textContent, d.rechnungsnummer, d.status)));
+      const nrHinweis = (t, fehler) => { const e = $("nrHinweis"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
+      if ($("nrSpeichern")) {
+        $("nrNaechste").addEventListener("click", async () => { try { const x = await api("auftragsNrAdmin", { aktion: "naechste" }); $("nrFeld").value = x.nr; nrHinweis("Vorschlag: nächste freie Nummer – noch nicht gespeichert."); } catch (e) { nrHinweis(e.message, true); } });
+        const nrSetzen = async (trotzdem) => {
+          try { const x = await api("auftragsNrAdmin", { aktion: "setzen", referenz: d.referenz, nr: $("nrFeld").value.trim(), trotzdem: trotzdem === true }); nrHinweis(x.nr ? `Gespeichert: Nr. ${x.nr}` : "Nummer entfernt."); }
+          catch (e) { if (/schon/.test(e.message) && confirm(e.message + "\n\nTrotzdem doppelt vergeben?")) return nrSetzen(true); nrHinweis(e.message, true); }
+        };
+        $("nrSpeichern").addEventListener("click", () => nrSetzen(false));
+      }
       const abMeldung = (t, fehler) => { const e = $("abMeldung"); if (e) { e.textContent = t || ""; e.style.color = fehler ? "var(--err)" : ""; } };
       // Zahlung speichern bzw. ändern: Gebühr (SumUp/Stripe/Provision) und Auszahlungsdatum je nach Zahlungsart
       let satzCache = null;
